@@ -1,0 +1,242 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/types";
+
+export type ActionResult = { error?: string };
+
+type PlanScope = Database["public"]["Enums"]["plan_scope"];
+type PlanStatus = Database["public"]["Enums"]["plan_status"];
+
+async function requireTrainerOrAdmin() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht angemeldet.");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "admin" && profile?.role !== "trainer") {
+    throw new Error("Keine Berechtigung.");
+  }
+
+  return { supabase, userId: user.id, role: profile.role };
+}
+
+export async function createPlanAction(
+  _prevState: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const { supabase, userId } = await requireTrainerOrAdmin();
+
+  const title = String(formData.get("title") ?? "").trim();
+  const categoryLabel = String(formData.get("category_label") ?? "").trim();
+  const date = String(formData.get("date") ?? "");
+  const scopeType = String(formData.get("scope_type") ?? "") as PlanScope;
+  const groupId = String(formData.get("group_id") ?? "") || null;
+  const athleteId = String(formData.get("athlete_id") ?? "") || null;
+
+  if (!title || !date) {
+    return { error: "Bitte Titel und Datum angeben." };
+  }
+  if (scopeType === "group" && !groupId) {
+    return { error: "Bitte eine Gruppe auswählen." };
+  }
+  if (scopeType === "athlete" && !athleteId) {
+    return { error: "Bitte einen Athleten auswählen." };
+  }
+
+  const { data: plan, error } = await supabase
+    .from("training_plans")
+    .insert({
+      title,
+      category_label: categoryLabel || null,
+      date,
+      scope_type: scopeType,
+      group_id: scopeType === "group" ? groupId : null,
+      athlete_id: scopeType === "athlete" ? athleteId : null,
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (error || !plan) {
+    return { error: "Plan konnte nicht angelegt werden." };
+  }
+
+  redirect(`/trainer/plans/${plan.id}/edit`);
+}
+
+export async function updatePlanMetaAction(
+  _prevState: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const { supabase } = await requireTrainerOrAdmin();
+
+  const planId = String(formData.get("plan_id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const categoryLabel = String(formData.get("category_label") ?? "").trim();
+  const date = String(formData.get("date") ?? "");
+
+  if (!planId || !title || !date) {
+    return { error: "Bitte Titel und Datum angeben." };
+  }
+
+  const { error } = await supabase
+    .from("training_plans")
+    .update({ title, category_label: categoryLabel || null, date })
+    .eq("id", planId);
+
+  if (error) return { error: "Änderungen konnten nicht gespeichert werden." };
+
+  revalidatePath(`/trainer/plans/${planId}/edit`);
+  revalidatePath("/trainer/plans");
+  return {};
+}
+
+type PlanItemInput = {
+  exercise_name: string;
+  reps_or_duration: string;
+  sets: string;
+  notes: string;
+};
+
+export async function savePlanItemsAction(
+  planId: string,
+  items: PlanItemInput[]
+): Promise<ActionResult> {
+  const { supabase } = await requireTrainerOrAdmin();
+
+  const { error: deleteError } = await supabase
+    .from("training_plan_items")
+    .delete()
+    .eq("training_plan_id", planId);
+  if (deleteError) return { error: "Speichern fehlgeschlagen." };
+
+  const rows = items
+    .filter((item) => item.exercise_name.trim())
+    .map((item, index) => ({
+      training_plan_id: planId,
+      position: index,
+      exercise_name: item.exercise_name.trim(),
+      reps_or_duration: item.reps_or_duration.trim() || null,
+      sets: item.sets.trim() || null,
+      notes: item.notes.trim() || null,
+    }));
+
+  if (rows.length > 0) {
+    const { error: insertError } = await supabase.from("training_plan_items").insert(rows);
+    if (insertError) return { error: "Speichern fehlgeschlagen." };
+  }
+
+  revalidatePath(`/trainer/plans/${planId}/edit`);
+  return {};
+}
+
+export async function setPlanStatusAction(
+  planId: string,
+  status: PlanStatus
+): Promise<ActionResult> {
+  const { supabase } = await requireTrainerOrAdmin();
+
+  const { error } = await supabase
+    .from("training_plans")
+    .update({ status })
+    .eq("id", planId);
+
+  if (error) return { error: "Status konnte nicht geändert werden." };
+
+  revalidatePath(`/trainer/plans/${planId}/edit`);
+  revalidatePath("/trainer/plans");
+  return {};
+}
+
+export async function deletePlanAction(planId: string): Promise<ActionResult> {
+  const { supabase } = await requireTrainerOrAdmin();
+
+  const { error } = await supabase.from("training_plans").delete().eq("id", planId);
+  if (error) return { error: "Plan konnte nicht gelöscht werden." };
+
+  revalidatePath("/trainer/plans");
+  return {};
+}
+
+export async function copyPlanAction(
+  _prevState: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const { supabase, userId } = await requireTrainerOrAdmin();
+
+  const sourcePlanId = String(formData.get("source_plan_id") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const scopeType = String(formData.get("scope_type") ?? "") as PlanScope;
+  const groupId = String(formData.get("group_id") ?? "") || null;
+  const athleteId = String(formData.get("athlete_id") ?? "") || null;
+
+  if (!sourcePlanId || !date) {
+    return { error: "Bitte ein Zieldatum angeben." };
+  }
+  if (scopeType === "group" && !groupId) {
+    return { error: "Bitte eine Gruppe auswählen." };
+  }
+  if (scopeType === "athlete" && !athleteId) {
+    return { error: "Bitte einen Athleten auswählen." };
+  }
+
+  const { data: sourcePlan } = await supabase
+    .from("training_plans")
+    .select("title, category_label")
+    .eq("id", sourcePlanId)
+    .single();
+
+  if (!sourcePlan) return { error: "Ursprungsplan nicht gefunden." };
+
+  const { data: sourceItems } = await supabase
+    .from("training_plan_items")
+    .select("position, exercise_name, exercise_id, reps_or_duration, sets, notes")
+    .eq("training_plan_id", sourcePlanId)
+    .order("position");
+
+  const { data: newPlan, error } = await supabase
+    .from("training_plans")
+    .insert({
+      title: sourcePlan.title,
+      category_label: sourcePlan.category_label,
+      date,
+      status: "draft",
+      scope_type: scopeType,
+      group_id: scopeType === "group" ? groupId : null,
+      athlete_id: scopeType === "athlete" ? athleteId : null,
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (error || !newPlan) {
+    return { error: "Plan konnte nicht kopiert werden." };
+  }
+
+  if (sourceItems && sourceItems.length > 0) {
+    await supabase.from("training_plan_items").insert(
+      sourceItems.map((item) => ({
+        training_plan_id: newPlan.id,
+        position: item.position,
+        exercise_name: item.exercise_name,
+        exercise_id: item.exercise_id,
+        reps_or_duration: item.reps_or_duration,
+        sets: item.sets,
+        notes: item.notes,
+      }))
+    );
+  }
+
+  revalidatePath("/trainer/plans");
+  redirect(`/trainer/plans/${newPlan.id}/edit`);
+}
