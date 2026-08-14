@@ -1,5 +1,11 @@
-import Link from "next/link";
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { reschedulePlanAction, duplicatePlanToDateAction } from "@/lib/actions/plans";
+import { rescheduleEventAction, duplicateEventToDateAction } from "@/lib/actions/events";
 
 export type CalendarItem = {
   id: string;
@@ -7,6 +13,8 @@ export type CalendarItem = {
   color: string;
   href: string;
   status?: string;
+  subtitle?: string;
+  kind: "plan" | "event";
 };
 
 const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -28,6 +36,7 @@ export function CalendarGrid({
   selectedDate,
   todayStr,
   activeParams,
+  enableDragDrop = false,
 }: {
   baseHref: string;
   monthStr: string;
@@ -36,7 +45,47 @@ export function CalendarGrid({
   selectedDate?: string;
   todayStr: string;
   activeParams: Record<string, string | undefined>;
+  enableDragDrop?: boolean;
 }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [copyMode, setCopyMode] = useState(false);
+
+  function goToDay(day: string) {
+    router.push(buildHref(baseHref, { ...activeParams, month: monthStr, date: day }));
+  }
+
+  function handleDragStart(e: React.DragEvent, item: CalendarItem) {
+    e.dataTransfer.setData("application/json", JSON.stringify({ id: item.id, kind: item.kind }));
+    e.dataTransfer.effectAllowed = "copyMove";
+  }
+
+  function handleDrop(e: React.DragEvent, day: string) {
+    e.preventDefault();
+    const isCopy = e.ctrlKey || e.metaKey;
+    setDragOverDate(null);
+    const raw = e.dataTransfer.getData("application/json");
+    if (!raw) return;
+    const { id, kind } = JSON.parse(raw) as { id: string; kind: "plan" | "event" };
+
+    startTransition(async () => {
+      const result = isCopy
+        ? kind === "plan"
+          ? await duplicatePlanToDateAction(id, day)
+          : await duplicateEventToDateAction(id, day)
+        : kind === "plan"
+          ? await reschedulePlanAction(id, day)
+          : await rescheduleEventAction(id, day);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(isCopy ? "Termin kopiert." : "Termin verschoben.");
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <div className="overflow-hidden rounded-md border">
       <div className="grid grid-cols-7 bg-muted/50 text-xs font-medium text-muted-foreground">
@@ -52,14 +101,35 @@ export function CalendarGrid({
           const items = itemsByDate[day] ?? [];
           const isToday = day === todayStr;
           const isSelected = day === selectedDate;
+          const isDragOver = day === dragOverDate;
           return (
-            <Link
+            <div
               key={day}
-              href={buildHref(baseHref, { ...activeParams, month: monthStr, date: day })}
+              role="button"
+              tabIndex={0}
+              onClick={() => goToDay(day)}
+              onKeyDown={(e) => e.key === "Enter" && goToDay(day)}
+              onDragOver={
+                enableDragDrop
+                  ? (e) => {
+                      e.preventDefault();
+                      const isCopy = e.ctrlKey || e.metaKey;
+                      e.dataTransfer.dropEffect = isCopy ? "copy" : "move";
+                      setDragOverDate(day);
+                      setCopyMode(isCopy);
+                    }
+                  : undefined
+              }
+              onDragLeave={enableDragDrop ? () => setDragOverDate(null) : undefined}
+              onDrop={enableDragDrop ? (e) => handleDrop(e, day) : undefined}
               className={cn(
-                "flex min-h-20 flex-col gap-1 border-t border-l p-1.5 text-left first:border-l-0 hover:bg-muted/40",
+                "flex min-h-20 cursor-pointer flex-col gap-1 border-t border-l p-1.5 text-left first:border-l-0 hover:bg-muted/40",
                 !inMonth && "bg-muted/20 text-muted-foreground",
-                isSelected && "bg-accent"
+                isSelected && "bg-accent",
+                isDragOver &&
+                  (copyMode
+                    ? "bg-emerald-500/10 ring-2 ring-inset ring-emerald-500"
+                    : "bg-primary/10 ring-2 ring-inset ring-primary")
               )}
             >
               <span
@@ -70,16 +140,28 @@ export function CalendarGrid({
               >
                 {Number(day.slice(8, 10))}
               </span>
+              {isDragOver && (
+                <span className="text-[0.6rem] font-medium text-emerald-600">
+                  {copyMode ? "+ Kopie" : ""}
+                </span>
+              )}
               <div className="flex flex-col gap-0.5">
                 {items.slice(0, 3).map((item) => (
-                  <span
+                  <a
                     key={item.id}
-                    className="truncate rounded px-1 py-0.5 text-[0.65rem] text-white"
+                    href={item.href}
+                    draggable={enableDragDrop}
+                    onDragStart={enableDragDrop ? (e) => handleDragStart(e, item) : undefined}
+                    onClick={(e) => e.stopPropagation()}
+                    className={cn(
+                      "truncate rounded px-1 py-0.5 text-[0.65rem] text-white",
+                      enableDragDrop && "cursor-grab active:cursor-grabbing"
+                    )}
                     style={{ backgroundColor: item.color, opacity: item.status === "proposed" ? 0.6 : 1 }}
                     title={item.title}
                   >
                     {item.title}
-                  </span>
+                  </a>
                 ))}
                 {items.length > 3 && (
                   <span className="text-[0.65rem] text-muted-foreground">
@@ -87,7 +169,7 @@ export function CalendarGrid({
                   </span>
                 )}
               </div>
-            </Link>
+            </div>
           );
         })}
       </div>

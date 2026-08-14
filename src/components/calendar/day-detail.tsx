@@ -2,16 +2,17 @@ import Link from "next/link";
 import { formatDateLabel } from "@/lib/date";
 import { Badge } from "@/components/ui/badge";
 import { EventActions } from "@/components/calendar/event-actions";
+import { MoveCopyMenu } from "@/components/calendar/move-copy-menu";
 import type { CalendarItem } from "@/components/calendar/calendar-grid";
 
 export function DayDetail({
   date,
   items,
-  canManageEvents = false,
+  canManage = false,
 }: {
   date: string;
-  items: (CalendarItem & { subtitle?: string; kind: "plan" | "event" })[];
-  canManageEvents?: boolean;
+  items: CalendarItem[];
+  canManage?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-md border p-4">
@@ -39,8 +40,13 @@ export function DayDetail({
               {item.status === "proposed" && <Badge variant="secondary">Vorschlag</Badge>}
               {item.status === "draft" && <Badge variant="secondary">Entwurf</Badge>}
             </Link>
-            {canManageEvents && item.kind === "event" && (
-              <EventActions eventId={item.id} status={item.status} />
+            {canManage && (
+              <div className="flex shrink-0 items-center gap-1">
+                <MoveCopyMenu itemId={item.id} kind={item.kind} currentDate={date} />
+                {item.kind === "event" && (
+                  <EventActions eventId={item.id} status={item.status} />
+                )}
+              </div>
             )}
           </li>
         ))}

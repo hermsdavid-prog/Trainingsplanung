@@ -64,3 +64,19 @@ export function getMonthGridDays(monthStr: string): string[] {
   }
   return days;
 }
+
+// Returns weekly occurrence dates (YYYY-MM-DD), starting at startDate and
+// repeating on the same weekday up to and including untilDate.
+export function weeklyOccurrences(startDate: string, untilDate: string): string[] {
+  const dates: string[] = [];
+  const [sy, sm, sd] = startDate.split("-").map(Number);
+  const cursor = new Date(Date.UTC(sy, sm - 1, sd));
+  const until = new Date(untilDate + "T23:59:59Z");
+  let guard = 0;
+  while (cursor <= until && guard < 104) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 7);
+    guard++;
+  }
+  return dates;
+}

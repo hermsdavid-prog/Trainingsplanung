@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { weeklyOccurrences } from "@/lib/date";
 
 export type ActionResult = { error?: string };
 
@@ -13,20 +14,6 @@ async function requireUser() {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht angemeldet.");
   return { supabase, userId: user.id };
-}
-
-function weeklyOccurrences(startDate: string, untilDate: string): string[] {
-  const dates: string[] = [];
-  const [sy, sm, sd] = startDate.split("-").map(Number);
-  const cursor = new Date(Date.UTC(sy, sm - 1, sd));
-  const until = new Date(untilDate + "T23:59:59Z");
-  let guard = 0;
-  while (cursor <= until && guard < 104) {
-    dates.push(cursor.toISOString().slice(0, 10));
-    cursor.setUTCDate(cursor.getUTCDate() + 7);
-    guard++;
-  }
-  return dates;
 }
 
 export type CreateEventInput = {
@@ -105,6 +92,87 @@ export async function proposeEventAction(input: {
 
   revalidatePath("/athlete/calendar");
   revalidatePath("/trainer/calendar");
+  return {};
+}
+
+export async function duplicateEventToDateAction(
+  eventId: string,
+  newDate: string
+): Promise<ActionResult> {
+  const { supabase, userId } = await requireUser();
+
+  const { data: existing } = await supabase
+    .from("events")
+    .select("title, description, event_type, color, start_at, end_at, all_day, group_id, athlete_id, status")
+    .eq("id", eventId)
+    .single();
+
+  if (!existing) return { error: "Termin nicht gefunden." };
+
+  const oldStart = new Date(existing.start_at);
+  const timePart = oldStart.toISOString().slice(11);
+  const newStart = `${newDate}T${timePart}`;
+
+  let newEnd: string | null = null;
+  if (existing.end_at) {
+    const durationMs = new Date(existing.end_at).getTime() - oldStart.getTime();
+    newEnd = new Date(new Date(newStart).getTime() + durationMs).toISOString();
+  }
+
+  const { error } = await supabase.from("events").insert({
+    title: existing.title,
+    description: existing.description,
+    event_type: existing.event_type,
+    color: existing.color,
+    start_at: newStart,
+    end_at: newEnd,
+    all_day: existing.all_day,
+    group_id: existing.group_id,
+    athlete_id: existing.athlete_id,
+    status: existing.status,
+    created_by: userId,
+  });
+
+  if (error) return { error: "Termin konnte nicht kopiert werden." };
+
+  revalidatePath("/trainer/calendar");
+  revalidatePath("/athlete/calendar");
+  return {};
+}
+
+export async function rescheduleEventAction(
+  eventId: string,
+  newDate: string
+): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+
+  const { data: existing } = await supabase
+    .from("events")
+    .select("start_at, end_at")
+    .eq("id", eventId)
+    .single();
+
+  if (!existing) return { error: "Termin nicht gefunden." };
+
+  const oldStart = new Date(existing.start_at);
+  const timePart = oldStart.toISOString().slice(11);
+  const newStart = `${newDate}T${timePart}`;
+
+  let newEnd: string | null = null;
+  if (existing.end_at) {
+    const durationMs = new Date(existing.end_at).getTime() - oldStart.getTime();
+    newEnd = new Date(new Date(newStart).getTime() + durationMs).toISOString();
+  }
+
+  const { error } = await supabase
+    .from("events")
+    .update({ start_at: newStart, end_at: newEnd })
+    .eq("id", eventId);
+
+  if (error) return { error: "Termin konnte nicht verschoben werden." };
+
+  revalidatePath("/trainer/calendar");
+  revalidatePath("/athlete/calendar");
   return {};
 }
 

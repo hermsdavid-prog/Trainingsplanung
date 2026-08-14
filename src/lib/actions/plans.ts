@@ -1,8 +1,10 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { weeklyOccurrences } from "@/lib/date";
 import type { Database } from "@/lib/supabase/types";
 
 export type ActionResult = { error?: string };
@@ -42,6 +44,7 @@ export async function createPlanAction(
   const scopeType = String(formData.get("scope_type") ?? "") as PlanScope;
   const groupId = String(formData.get("group_id") ?? "") || null;
   const athleteId = String(formData.get("athlete_id") ?? "") || null;
+  const repeatUntil = String(formData.get("repeat_until") ?? "") || null;
 
   if (!title || !date) {
     return { error: "Bitte Titel und Datum angeben." };
@@ -53,25 +56,31 @@ export async function createPlanAction(
     return { error: "Bitte einen Athleten auswählen." };
   }
 
-  const { data: plan, error } = await supabase
-    .from("training_plans")
-    .insert({
-      title,
-      category_label: categoryLabel || null,
-      date,
-      scope_type: scopeType,
-      group_id: scopeType === "group" ? groupId : null,
-      athlete_id: scopeType === "athlete" ? athleteId : null,
-      created_by: userId,
-    })
-    .select("id")
-    .single();
+  const dates = repeatUntil ? weeklyOccurrences(date, repeatUntil) : [date];
+  const seriesId = dates.length > 1 ? randomUUID() : null;
 
-  if (error || !plan) {
+  const { data: plans, error } = await supabase
+    .from("training_plans")
+    .insert(
+      dates.map((occurrenceDate) => ({
+        title,
+        category_label: categoryLabel || null,
+        date: occurrenceDate,
+        scope_type: scopeType,
+        group_id: scopeType === "group" ? groupId : null,
+        athlete_id: scopeType === "athlete" ? athleteId : null,
+        series_id: seriesId,
+        created_by: userId,
+      }))
+    )
+    .select("id, date")
+    .order("date");
+
+  if (error || !plans || plans.length === 0) {
     return { error: "Plan konnte nicht angelegt werden." };
   }
 
-  redirect(`/trainer/plans/${plan.id}/edit`);
+  redirect(`/trainer/plans/${plans[0].id}/edit`);
 }
 
 export async function updatePlanMetaAction(
@@ -136,7 +145,110 @@ export async function savePlanItemsAction(
     if (insertError) return { error: "Speichern fehlgeschlagen." };
   }
 
+  // For recurring plans, propagate these exercises to sibling occurrences
+  // that haven't been individually customized yet (still have zero items).
+  // Once a sibling gets its own items, it "detaches" from auto-sync.
+  const { data: plan } = await supabase
+    .from("training_plans")
+    .select("series_id")
+    .eq("id", planId)
+    .single();
+
+  if (plan?.series_id) {
+    const { data: siblings } = await supabase
+      .from("training_plans")
+      .select("id, training_plan_items(id)")
+      .eq("series_id", plan.series_id)
+      .neq("id", planId);
+
+    const emptySiblingIds = (siblings ?? [])
+      .filter((s) => (s.training_plan_items?.length ?? 0) === 0)
+      .map((s) => s.id);
+
+    if (emptySiblingIds.length > 0 && rows.length > 0) {
+      const siblingRows = emptySiblingIds.flatMap((siblingId) =>
+        rows.map((row) => ({ ...row, training_plan_id: siblingId }))
+      );
+      await supabase.from("training_plan_items").insert(siblingRows);
+    }
+  }
+
   revalidatePath(`/trainer/plans/${planId}/edit`);
+  revalidatePath("/trainer/plans");
+  return {};
+}
+
+export async function reschedulePlanAction(
+  planId: string,
+  newDate: string
+): Promise<ActionResult> {
+  const { supabase } = await requireTrainerOrAdmin();
+
+  const { error } = await supabase
+    .from("training_plans")
+    .update({ date: newDate })
+    .eq("id", planId);
+
+  if (error) return { error: "Plan konnte nicht verschoben werden." };
+
+  revalidatePath("/trainer/calendar");
+  revalidatePath("/trainer/plans");
+  return {};
+}
+
+export async function duplicatePlanToDateAction(
+  planId: string,
+  newDate: string
+): Promise<ActionResult> {
+  const { supabase, userId } = await requireTrainerOrAdmin();
+
+  const { data: sourcePlan } = await supabase
+    .from("training_plans")
+    .select("title, category_label, scope_type, group_id, athlete_id")
+    .eq("id", planId)
+    .single();
+
+  if (!sourcePlan) return { error: "Ursprungsplan nicht gefunden." };
+
+  const { data: sourceItems } = await supabase
+    .from("training_plan_items")
+    .select("position, exercise_name, exercise_id, reps_or_duration, sets, notes")
+    .eq("training_plan_id", planId)
+    .order("position");
+
+  const { data: newPlan, error } = await supabase
+    .from("training_plans")
+    .insert({
+      title: sourcePlan.title,
+      category_label: sourcePlan.category_label,
+      date: newDate,
+      status: "draft",
+      scope_type: sourcePlan.scope_type,
+      group_id: sourcePlan.group_id,
+      athlete_id: sourcePlan.athlete_id,
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (error || !newPlan) return { error: "Plan konnte nicht kopiert werden." };
+
+  if (sourceItems && sourceItems.length > 0) {
+    await supabase.from("training_plan_items").insert(
+      sourceItems.map((item) => ({
+        training_plan_id: newPlan.id,
+        position: item.position,
+        exercise_name: item.exercise_name,
+        exercise_id: item.exercise_id,
+        reps_or_duration: item.reps_or_duration,
+        sets: item.sets,
+        notes: item.notes,
+      }))
+    );
+  }
+
+  revalidatePath("/trainer/calendar");
+  revalidatePath("/trainer/plans");
   return {};
 }
 

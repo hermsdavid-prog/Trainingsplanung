@@ -50,7 +50,7 @@ export default async function AthleteCalendarPage({
       .lte("start_at", `${rangeEnd}T23:59:59Z`),
   ]);
 
-  const itemsByDate: Record<string, (CalendarItem & { subtitle?: string; kind: "plan" | "event" })[]> = {};
+  const itemsByDate: Record<string, CalendarItem[]> = {};
 
   for (const plan of plans ?? []) {
     const item = {

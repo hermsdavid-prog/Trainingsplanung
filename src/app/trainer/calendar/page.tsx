@@ -79,7 +79,7 @@ export default async function TrainerCalendarPage({
     new Set((allEvents ?? []).map((e) => e.event_type).filter(Boolean))
   ).sort();
 
-  const itemsByDate: Record<string, (CalendarItem & { subtitle?: string; kind: "plan" | "event" })[]> = {};
+  const itemsByDate: Record<string, CalendarItem[]> = {};
 
   for (const plan of plans ?? []) {
     const item = {
@@ -149,6 +149,12 @@ export default async function TrainerCalendarPage({
         </Link>
       </div>
 
+      <p className="text-xs text-muted-foreground">
+        Tipp: Trainings und Termine lassen sich per Drag &amp; Drop verschieben (mit
+        gedrückter Strg-Taste, Mac: Cmd, wird stattdessen eine Kopie angelegt). Auf dem
+        Handy nutze dafür das ⋮-Menü bei einem Tag weiter unten.
+      </p>
+
       <CalendarGrid
         baseHref="/trainer/calendar"
         monthStr={month}
@@ -157,10 +163,11 @@ export default async function TrainerCalendarPage({
         selectedDate={selectedDate}
         todayStr={today}
         activeParams={activeParams}
+        enableDragDrop
       />
 
       {selectedDate && (
-        <DayDetail date={selectedDate} items={selectedItems} canManageEvents />
+        <DayDetail date={selectedDate} items={selectedItems} canManage />
       )}
     </div>
   );

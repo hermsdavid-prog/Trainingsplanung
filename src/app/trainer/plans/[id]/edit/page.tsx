@@ -18,7 +18,7 @@ export default async function EditPlanPage({
     await Promise.all([
       supabase
         .from("training_plans")
-        .select("id, title, category_label, date, status, scope_type, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
+        .select("id, title, category_label, date, status, scope_type, series_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
         .eq("id", id)
         .single(),
       supabase
@@ -31,6 +31,13 @@ export default async function EditPlanPage({
     ]);
 
   if (!plan) notFound();
+
+  const { count: seriesCount } = plan.series_id
+    ? await supabase
+        .from("training_plans")
+        .select("id", { count: "exact", head: true })
+        .eq("series_id", plan.series_id)
+    : { count: null };
 
   const athleteMap = new Map<string, string>();
   for (const row of groupAthletes ?? []) {
@@ -55,10 +62,19 @@ export default async function EditPlanPage({
             ) : (
               <Badge variant="secondary">Entwurf</Badge>
             )}
+            {plan.series_id && seriesCount && seriesCount > 1 && (
+              <Badge variant="secondary">Serie · {seriesCount} Termine</Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             Für: {targetLabel ?? "—"} ({plan.scope_type === "group" ? "Gruppe" : "Einzelplan"})
           </p>
+          {plan.series_id && seriesCount && seriesCount > 1 && (
+            <p className="text-xs text-muted-foreground">
+              Übungen werden beim Speichern automatisch auf noch leere Termine dieser
+              Serie übertragen.
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
           <PlanActions planId={plan.id} status={plan.status} />

@@ -24,6 +24,7 @@ export function CreatePlanForm({
 }) {
   const [state, formAction, isPending] = useActionState(createPlanAction, initialState);
   const [scopeType, setScopeType] = useState<"group" | "athlete">("group");
+  const [repeats, setRepeats] = useState(false);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -45,6 +46,27 @@ export function CreatePlanForm({
         <Label htmlFor="date">Datum</Label>
         <Input id="date" name="date" type="date" required />
       </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={repeats}
+          onChange={(e) => setRepeats(e.target.checked)}
+        />
+        Wiederholt sich wöchentlich
+      </label>
+
+      {repeats && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="repeat_until">Wiederholen bis</Label>
+          <Input id="repeat_until" name="repeat_until" type="date" />
+          <p className="text-xs text-muted-foreground">
+            Legt für jede Woche bis zu diesem Datum einen eigenen Entwurf an. Die
+            Übungstabelle, die du als Nächstes ausfüllst, wird automatisch auf alle noch
+            leeren Termine der Serie übertragen.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <Label>Für wen?</Label>
