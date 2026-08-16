@@ -112,6 +112,15 @@ export default async function TrainerCalendarPage({
 
   const activeParams = { group: params.group, athlete: params.athlete, type: params.type };
 
+  function monthHref(targetMonth: string) {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(activeParams)) {
+      if (value) query.set(key, value);
+    }
+    query.set("month", targetMonth);
+    return `/trainer/calendar?${query.toString()}`;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -132,7 +141,7 @@ export default async function TrainerCalendarPage({
 
       <div className="flex items-center justify-between">
         <Link
-          href={`/trainer/calendar?${new URLSearchParams({ ...activeParams, month: shiftMonthStr(month, -1) } as Record<string, string>).toString()}`}
+          href={monthHref(shiftMonthStr(month, -1))}
           className="rounded-md p-2 hover:bg-muted"
           aria-label="Vorheriger Monat"
         >
@@ -140,7 +149,7 @@ export default async function TrainerCalendarPage({
         </Link>
         <span className="text-sm font-medium capitalize">{formatMonthLabel(month)}</span>
         <Link
-          href={`/trainer/calendar?${new URLSearchParams({ ...activeParams, month: shiftMonthStr(month, 1) } as Record<string, string>).toString()}`}
+          href={monthHref(shiftMonthStr(month, 1))}
           className="rounded-md p-2 hover:bg-muted"
           aria-label="Nächster Monat"
         >

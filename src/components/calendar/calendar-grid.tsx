@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,16 @@ export type CalendarItem = {
 };
 
 const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+function subscribeNoop() {
+  return () => {};
+}
+function getCoarsePointerSnapshot() {
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+function getCoarsePointerServerSnapshot() {
+  return false;
+}
 
 function buildHref(base: string, params: Record<string, string | undefined>) {
   const query = new URLSearchParams();
@@ -51,6 +61,19 @@ export function CalendarGrid({
   const [, startTransition] = useTransition();
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [copyMode, setCopyMode] = useState(false);
+  // Native HTML5 drag-and-drop doesn't reliably support touch, and the
+  // copy-vs-move modifier (Ctrl/Cmd) has no touch equivalent — so on
+  // touch devices, dragging can only ever "move", never "copy", with no
+  // indication why. Disable it there and rely on the ⋮ menu instead,
+  // which supports both. useSyncExternalStore avoids a hydration mismatch
+  // by rendering the server-safe default until after hydration.
+  const isCoarsePointer = useSyncExternalStore(
+    subscribeNoop,
+    getCoarsePointerSnapshot,
+    getCoarsePointerServerSnapshot
+  );
+
+  const dragDropActive = enableDragDrop && !isCoarsePointer;
 
   function goToDay(day: string) {
     router.push(buildHref(baseHref, { ...activeParams, month: monthStr, date: day }));
@@ -110,7 +133,7 @@ export function CalendarGrid({
               onClick={() => goToDay(day)}
               onKeyDown={(e) => e.key === "Enter" && goToDay(day)}
               onDragOver={
-                enableDragDrop
+                dragDropActive
                   ? (e) => {
                       e.preventDefault();
                       const isCopy = e.ctrlKey || e.metaKey;
@@ -120,8 +143,8 @@ export function CalendarGrid({
                     }
                   : undefined
               }
-              onDragLeave={enableDragDrop ? () => setDragOverDate(null) : undefined}
-              onDrop={enableDragDrop ? (e) => handleDrop(e, day) : undefined}
+              onDragLeave={dragDropActive ? () => setDragOverDate(null) : undefined}
+              onDrop={dragDropActive ? (e) => handleDrop(e, day) : undefined}
               className={cn(
                 "flex min-h-20 cursor-pointer flex-col gap-1 border-t border-l p-1.5 text-left first:border-l-0 hover:bg-muted/40",
                 !inMonth && "bg-muted/20 text-muted-foreground",
@@ -150,12 +173,12 @@ export function CalendarGrid({
                   <a
                     key={item.id}
                     href={item.href}
-                    draggable={enableDragDrop}
-                    onDragStart={enableDragDrop ? (e) => handleDragStart(e, item) : undefined}
+                    draggable={dragDropActive}
+                    onDragStart={dragDropActive ? (e) => handleDragStart(e, item) : undefined}
                     onClick={(e) => e.stopPropagation()}
                     className={cn(
                       "truncate rounded px-1 py-0.5 text-[0.65rem] text-white",
-                      enableDragDrop && "cursor-grab active:cursor-grabbing"
+                      dragDropActive && "cursor-grab active:cursor-grabbing"
                     )}
                     style={{ backgroundColor: item.color, opacity: item.status === "proposed" ? 0.6 : 1 }}
                     title={item.title}
