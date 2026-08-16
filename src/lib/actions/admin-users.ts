@@ -28,8 +28,10 @@ async function requireAdmin() {
     .single();
 
   if (profile?.role !== "admin") {
-    throw new Error("Nur Admins dürfen Accounts anlegen.");
+    throw new Error("Nur Admins dürfen Accounts verwalten.");
   }
+
+  return user.id;
 }
 
 export async function createUserAction(
@@ -70,4 +72,24 @@ export async function createUserAction(
 
   revalidatePath("/admin/users");
   return { email, tempPassword };
+}
+
+export type DeleteUserResult = { error?: string };
+
+export async function deleteUserAction(userId: string): Promise<DeleteUserResult> {
+  const adminId = await requireAdmin();
+
+  if (userId === adminId) {
+    return { error: "Du kannst deinen eigenen Account nicht löschen." };
+  }
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.admin.deleteUser(userId);
+
+  if (error) {
+    return { error: "Account konnte nicht gelöscht werden: " + error.message };
+  }
+
+  revalidatePath("/admin/users");
+  return {};
 }

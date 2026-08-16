@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { CreateUserDialog } from "@/components/admin/create-user-dialog";
+import { DeleteUserDialog } from "@/components/admin/delete-user-dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -18,6 +19,9 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default async function AdminUsersPage() {
   const supabase = await createClient();
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser();
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, full_name, role, must_change_password, created_at")
@@ -41,6 +45,7 @@ export default async function AdminUsersPage() {
             <TableHead>Name</TableHead>
             <TableHead>Rolle</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -55,11 +60,16 @@ export default async function AdminUsersPage() {
                   <Badge variant="outline">Aktiv</Badge>
                 )}
               </TableCell>
+              <TableCell className="text-right">
+                {p.id !== currentUser?.id && (
+                  <DeleteUserDialog userId={p.id} fullName={p.full_name || "—"} />
+                )}
+              </TableCell>
             </TableRow>
           ))}
           {(!profiles || profiles.length === 0) && (
             <TableRow>
-              <TableCell colSpan={3} className="text-center text-muted-foreground">
+              <TableCell colSpan={4} className="text-center text-muted-foreground">
                 Noch keine Nutzer angelegt.
               </TableCell>
             </TableRow>
