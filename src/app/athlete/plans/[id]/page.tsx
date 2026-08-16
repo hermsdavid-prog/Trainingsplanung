@@ -29,7 +29,7 @@ export default async function AthletePlanPage({
       .single(),
     supabase
       .from("training_plan_items")
-      .select("id, exercise_name, reps_or_duration, sets, notes, exercise_id")
+      .select("id, exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id")
       .eq("training_plan_id", id)
       .order("position"),
   ]);
@@ -100,7 +100,9 @@ export default async function AthletePlanPage({
             exercise_name: item.exercise_name,
             reps_or_duration: item.reps_or_duration ?? "",
             sets: item.sets ?? "",
+            rest_time: item.rest_time ?? "",
             notes: item.notes ?? "",
+            link_url: item.link_url ?? "",
             exercise_id: item.exercise_id,
             result_value: item.exercise_id ? resultsByExercise[item.exercise_id]?.value ?? "" : "",
             result_unit: item.exercise_id ? resultsByExercise[item.exercise_id]?.unit ?? "" : "",

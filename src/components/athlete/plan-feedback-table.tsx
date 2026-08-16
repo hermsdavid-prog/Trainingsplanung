@@ -12,14 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { NotebookTextIcon } from "lucide-react";
+import { NotebookTextIcon, LinkIcon } from "lucide-react";
 
 type Item = {
   id: string;
   exercise_name: string;
   reps_or_duration: string | null;
   sets: string | null;
+  rest_time?: string | null;
   notes: string | null;
+  link_url?: string | null;
   exercise_id?: string | null;
 };
 
@@ -103,7 +105,8 @@ export function PlanFeedbackTable({
             <th className="p-2 text-left font-medium">Übung</th>
             <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
             <th className="p-2 text-left font-medium">Sätze</th>
-            <th className="p-2 text-left font-medium">Hinweise</th>
+            <th className="p-2 text-left font-medium">Pause</th>
+            <th className="p-2 text-left font-medium">Hinweise / Link</th>
             <th className="p-2 text-left font-medium">Ist-Wert / Notiz</th>
             {isAthletik && <th className="p-2 text-left font-medium">Ergebnis</th>}
           </tr>
@@ -126,19 +129,33 @@ export function PlanFeedbackTable({
                 </td>
                 <td className="p-2">{item.reps_or_duration || "—"}</td>
                 <td className="p-2">{item.sets || "—"}</td>
+                <td className="p-2">{item.rest_time || "—"}</td>
                 <td className="p-2">
-                  {item.notes ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setNotesOpenId(item.id)}
-                    >
-                      <NotebookTextIcon /> Hinweise
-                    </Button>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {item.notes ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setNotesOpenId(item.id)}
+                      >
+                        <NotebookTextIcon /> Hinweise
+                      </Button>
+                    ) : null}
+                    {item.link_url ? (
+                      <a
+                        href={item.link_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs hover:bg-muted"
+                      >
+                        <LinkIcon className="size-3.5" /> Link
+                      </a>
+                    ) : null}
+                    {!item.notes && !item.link_url && (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </div>
                 </td>
                 <td className="p-2">
                   <Input

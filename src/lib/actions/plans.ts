@@ -215,9 +215,19 @@ type PlanItemInput = {
   exercise_name: string;
   reps_or_duration: string;
   sets: string;
+  rest_time: string;
   notes: string;
+  link_url: string;
   exercise_id?: string | null;
 };
+
+// Prefix bare domains/paths with https:// so links always navigate instead
+// of being interpreted as a relative path on this site.
+function normalizeUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
 
 export async function savePlanItemsAction(
   planId: string,
@@ -240,6 +250,8 @@ export async function savePlanItemsAction(
       exercise_id: item.exercise_id ?? null,
       reps_or_duration: item.reps_or_duration.trim() || null,
       sets: item.sets.trim() || null,
+      rest_time: item.rest_time.trim() || null,
+      link_url: normalizeUrl(item.link_url),
       notes: item.notes.trim() || null,
     }));
 
@@ -316,7 +328,7 @@ export async function duplicatePlanToDateAction(
 
   const { data: sourceItems } = await supabase
     .from("training_plan_items")
-    .select("position, exercise_name, exercise_id, reps_or_duration, sets, notes")
+    .select("position, exercise_name, exercise_id, reps_or_duration, sets, rest_time, link_url, notes")
     .eq("training_plan_id", planId)
     .order("position");
 
@@ -345,6 +357,8 @@ export async function duplicatePlanToDateAction(
         exercise_id: item.exercise_id,
         reps_or_duration: item.reps_or_duration,
         sets: item.sets,
+        rest_time: item.rest_time,
+        link_url: item.link_url,
         notes: item.notes,
       }))
     );
@@ -402,7 +416,7 @@ export async function copyPlanAction(
 
   const { data: sourceItems } = await supabase
     .from("training_plan_items")
-    .select("position, exercise_name, exercise_id, reps_or_duration, sets, notes")
+    .select("position, exercise_name, exercise_id, reps_or_duration, sets, rest_time, link_url, notes")
     .eq("training_plan_id", sourcePlanId)
     .order("position");
 
@@ -433,6 +447,8 @@ export async function copyPlanAction(
         exercise_id: item.exercise_id,
         reps_or_duration: item.reps_or_duration,
         sets: item.sets,
+        rest_time: item.rest_time,
+        link_url: item.link_url,
         notes: item.notes,
       }))
     );

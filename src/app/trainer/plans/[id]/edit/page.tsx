@@ -28,7 +28,7 @@ export default async function EditPlanPage({
         .single(),
       supabase
         .from("training_plan_items")
-        .select("exercise_name, reps_or_duration, sets, notes, exercise_id")
+        .select("exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id")
         .eq("training_plan_id", id)
         .order("position"),
       supabase.from("groups").select("id, name").order("name"),
@@ -117,7 +117,9 @@ export default async function EditPlanPage({
               exercise_name: item.exercise_name,
               reps_or_duration: item.reps_or_duration ?? "",
               sets: item.sets ?? "",
+              rest_time: item.rest_time ?? "",
               notes: item.notes ?? "",
+              link_url: item.link_url ?? "",
               exercise_id: item.exercise_id,
             }))}
           />

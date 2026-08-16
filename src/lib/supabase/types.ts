@@ -382,9 +382,11 @@ export type Database = {
           exercise_id: string | null
           exercise_name: string
           id: string
+          link_url: string | null
           notes: string | null
           position: number
           reps_or_duration: string | null
+          rest_time: string | null
           sets: string | null
           training_plan_id: string
         }
@@ -393,9 +395,11 @@ export type Database = {
           exercise_id?: string | null
           exercise_name: string
           id?: string
+          link_url?: string | null
           notes?: string | null
           position?: number
           reps_or_duration?: string | null
+          rest_time?: string | null
           sets?: string | null
           training_plan_id: string
         }
@@ -404,9 +408,11 @@ export type Database = {
           exercise_id?: string | null
           exercise_name?: string
           id?: string
+          link_url?: string | null
           notes?: string | null
           position?: number
           reps_or_duration?: string | null
+          rest_time?: string | null
           sets?: string | null
           training_plan_id?: string
         }

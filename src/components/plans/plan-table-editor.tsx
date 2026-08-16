@@ -14,13 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2Icon, NotebookTextIcon, PlusIcon } from "lucide-react";
+import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon } from "lucide-react";
 
 type Row = {
   exercise_name: string;
   reps_or_duration: string;
   sets: string;
+  rest_time: string;
   notes: string;
+  link_url: string;
   exercise_id?: string | null;
   result_value?: string;
   result_unit?: string;
@@ -30,7 +32,9 @@ const EMPTY_ROW: Row = {
   exercise_name: "",
   reps_or_duration: "",
   sets: "",
+  rest_time: "",
   notes: "",
+  link_url: "",
   exercise_id: null,
   result_value: "",
   result_unit: "",
@@ -57,6 +61,7 @@ export function PlanTableEditor({
     initialItems.length > 0 ? initialItems.map((r) => ({ ...EMPTY_ROW, ...r })) : [{ ...EMPTY_ROW }]
   );
   const [notesOpenIndex, setNotesOpenIndex] = useState<number | null>(null);
+  const [linkOpenIndex, setLinkOpenIndex] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
@@ -122,10 +127,11 @@ export function PlanTableEditor({
               <th className="p-2 text-left font-medium">Übung</th>
               <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
               <th className="p-2 text-left font-medium">Sätze</th>
+              <th className="p-2 text-left font-medium">Pause</th>
               {isAthletik && trackResults && (
                 <th className="p-2 text-left font-medium">Ergebnis</th>
               )}
-              <th className="p-2 text-left font-medium">Hinweise</th>
+              <th className="p-2 text-left font-medium">Hinweise / Link</th>
               <th className="w-8 p-2" />
             </tr>
           </thead>
@@ -157,6 +163,14 @@ export function PlanTableEditor({
                     className="w-20"
                   />
                 </td>
+                <td className="p-2">
+                  <Input
+                    value={row.rest_time}
+                    onChange={(e) => updateRow(index, "rest_time", e.target.value)}
+                    placeholder="z. B. 60 Sek."
+                    className="w-24"
+                  />
+                </td>
                 {isAthletik && trackResults && (
                   <td className="p-2">
                     {row.exercise_id ? (
@@ -183,15 +197,27 @@ export function PlanTableEditor({
                   </td>
                 )}
                 <td className="p-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setNotesOpenIndex(index)}
-                  >
-                    <NotebookTextIcon />
-                    {row.notes ? "Hinweise bearbeiten" : "Hinweise hinzufügen"}
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNotesOpenIndex(index)}
+                      aria-label="Hinweise"
+                    >
+                      <NotebookTextIcon />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLinkOpenIndex(index)}
+                      aria-label="Link"
+                      className={row.link_url ? "border-primary text-primary" : undefined}
+                    >
+                      <LinkIcon />
+                    </Button>
+                  </div>
                 </td>
                 <td className="p-2">
                   <Button
@@ -249,6 +275,30 @@ export function PlanTableEditor({
           />
           <DialogFooter>
             <Button onClick={() => setNotesOpenIndex(null)}>Übernehmen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={linkOpenIndex !== null} onOpenChange={(open) => !open && setLinkOpenIndex(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Link{" "}
+              {linkOpenIndex !== null &&
+                rows[linkOpenIndex]?.exercise_name &&
+                `— ${rows[linkOpenIndex].exercise_name}`}
+            </DialogTitle>
+          </DialogHeader>
+          <Input
+            type="url"
+            value={linkOpenIndex !== null ? rows[linkOpenIndex]?.link_url ?? "" : ""}
+            onChange={(e) =>
+              linkOpenIndex !== null && updateRow(linkOpenIndex, "link_url", e.target.value)
+            }
+            placeholder="z. B. https://youtube.com/…"
+          />
+          <DialogFooter>
+            <Button onClick={() => setLinkOpenIndex(null)}>Übernehmen</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

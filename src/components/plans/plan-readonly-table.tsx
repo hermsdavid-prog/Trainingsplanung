@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { NotebookTextIcon } from "lucide-react";
+import { NotebookTextIcon, LinkIcon } from "lucide-react";
 
 type Row = {
   exercise_name: string;
   reps_or_duration: string | null;
   sets: string | null;
+  rest_time?: string | null;
   notes: string | null;
+  link_url?: string | null;
 };
 
 export function PlanReadOnlyTable({ items }: { items: Row[] }) {
@@ -31,7 +33,8 @@ export function PlanReadOnlyTable({ items }: { items: Row[] }) {
             <th className="p-2 text-left font-medium">Übung</th>
             <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
             <th className="p-2 text-left font-medium">Sätze</th>
-            <th className="p-2 text-left font-medium">Hinweise</th>
+            <th className="p-2 text-left font-medium">Pause</th>
+            <th className="p-2 text-left font-medium">Hinweise / Link</th>
           </tr>
         </thead>
         <tbody>
@@ -40,19 +43,31 @@ export function PlanReadOnlyTable({ items }: { items: Row[] }) {
               <td className="p-2">{row.exercise_name}</td>
               <td className="p-2">{row.reps_or_duration || "—"}</td>
               <td className="p-2">{row.sets || "—"}</td>
+              <td className="p-2">{row.rest_time || "—"}</td>
               <td className="p-2">
-                {row.notes ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setNotesOpenIndex(index)}
-                  >
-                    <NotebookTextIcon /> Hinweise
-                  </Button>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
+                <div className="flex items-center gap-1">
+                  {row.notes ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNotesOpenIndex(index)}
+                    >
+                      <NotebookTextIcon /> Hinweise
+                    </Button>
+                  ) : null}
+                  {row.link_url ? (
+                    <a
+                      href={row.link_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs hover:bg-muted"
+                    >
+                      <LinkIcon className="size-3.5" /> Link
+                    </a>
+                  ) : null}
+                  {!row.notes && !row.link_url && <span className="text-muted-foreground">—</span>}
+                </div>
               </td>
             </tr>
           ))}
