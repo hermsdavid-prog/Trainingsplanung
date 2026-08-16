@@ -30,12 +30,14 @@ export function PlanFeedbackTable({
   items,
   initialFeedback,
   categoryLabel,
+  planId,
   planDate,
   initialResults = {},
 }: {
   items: Item[];
   initialFeedback: FeedbackMap;
   categoryLabel?: string | null;
+  planId?: string;
   planDate?: string;
   initialResults?: ResultMap;
 }) {
@@ -80,12 +82,12 @@ export function PlanFeedbackTable({
   }
 
   function saveResult(exerciseId: string) {
-    if (!planDate) return;
+    if (!planDate || !planId) return;
     const row = getResult(exerciseId);
     const value = Number(row.value.replace(",", "."));
     if (!row.value.trim() || Number.isNaN(value)) return;
     startTransition(async () => {
-      const result = await upsertExerciseResultAction(exerciseId, planDate, value, row.unit);
+      const result = await upsertExerciseResultAction(exerciseId, planDate, value, row.unit, planId);
       if (result.error) toast.error(result.error);
     });
   }

@@ -66,6 +66,7 @@ export type Database = {
           date: string
           exercise_id: string
           id: string
+          training_plan_id: string | null
           unit: string | null
           updated_at: string
           value: number
@@ -76,6 +77,7 @@ export type Database = {
           date: string
           exercise_id: string
           id?: string
+          training_plan_id?: string | null
           unit?: string | null
           updated_at?: string
           value: number
@@ -86,6 +88,7 @@ export type Database = {
           date?: string
           exercise_id?: string
           id?: string
+          training_plan_id?: string | null
           unit?: string | null
           updated_at?: string
           value?: number
@@ -103,6 +106,13 @@ export type Database = {
             columns: ["exercise_id"]
             isOneToOne: false
             referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_results_training_plan_id_fkey"
+            columns: ["training_plan_id"]
+            isOneToOne: false
+            referencedRelation: "training_plans"
             referencedColumns: ["id"]
           },
         ]

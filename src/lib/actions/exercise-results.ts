@@ -8,7 +8,8 @@ export async function upsertExerciseResultAction(
   exerciseId: string,
   date: string,
   value: number,
-  unit: string
+  unit: string,
+  planId: string
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const {
@@ -23,6 +24,7 @@ export async function upsertExerciseResultAction(
       date,
       value,
       unit: unit.trim() || null,
+      training_plan_id: planId,
     },
     { onConflict: "athlete_id,exercise_id,date" }
   );

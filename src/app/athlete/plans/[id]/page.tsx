@@ -152,6 +152,7 @@ export default async function AthletePlanPage({
         items={items ?? []}
         initialFeedback={initialFeedback}
         categoryLabel={plan.category_label}
+        planId={plan.id}
         planDate={plan.date}
         initialResults={resultsByExercise}
       />

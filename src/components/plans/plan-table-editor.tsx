@@ -97,7 +97,7 @@ export function PlanTableEditor({
           if (!row.exercise_id || !row.result_value?.trim()) continue;
           const value = Number(row.result_value.replace(",", "."));
           if (Number.isNaN(value)) continue;
-          await upsertExerciseResultAction(row.exercise_id, planDate, value, row.result_unit ?? "");
+          await upsertExerciseResultAction(row.exercise_id, planDate, value, row.result_unit ?? "", planId);
         }
       }
 
