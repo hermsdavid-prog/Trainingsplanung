@@ -38,7 +38,6 @@ export function DayDetail({
                 )}
               </span>
               {item.status === "proposed" && <Badge variant="secondary">Vorschlag</Badge>}
-              {item.status === "draft" && <Badge variant="secondary">Entwurf</Badge>}
             </Link>
             {canManage && (
               <div className="flex shrink-0 items-center gap-1">

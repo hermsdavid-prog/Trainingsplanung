@@ -38,8 +38,20 @@ export function CreatePlanForm({
         <Input
           id="category_label"
           name="category_label"
-          placeholder="z. B. Kraft, Ausdauer, Technik"
+          placeholder="z. B. Athletik, Technik, Ausdauer"
+          list="category-options"
         />
+        <datalist id="category-options">
+          <option value="Athletik" />
+          <option value="Technik" />
+          <option value="Ausdauer" />
+          <option value="Beweglichkeit" />
+        </datalist>
+        <p className="text-xs text-muted-foreground">
+          Bei der Kategorie &bdquo;Athletik&rdquo; steht beim Eintragen der Übungen eine
+          Übungsbibliothek mit Vorschlägen zur Verfügung, und die Ergebnisse können als
+          Fortschrittskurve verfolgt werden.
+        </p>
       </div>
 
       <div className="flex flex-col gap-2">

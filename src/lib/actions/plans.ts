@@ -10,7 +10,6 @@ import type { Database } from "@/lib/supabase/types";
 export type ActionResult = { error?: string };
 
 type PlanScope = Database["public"]["Enums"]["plan_scope"];
-type PlanStatus = Database["public"]["Enums"]["plan_status"];
 
 async function requireTrainerOrAdmin() {
   const supabase = await createClient();
@@ -28,6 +27,69 @@ async function requireTrainerOrAdmin() {
   if (profile?.role !== "admin" && profile?.role !== "trainer") {
     throw new Error("Keine Berechtigung.");
   }
+
+  return { supabase, userId: user.id, role: profile.role };
+}
+
+async function requireAthlete() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht angemeldet.");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "athlete") {
+    throw new Error("Keine Berechtigung.");
+  }
+
+  return { supabase, userId: user.id };
+}
+
+// Mirrors the training_plans_update / training_plan_items_* RLS policies so the
+// app can show a clean error instead of a silent no-op update. Admin, the
+// plan's creator, or the trainer of its group may edit; an athlete's own
+// self-created plan is only editable by that athlete (created_by = auth.uid()),
+// not by trainers viewing it.
+async function requirePlanEditAccess(planId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht angemeldet.");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile) throw new Error("Kein Profil gefunden.");
+
+  const { data: plan } = await supabase
+    .from("training_plans")
+    .select("id, created_by, group_id")
+    .eq("id", planId)
+    .single();
+  if (!plan) throw new Error("Plan nicht gefunden.");
+
+  let canEdit = profile.role === "admin" || plan.created_by === user.id;
+
+  if (!canEdit && profile.role === "trainer" && plan.group_id) {
+    const { data: trainerGroup } = await supabase
+      .from("group_trainers")
+      .select("group_id")
+      .eq("trainer_id", user.id)
+      .eq("group_id", plan.group_id)
+      .maybeSingle();
+    canEdit = !!trainerGroup;
+  }
+
+  if (!canEdit) throw new Error("Keine Berechtigung, diesen Plan zu bearbeiten.");
 
   return { supabase, userId: user.id, role: profile.role };
 }
@@ -83,18 +145,55 @@ export async function createPlanAction(
   redirect(`/trainer/plans/${plans[0].id}/edit`);
 }
 
-export async function updatePlanMetaAction(
+export async function createOwnPlanAction(
   _prevState: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const { supabase } = await requireTrainerOrAdmin();
+  const { supabase, userId } = await requireAthlete();
 
-  const planId = String(formData.get("plan_id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const categoryLabel = String(formData.get("category_label") ?? "").trim();
   const date = String(formData.get("date") ?? "");
 
-  if (!planId || !title || !date) {
+  if (!title || !date) {
+    return { error: "Bitte Titel und Datum angeben." };
+  }
+
+  const { data: plan, error } = await supabase
+    .from("training_plans")
+    .insert({
+      title,
+      category_label: categoryLabel || null,
+      date,
+      scope_type: "athlete",
+      athlete_id: userId,
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (error || !plan) {
+    return { error: "Plan konnte nicht angelegt werden." };
+  }
+
+  revalidatePath("/athlete");
+  redirect(`/athlete/plans/${plan.id}`);
+}
+
+export async function updatePlanMetaAction(
+  _prevState: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const planId = String(formData.get("plan_id") ?? "");
+  if (!planId) return { error: "Bitte Titel und Datum angeben." };
+
+  const { supabase } = await requirePlanEditAccess(planId);
+
+  const title = String(formData.get("title") ?? "").trim();
+  const categoryLabel = String(formData.get("category_label") ?? "").trim();
+  const date = String(formData.get("date") ?? "");
+
+  if (!title || !date) {
     return { error: "Bitte Titel und Datum angeben." };
   }
 
@@ -107,6 +206,8 @@ export async function updatePlanMetaAction(
 
   revalidatePath(`/trainer/plans/${planId}/edit`);
   revalidatePath("/trainer/plans");
+  revalidatePath(`/athlete/plans/${planId}`);
+  revalidatePath("/athlete");
   return {};
 }
 
@@ -115,13 +216,14 @@ type PlanItemInput = {
   reps_or_duration: string;
   sets: string;
   notes: string;
+  exercise_id?: string | null;
 };
 
 export async function savePlanItemsAction(
   planId: string,
   items: PlanItemInput[]
 ): Promise<ActionResult> {
-  const { supabase } = await requireTrainerOrAdmin();
+  const { supabase } = await requirePlanEditAccess(planId);
 
   const { error: deleteError } = await supabase
     .from("training_plan_items")
@@ -135,6 +237,7 @@ export async function savePlanItemsAction(
       training_plan_id: planId,
       position: index,
       exercise_name: item.exercise_name.trim(),
+      exercise_id: item.exercise_id ?? null,
       reps_or_duration: item.reps_or_duration.trim() || null,
       sets: item.sets.trim() || null,
       notes: item.notes.trim() || null,
@@ -175,6 +278,7 @@ export async function savePlanItemsAction(
 
   revalidatePath(`/trainer/plans/${planId}/edit`);
   revalidatePath("/trainer/plans");
+  revalidatePath(`/athlete/plans/${planId}`);
   return {};
 }
 
@@ -222,7 +326,6 @@ export async function duplicatePlanToDateAction(
       title: sourcePlan.title,
       category_label: sourcePlan.category_label,
       date: newDate,
-      status: "draft",
       scope_type: sourcePlan.scope_type,
       group_id: sourcePlan.group_id,
       athlete_id: sourcePlan.athlete_id,
@@ -234,7 +337,7 @@ export async function duplicatePlanToDateAction(
   if (error || !newPlan) return { error: "Plan konnte nicht kopiert werden." };
 
   if (sourceItems && sourceItems.length > 0) {
-    await supabase.from("training_plan_items").insert(
+    const { error: itemsError } = await supabase.from("training_plan_items").insert(
       sourceItems.map((item) => ({
         training_plan_id: newPlan.id,
         position: item.position,
@@ -245,38 +348,25 @@ export async function duplicatePlanToDateAction(
         notes: item.notes,
       }))
     );
+    if (itemsError) {
+      return { error: "Plan wurde angelegt, Übungen konnten aber nicht kopiert werden." };
+    }
   }
 
   revalidatePath("/trainer/calendar");
   revalidatePath("/trainer/plans");
-  return {};
-}
-
-export async function setPlanStatusAction(
-  planId: string,
-  status: PlanStatus
-): Promise<ActionResult> {
-  const { supabase } = await requireTrainerOrAdmin();
-
-  const { error } = await supabase
-    .from("training_plans")
-    .update({ status })
-    .eq("id", planId);
-
-  if (error) return { error: "Status konnte nicht geändert werden." };
-
-  revalidatePath(`/trainer/plans/${planId}/edit`);
-  revalidatePath("/trainer/plans");
+  revalidatePath(`/trainer/plans/${newPlan.id}/edit`);
   return {};
 }
 
 export async function deletePlanAction(planId: string): Promise<ActionResult> {
-  const { supabase } = await requireTrainerOrAdmin();
+  const { supabase } = await requirePlanEditAccess(planId);
 
   const { error } = await supabase.from("training_plans").delete().eq("id", planId);
   if (error) return { error: "Plan konnte nicht gelöscht werden." };
 
   revalidatePath("/trainer/plans");
+  revalidatePath("/athlete");
   return {};
 }
 
@@ -322,7 +412,6 @@ export async function copyPlanAction(
       title: sourcePlan.title,
       category_label: sourcePlan.category_label,
       date,
-      status: "draft",
       scope_type: scopeType,
       group_id: scopeType === "group" ? groupId : null,
       athlete_id: scopeType === "athlete" ? athleteId : null,
@@ -336,7 +425,7 @@ export async function copyPlanAction(
   }
 
   if (sourceItems && sourceItems.length > 0) {
-    await supabase.from("training_plan_items").insert(
+    const { error: itemsError } = await supabase.from("training_plan_items").insert(
       sourceItems.map((item) => ({
         training_plan_id: newPlan.id,
         position: item.position,
@@ -347,6 +436,9 @@ export async function copyPlanAction(
         notes: item.notes,
       }))
     );
+    if (itemsError) {
+      return { error: "Plan wurde angelegt, Übungen konnten aber nicht kopiert werden." };
+    }
   }
 
   revalidatePath("/trainer/plans");

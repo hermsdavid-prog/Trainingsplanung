@@ -25,6 +25,35 @@ async function requireTrainerOrAdmin() {
   return { supabase, userId: user.id, role: profile.role };
 }
 
+// A trainer may only manage groups they are actually assigned to (or created);
+// admins may manage any group. Prevents a trainer from mutating an arbitrary
+// group_id they merely guessed or that isn't shown to them in the UI.
+async function requireGroupManageAccess(groupId: string) {
+  const { supabase, userId, role } = await requireTrainerOrAdmin();
+
+  if (role === "admin") return { supabase, userId, role };
+
+  const { data: group } = await supabase
+    .from("groups")
+    .select("id, created_by")
+    .eq("id", groupId)
+    .maybeSingle();
+  if (!group) throw new Error("Gruppe nicht gefunden.");
+
+  if (group.created_by === userId) return { supabase, userId, role };
+
+  const { data: link } = await supabase
+    .from("group_trainers")
+    .select("group_id")
+    .eq("group_id", groupId)
+    .eq("trainer_id", userId)
+    .maybeSingle();
+
+  if (!link) throw new Error("Du verwaltest diese Gruppe nicht.");
+
+  return { supabase, userId, role };
+}
+
 export async function createGroupAction(
   _prevState: ActionResult,
   formData: FormData
@@ -65,8 +94,6 @@ export async function updateGroupAction(
   _prevState: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const { supabase } = await requireTrainerOrAdmin();
-
   const groupId = String(formData.get("group_id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -75,6 +102,8 @@ export async function updateGroupAction(
   if (!groupId || !name) {
     return { error: "Bitte einen Namen für die Gruppe angeben." };
   }
+
+  const { supabase } = await requireGroupManageAccess(groupId);
 
   const { error } = await supabase
     .from("groups")
@@ -111,7 +140,7 @@ export async function setGroupTrainerAction(
   trainerId: string,
   assign: boolean
 ): Promise<ActionResult> {
-  const { supabase } = await requireTrainerOrAdmin();
+  const { supabase } = await requireGroupManageAccess(groupId);
 
   const { error } = assign
     ? await supabase.from("group_trainers").insert({ group_id: groupId, trainer_id: trainerId })
@@ -133,7 +162,7 @@ export async function setGroupAthleteAction(
   athleteId: string,
   assign: boolean
 ): Promise<ActionResult> {
-  const { supabase } = await requireTrainerOrAdmin();
+  const { supabase } = await requireGroupManageAccess(groupId);
 
   const { error } = assign
     ? await supabase.from("group_athletes").insert({ group_id: groupId, athlete_id: athleteId })

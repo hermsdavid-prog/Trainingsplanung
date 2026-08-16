@@ -59,6 +59,54 @@ export type Database = {
           },
         ]
       }
+      exercise_results: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          date: string
+          exercise_id: string
+          id: string
+          unit: string | null
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          date: string
+          exercise_id: string
+          id?: string
+          unit?: string | null
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          date?: string
+          exercise_id?: string
+          id?: string
+          unit?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_results_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_results_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           all_day: boolean
@@ -380,7 +428,6 @@ export type Database = {
           id: string
           scope_type: Database["public"]["Enums"]["plan_scope"]
           series_id: string | null
-          status: Database["public"]["Enums"]["plan_status"]
           title: string
           updated_at: string
         }
@@ -394,7 +441,6 @@ export type Database = {
           id?: string
           scope_type: Database["public"]["Enums"]["plan_scope"]
           series_id?: string | null
-          status?: Database["public"]["Enums"]["plan_status"]
           title: string
           updated_at?: string
         }
@@ -408,7 +454,6 @@ export type Database = {
           id?: string
           scope_type?: Database["public"]["Enums"]["plan_scope"]
           series_id?: string | null
-          status?: Database["public"]["Enums"]["plan_status"]
           title?: string
           updated_at?: string
         }
@@ -446,7 +491,6 @@ export type Database = {
     Enums: {
       event_status: "proposed" | "confirmed"
       plan_scope: "group" | "athlete"
-      plan_status: "draft" | "published"
       user_role: "admin" | "trainer" | "athlete"
     }
     CompositeTypes: {
@@ -577,7 +621,6 @@ export const Constants = {
     Enums: {
       event_status: ["proposed", "confirmed"],
       plan_scope: ["group", "athlete"],
-      plan_status: ["draft", "published"],
       user_role: ["admin", "trainer", "athlete"],
     },
   },

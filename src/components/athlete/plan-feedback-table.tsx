@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { upsertFeedbackAction } from "@/lib/actions/feedback";
+import { upsertExerciseResultAction } from "@/lib/actions/exercise-results";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,23 +20,38 @@ type Item = {
   reps_or_duration: string | null;
   sets: string | null;
   notes: string | null;
+  exercise_id?: string | null;
 };
 
 type FeedbackMap = Record<string, { done: boolean; actual_value: string }>;
+type ResultMap = Record<string, { value: string; unit: string }>;
 
 export function PlanFeedbackTable({
   items,
   initialFeedback,
+  categoryLabel,
+  planDate,
+  initialResults = {},
 }: {
   items: Item[];
   initialFeedback: FeedbackMap;
+  categoryLabel?: string | null;
+  planDate?: string;
+  initialResults?: ResultMap;
 }) {
   const [feedback, setFeedback] = useState<FeedbackMap>(initialFeedback);
+  const [results, setResults] = useState<ResultMap>(initialResults);
   const [notesOpenId, setNotesOpenId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
+
   function getRow(id: string) {
     return feedback[id] ?? { done: false, actual_value: "" };
+  }
+
+  function getResult(exerciseId: string) {
+    return results[exerciseId] ?? { value: "", unit: "" };
   }
 
   function toggleDone(id: string, done: boolean) {
@@ -59,6 +75,21 @@ export function PlanFeedbackTable({
     });
   }
 
+  function updateResultField(exerciseId: string, field: "value" | "unit", value: string) {
+    setResults((prev) => ({ ...prev, [exerciseId]: { ...getResult(exerciseId), [field]: value } }));
+  }
+
+  function saveResult(exerciseId: string) {
+    if (!planDate) return;
+    const row = getResult(exerciseId);
+    const value = Number(row.value.replace(",", "."));
+    if (!row.value.trim() || Number.isNaN(value)) return;
+    startTransition(async () => {
+      const result = await upsertExerciseResultAction(exerciseId, planDate, value, row.unit);
+      if (result.error) toast.error(result.error);
+    });
+  }
+
   const notesItem = items.find((i) => i.id === notesOpenId);
 
   return (
@@ -72,6 +103,7 @@ export function PlanFeedbackTable({
             <th className="p-2 text-left font-medium">Sätze</th>
             <th className="p-2 text-left font-medium">Hinweise</th>
             <th className="p-2 text-left font-medium">Ist-Wert / Notiz</th>
+            {isAthletik && <th className="p-2 text-left font-medium">Ergebnis</th>}
           </tr>
         </thead>
         <tbody>
@@ -115,6 +147,35 @@ export function PlanFeedbackTable({
                     className="min-w-40"
                   />
                 </td>
+                {isAthletik && (
+                  <td className="p-2">
+                    {item.exercise_id ? (
+                      <div className="flex gap-1">
+                        <Input
+                          type="number"
+                          value={getResult(item.exercise_id).value}
+                          onChange={(e) =>
+                            updateResultField(item.exercise_id!, "value", e.target.value)
+                          }
+                          onBlur={() => saveResult(item.exercise_id!)}
+                          placeholder="z. B. 60"
+                          className="w-20"
+                        />
+                        <Input
+                          value={getResult(item.exercise_id).unit}
+                          onChange={(e) =>
+                            updateResultField(item.exercise_id!, "unit", e.target.value)
+                          }
+                          onBlur={() => saveResult(item.exercise_id!)}
+                          placeholder="kg"
+                          className="w-16"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                )}
               </tr>
             );
           })}

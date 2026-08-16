@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -19,10 +23,12 @@ const NAV_BY_ROLE: Record<string, { href: string; label: string }[]> = {
     { href: "/trainer/calendar", label: "Kalender" },
     { href: "/trainer/groups", label: "Gruppen" },
     { href: "/trainer/health", label: "Gesundheit" },
+    { href: "/trainer/athletik", label: "Athletik" },
   ],
   athlete: [
     { href: "/athlete", label: "Heute" },
     { href: "/athlete/calendar", label: "Kalender" },
+    { href: "/athlete/athletik", label: "Athletik" },
   ],
 };
 
@@ -36,6 +42,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const nav = NAV_BY_ROLE[role] ?? [];
+  const pathname = usePathname();
 
   return (
     <div className="min-h-screen bg-muted/20">
@@ -59,16 +66,28 @@ export function AppShell({
               </Button>
             </form>
           </div>
-          <nav className="flex items-center gap-4">
-            {nav.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-              >
-                {item.label}
-              </Link>
-            ))}
+          <nav className="flex items-center gap-1">
+            {nav.map((item) => {
+              const isActive =
+                item.href === pathname ||
+                (item.href !== "/trainer" &&
+                  item.href !== "/athlete" &&
+                  pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
           <form action={logoutAction} className="hidden sm:block">
             <Button type="submit" variant="outline" size="sm">

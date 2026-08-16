@@ -57,7 +57,7 @@ export default async function TrainerCalendarPage({
 
   let plansQuery = supabase
     .from("training_plans")
-    .select("id, title, date, status, scope_type, group_id, athlete_id, groups(name, color)")
+    .select("id, title, date, scope_type, group_id, athlete_id, groups(name, color)")
     .gte("date", rangeStart)
     .lte("date", rangeEnd);
   if (params.group) plansQuery = plansQuery.eq("group_id", params.group);
@@ -87,7 +87,6 @@ export default async function TrainerCalendarPage({
       title: plan.title,
       color: plan.scope_type === "group" ? groupColor.get(plan.group_id ?? "") ?? INDIVIDUAL_PLAN_COLOR : INDIVIDUAL_PLAN_COLOR,
       href: `/trainer/plans/${plan.id}/edit`,
-      status: plan.status,
       subtitle: plan.scope_type === "group" ? groupName.get(plan.group_id ?? "") : "Einzelplan",
       kind: "plan" as const,
     };

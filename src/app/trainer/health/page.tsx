@@ -1,24 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO } from "@/lib/date";
-import { computeHealthStatus, type HealthLog } from "@/lib/health-status";
+import {
+  computeHealthStatus,
+  HEALTH_STATUS_LABEL,
+  HEALTH_STATUS_DOT,
+  type HealthLog,
+} from "@/lib/health-status";
 import { HealthChart } from "@/components/health/health-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-
-const STATUS_LABEL: Record<string, string> = {
-  green: "Unauffällig",
-  yellow: "Leichte Abweichung",
-  red: "Deutliche Abweichung",
-  none: "Keine Daten",
-};
-
-const STATUS_DOT: Record<string, string> = {
-  green: "bg-emerald-500",
-  yellow: "bg-amber-500",
-  red: "bg-red-500",
-  none: "bg-muted-foreground/40",
-};
 
 export default async function TrainerHealthPage() {
   const today = todayISO();
@@ -78,10 +69,10 @@ export default async function TrainerHealthPage() {
             <Card key={athlete.id}>
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={cn("size-2.5 rounded-full", STATUS_DOT[level])} />
+                  <span className={cn("size-2.5 rounded-full", HEALTH_STATUS_DOT[level])} />
                   <CardTitle className="text-base">{athlete.full_name}</CardTitle>
                   <Badge variant={level === "red" ? "destructive" : "secondary"}>
-                    {STATUS_LABEL[level]}
+                    {HEALTH_STATUS_LABEL[level]}
                   </Badge>
                   {todayLog && (
                     <span className="text-xs text-muted-foreground">

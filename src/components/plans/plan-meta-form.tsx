@@ -34,7 +34,14 @@ export function PlanMetaForm({
           id="category_label"
           name="category_label"
           defaultValue={categoryLabel ?? ""}
+          list="category-options"
         />
+        <datalist id="category-options">
+          <option value="Athletik" />
+          <option value="Technik" />
+          <option value="Ausdauer" />
+          <option value="Beweglichkeit" />
+        </datalist>
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="date">Datum</Label>

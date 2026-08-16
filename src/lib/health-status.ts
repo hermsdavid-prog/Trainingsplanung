@@ -7,6 +7,27 @@ export type HealthLog = {
 
 export type HealthStatusLevel = "green" | "yellow" | "red" | "none";
 
+export const HEALTH_STATUS_LABEL: Record<HealthStatusLevel, string> = {
+  green: "Unauffällig",
+  yellow: "Leichte Abweichung",
+  red: "Deutliche Abweichung",
+  none: "Keine Daten",
+};
+
+export const HEALTH_STATUS_DOT: Record<HealthStatusLevel, string> = {
+  green: "bg-emerald-500",
+  yellow: "bg-amber-500",
+  red: "bg-red-500",
+  none: "bg-muted-foreground/40",
+};
+
+export const HEALTH_STATUS_BORDER: Record<HealthStatusLevel, string> = {
+  green: "border-l-emerald-500",
+  yellow: "border-l-amber-500",
+  red: "border-l-red-500",
+  none: "border-l-border",
+};
+
 function mean(values: number[]): number | null {
   if (values.length === 0) return null;
   return values.reduce((a, b) => a + b, 0) / values.length;
