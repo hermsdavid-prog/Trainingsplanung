@@ -28,7 +28,9 @@ export default async function EditPlanPage({
         .single(),
       supabase
         .from("training_plan_items")
-        .select("exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id")
+        .select(
+          "exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id, section, round_rest, heart_rate_on, heart_rate_off"
+        )
         .eq("training_plan_id", id)
         .order("position"),
       supabase.from("groups").select("id, name").order("name"),
@@ -104,7 +106,6 @@ export default async function EditPlanPage({
         <>
           <PlanMetaForm
             planId={plan.id}
-            title={plan.title}
             categoryLabel={plan.category_label}
             date={plan.date}
           />
@@ -121,11 +122,15 @@ export default async function EditPlanPage({
               notes: item.notes ?? "",
               link_url: item.link_url ?? "",
               exercise_id: item.exercise_id,
+              section: item.section === "cardio" ? "cardio" : "kraft",
+              round_rest: item.round_rest ?? "",
+              heart_rate_on: item.heart_rate_on ?? "",
+              heart_rate_off: item.heart_rate_off ?? "",
             }))}
           />
         </>
       ) : (
-        <PlanReadOnlyTable items={items ?? []} />
+        <PlanReadOnlyTable items={items ?? []} categoryLabel={plan.category_label} />
       )}
     </div>
   );

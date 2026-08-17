@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { weeklyOccurrences } from "@/lib/date";
+import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
 import type { Database } from "@/lib/supabase/types";
 
 export type ActionResult = { error?: string };
@@ -100,16 +101,16 @@ export async function createPlanAction(
 ): Promise<ActionResult> {
   const { supabase, userId } = await requireTrainerOrAdmin();
 
-  const title = String(formData.get("title") ?? "").trim();
-  const categoryLabel = String(formData.get("category_label") ?? "").trim();
+  const categoryLabelRaw = String(formData.get("category_label") ?? "").trim();
+  const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
   const date = String(formData.get("date") ?? "");
   const scopeType = String(formData.get("scope_type") ?? "") as PlanScope;
   const groupId = String(formData.get("group_id") ?? "") || null;
   const athleteId = String(formData.get("athlete_id") ?? "") || null;
   const repeatUntil = String(formData.get("repeat_until") ?? "") || null;
 
-  if (!title || !date) {
-    return { error: "Bitte Titel und Datum angeben." };
+  if (!date) {
+    return { error: "Bitte ein Datum angeben." };
   }
   if (scopeType === "group" && !groupId) {
     return { error: "Bitte eine Gruppe auswählen." };
@@ -125,8 +126,8 @@ export async function createPlanAction(
     .from("training_plans")
     .insert(
       dates.map((occurrenceDate) => ({
-        title,
-        category_label: categoryLabel || null,
+        title: categoryLabel,
+        category_label: categoryLabel,
         date: occurrenceDate,
         scope_type: scopeType,
         group_id: scopeType === "group" ? groupId : null,
@@ -151,19 +152,19 @@ export async function createOwnPlanAction(
 ): Promise<ActionResult> {
   const { supabase, userId } = await requireAthlete();
 
-  const title = String(formData.get("title") ?? "").trim();
-  const categoryLabel = String(formData.get("category_label") ?? "").trim();
+  const categoryLabelRaw = String(formData.get("category_label") ?? "").trim();
+  const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
   const date = String(formData.get("date") ?? "");
 
-  if (!title || !date) {
-    return { error: "Bitte Titel und Datum angeben." };
+  if (!date) {
+    return { error: "Bitte ein Datum angeben." };
   }
 
   const { data: plan, error } = await supabase
     .from("training_plans")
     .insert({
-      title,
-      category_label: categoryLabel || null,
+      title: categoryLabel,
+      category_label: categoryLabel,
       date,
       scope_type: "athlete",
       athlete_id: userId,
@@ -185,21 +186,21 @@ export async function updatePlanMetaAction(
   formData: FormData
 ): Promise<ActionResult> {
   const planId = String(formData.get("plan_id") ?? "");
-  if (!planId) return { error: "Bitte Titel und Datum angeben." };
+  if (!planId) return { error: "Bitte ein Datum angeben." };
 
   const { supabase } = await requirePlanEditAccess(planId);
 
-  const title = String(formData.get("title") ?? "").trim();
-  const categoryLabel = String(formData.get("category_label") ?? "").trim();
+  const categoryLabelRaw = String(formData.get("category_label") ?? "").trim();
+  const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
   const date = String(formData.get("date") ?? "");
 
-  if (!title || !date) {
-    return { error: "Bitte Titel und Datum angeben." };
+  if (!date) {
+    return { error: "Bitte ein Datum angeben." };
   }
 
   const { error } = await supabase
     .from("training_plans")
-    .update({ title, category_label: categoryLabel || null, date })
+    .update({ title: categoryLabel, category_label: categoryLabel, date })
     .eq("id", planId);
 
   if (error) return { error: "Änderungen konnten nicht gespeichert werden." };
@@ -219,6 +220,10 @@ type PlanItemInput = {
   notes: string;
   link_url: string;
   exercise_id?: string | null;
+  section?: "kraft" | "cardio";
+  round_rest?: string;
+  heart_rate_on?: string;
+  heart_rate_off?: string;
 };
 
 // Prefix bare domains/paths with https:// so links always navigate instead
@@ -251,32 +256,34 @@ export async function savePlanItemsAction(
   // Athletes and trainers can both type an exercise name that doesn't exist
   // in the shared library yet (e.g. "Schwungdrücken") — auto-create it so
   // the item still links to an exercise_id and can be progress-tracked.
+  // Cardio rows never resolve to a library exercise — the weight/rep-based
+  // result tracking doesn't apply to them.
   const resolvedExerciseIds: (string | null)[] = [];
-  if (isAthletik) {
-    for (const item of filteredItems) {
-      if (item.exercise_id) {
-        resolvedExerciseIds.push(item.exercise_id);
-        continue;
-      }
-      const name = item.exercise_name.trim();
-      const { data: existing } = await supabase
-        .from("exercises")
-        .select("id")
-        .ilike("name", name)
-        .maybeSingle();
-      if (existing) {
-        resolvedExerciseIds.push(existing.id);
-        continue;
-      }
-      const { data: created } = await supabase
-        .from("exercises")
-        .insert({ name, created_by: userId })
-        .select("id")
-        .single();
-      resolvedExerciseIds.push(created?.id ?? null);
+  for (const item of filteredItems) {
+    if (!isAthletik || item.section === "cardio") {
+      resolvedExerciseIds.push(item.exercise_id ?? null);
+      continue;
     }
-  } else {
-    for (const item of filteredItems) resolvedExerciseIds.push(item.exercise_id ?? null);
+    if (item.exercise_id) {
+      resolvedExerciseIds.push(item.exercise_id);
+      continue;
+    }
+    const name = item.exercise_name.trim();
+    const { data: existing } = await supabase
+      .from("exercises")
+      .select("id")
+      .ilike("name", name)
+      .maybeSingle();
+    if (existing) {
+      resolvedExerciseIds.push(existing.id);
+      continue;
+    }
+    const { data: created } = await supabase
+      .from("exercises")
+      .insert({ name, created_by: userId })
+      .select("id")
+      .single();
+    resolvedExerciseIds.push(created?.id ?? null);
   }
 
   const { error: deleteError } = await supabase
@@ -290,9 +297,13 @@ export async function savePlanItemsAction(
     position: index,
     exercise_name: item.exercise_name.trim(),
     exercise_id: resolvedExerciseIds[index],
+    section: item.section ?? "kraft",
     reps_or_duration: item.reps_or_duration.trim() || null,
     sets: item.sets.trim() || null,
     rest_time: item.rest_time.trim() || null,
+    round_rest: item.round_rest?.trim() || null,
+    heart_rate_on: item.heart_rate_on?.trim() || null,
+    heart_rate_off: item.heart_rate_off?.trim() || null,
     link_url: normalizeUrl(item.link_url),
     notes: item.notes.trim() || null,
   }));
@@ -369,7 +380,9 @@ export async function duplicatePlanToDateAction(
 
   const { data: sourceItems } = await supabase
     .from("training_plan_items")
-    .select("position, exercise_name, exercise_id, reps_or_duration, sets, rest_time, link_url, notes")
+    .select(
+      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes"
+    )
     .eq("training_plan_id", planId)
     .order("position");
 
@@ -396,9 +409,13 @@ export async function duplicatePlanToDateAction(
         position: item.position,
         exercise_name: item.exercise_name,
         exercise_id: item.exercise_id,
+        section: item.section,
         reps_or_duration: item.reps_or_duration,
         sets: item.sets,
         rest_time: item.rest_time,
+        round_rest: item.round_rest,
+        heart_rate_on: item.heart_rate_on,
+        heart_rate_off: item.heart_rate_off,
         link_url: item.link_url,
         notes: item.notes,
       }))
@@ -457,7 +474,9 @@ export async function copyPlanAction(
 
   const { data: sourceItems } = await supabase
     .from("training_plan_items")
-    .select("position, exercise_name, exercise_id, reps_or_duration, sets, rest_time, link_url, notes")
+    .select(
+      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes"
+    )
     .eq("training_plan_id", sourcePlanId)
     .order("position");
 
@@ -486,9 +505,13 @@ export async function copyPlanAction(
         position: item.position,
         exercise_name: item.exercise_name,
         exercise_id: item.exercise_id,
+        section: item.section,
         reps_or_duration: item.reps_or_duration,
         sets: item.sets,
         rest_time: item.rest_time,
+        round_rest: item.round_rest,
+        heart_rate_on: item.heart_rate_on,
+        heart_rate_off: item.heart_rate_off,
         link_url: item.link_url,
         notes: item.notes,
       }))

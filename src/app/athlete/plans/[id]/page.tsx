@@ -5,7 +5,6 @@ import { PlanFeedbackTable } from "@/components/athlete/plan-feedback-table";
 import { PlanMetaForm } from "@/components/plans/plan-meta-form";
 import { PlanTableEditor } from "@/components/plans/plan-table-editor";
 import { PlanActions } from "@/components/plans/plan-actions";
-import { CategoryBadge } from "@/components/plans/category-badge";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeftIcon } from "lucide-react";
 
@@ -29,7 +28,9 @@ export default async function AthletePlanPage({
       .single(),
     supabase
       .from("training_plan_items")
-      .select("id, exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id")
+      .select(
+        "id, exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id, section, round_rest, heart_rate_on, heart_rate_off"
+      )
       .eq("training_plan_id", id)
       .order("position"),
   ]);
@@ -90,7 +91,6 @@ export default async function AthletePlanPage({
 
         <PlanMetaForm
           planId={plan.id}
-          title={plan.title}
           categoryLabel={plan.category_label}
           date={plan.date}
         />
@@ -109,6 +109,10 @@ export default async function AthletePlanPage({
             notes: item.notes ?? "",
             link_url: item.link_url ?? "",
             exercise_id: item.exercise_id,
+            section: item.section === "cardio" ? "cardio" : "kraft",
+            round_rest: item.round_rest ?? "",
+            heart_rate_on: item.heart_rate_on ?? "",
+            heart_rate_off: item.heart_rate_off ?? "",
             result_sets: item.exercise_id ? resultsByExercise[item.exercise_id]?.sets ?? [] : [],
             result_unit: item.exercise_id ? resultsByExercise[item.exercise_id]?.unit ?? "kg" : "kg",
           }))}
@@ -143,10 +147,7 @@ export default async function AthletePlanPage({
       </Link>
 
       <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold">{plan.title}</h1>
-          {plan.category_label && <CategoryBadge label={plan.category_label} />}
-        </div>
+        <h1 className="text-2xl font-semibold">{plan.title}</h1>
         <p className="text-sm text-muted-foreground">
           {plan.date} ·{" "}
           {plan.scope_type === "group"

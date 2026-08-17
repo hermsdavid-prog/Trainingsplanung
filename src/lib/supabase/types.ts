@@ -387,12 +387,16 @@ export type Database = {
           created_at: string
           exercise_id: string | null
           exercise_name: string
+          heart_rate_off: string | null
+          heart_rate_on: string | null
           id: string
           link_url: string | null
           notes: string | null
           position: number
           reps_or_duration: string | null
           rest_time: string | null
+          round_rest: string | null
+          section: string
           sets: string | null
           training_plan_id: string
         }
@@ -400,12 +404,16 @@ export type Database = {
           created_at?: string
           exercise_id?: string | null
           exercise_name: string
+          heart_rate_off?: string | null
+          heart_rate_on?: string | null
           id?: string
           link_url?: string | null
           notes?: string | null
           position?: number
           reps_or_duration?: string | null
           rest_time?: string | null
+          round_rest?: string | null
+          section?: string
           sets?: string | null
           training_plan_id: string
         }
@@ -413,12 +421,16 @@ export type Database = {
           created_at?: string
           exercise_id?: string | null
           exercise_name?: string
+          heart_rate_off?: string | null
+          heart_rate_on?: string | null
           id?: string
           link_url?: string | null
           notes?: string | null
           position?: number
           reps_or_duration?: string | null
           rest_time?: string | null
+          round_rest?: string | null
+          section?: string
           sets?: string | null
           training_plan_id?: string
         }
@@ -442,7 +454,7 @@ export type Database = {
       training_plans: {
         Row: {
           athlete_id: string | null
-          category_label: string | null
+          category_label: string
           created_at: string
           created_by: string | null
           date: string
@@ -455,7 +467,7 @@ export type Database = {
         }
         Insert: {
           athlete_id?: string | null
-          category_label?: string | null
+          category_label?: string
           created_at?: string
           created_by?: string | null
           date: string
@@ -468,7 +480,7 @@ export type Database = {
         }
         Update: {
           athlete_id?: string | null
-          category_label?: string | null
+          category_label?: string
           created_at?: string
           created_by?: string | null
           date?: string

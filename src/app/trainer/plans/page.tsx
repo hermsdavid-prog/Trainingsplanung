@@ -50,8 +50,7 @@ export default async function TrainerPlansPage() {
         <TableHeader>
           <TableRow>
             <TableHead>Datum</TableHead>
-            <TableHead>Titel</TableHead>
-            <TableHead>Oberkategorie</TableHead>
+            <TableHead>Typ</TableHead>
             <TableHead>Für</TableHead>
             <TableHead />
           </TableRow>
@@ -65,13 +64,8 @@ export default async function TrainerPlansPage() {
             return (
               <TableRow key={plan.id}>
                 <TableCell>{plan.date}</TableCell>
-                <TableCell>{plan.title}</TableCell>
                 <TableCell>
-                  {plan.category_label ? (
-                    <CategoryBadge label={plan.category_label} />
-                  ) : (
-                    "—"
-                  )}
+                  <CategoryBadge label={plan.category_label} />
                 </TableCell>
                 <TableCell>
                   {plan.scope_type === "group"
@@ -96,7 +90,7 @@ export default async function TrainerPlansPage() {
           })}
           {(!plans || plans.length === 0) && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={4} className="text-center text-muted-foreground">
                 Noch keine Trainingspläne angelegt.
               </TableCell>
             </TableRow>

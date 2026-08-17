@@ -26,6 +26,10 @@ type Item = {
   notes: string | null;
   link_url?: string | null;
   exercise_id?: string | null;
+  section?: string;
+  round_rest?: string | null;
+  heart_rate_on?: string | null;
+  heart_rate_off?: string | null;
 };
 
 type FeedbackMap = Record<string, { done: boolean; actual_value: string }>;
@@ -87,100 +91,202 @@ export function PlanFeedbackTable({
   const notesItem = items.find((i) => i.id === notesOpenId);
   const resultsItem = items.find((i) => i.id === resultsOpenId);
 
+  const kraftItems = items.filter((i) => !isAthletik || i.section !== "cardio");
+  const cardioItems = items.filter((i) => isAthletik && i.section === "cardio");
+
+  if (items.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Für diesen Plan wurden noch keine Übungen eingetragen.
+      </p>
+    );
+  }
+
   return (
-    <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50">
-          <tr>
-            <th className="w-8 p-2" />
-            <th className="p-2 text-left font-medium">Übung</th>
-            {isAthletik && <th className="p-2 text-left font-medium">Ergebnis</th>}
-            <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
-            <th className="p-2 text-left font-medium">Sätze</th>
-            <th className="p-2 text-left font-medium">Pause</th>
-            <th className="p-2 text-left font-medium">Hinweise / Link</th>
-            <th className="p-2 text-left font-medium">Ist-Wert / Notiz</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => {
-            const row = getRow(item.id);
-            return (
-              <tr key={item.id} className={`border-t ${row.done ? "bg-muted/30" : ""}`}>
-                <td className="p-2 text-center">
-                  <input
-                    type="checkbox"
-                    checked={row.done}
-                    onChange={(e) => toggleDone(item.id, e.target.checked)}
-                    aria-label="Erledigt"
-                  />
-                </td>
-                <td className={`p-2 ${row.done ? "line-through text-muted-foreground" : ""}`}>
-                  {item.exercise_name}
-                </td>
-                {isAthletik && (
-                  <td className="p-2">
-                    {item.exercise_id ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setResultsOpenId(item.id)}
-                      >
-                        <DumbbellIcon />
-                        {getResult(item.exercise_id).sets.length > 0
-                          ? `${getResult(item.exercise_id).sets.length} Satz${getResult(item.exercise_id).sets.length > 1 ? "e" : ""}`
-                          : "Ergebnis"}
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                )}
-                <td className="p-2">{item.reps_or_duration || "—"}</td>
-                <td className="p-2">{item.sets || "—"}</td>
-                <td className="p-2">{item.rest_time || "—"}</td>
-                <td className="p-2">
-                  <div className="flex items-center gap-1">
-                    {item.notes ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setNotesOpenId(item.id)}
-                      >
-                        <NotebookTextIcon /> Hinweise
-                      </Button>
-                    ) : null}
-                    {item.link_url ? (
-                      <a
-                        href={item.link_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs hover:bg-muted"
-                      >
-                        <LinkIcon className="size-3.5" /> Link
-                      </a>
-                    ) : null}
-                    {!item.notes && !item.link_url && (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </div>
-                </td>
-                <td className="p-2">
-                  <Input
-                    value={row.actual_value}
-                    onChange={(e) => updateActualValue(item.id, e.target.value)}
-                    onBlur={() => saveActualValue(item.id)}
-                    placeholder="z. B. tatsächliche Wiederholungen"
-                    className="min-w-40"
-                  />
-                </td>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        {isAthletik && <h3 className="text-sm font-semibold">Kraft</h3>}
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="w-8 p-2" />
+                <th className="p-2 text-left font-medium">Übung</th>
+                {isAthletik && <th className="p-2 text-left font-medium">Ergebnis</th>}
+                <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
+                <th className="p-2 text-left font-medium">Sätze</th>
+                <th className="p-2 text-left font-medium">Pause</th>
+                <th className="p-2 text-left font-medium">Hinweise / Link</th>
+                <th className="p-2 text-left font-medium">Ist-Wert / Notiz</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {kraftItems.map((item) => {
+                const row = getRow(item.id);
+                return (
+                  <tr key={item.id} className={`border-t ${row.done ? "bg-muted/30" : ""}`}>
+                    <td className="p-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={row.done}
+                        onChange={(e) => toggleDone(item.id, e.target.checked)}
+                        aria-label="Erledigt"
+                      />
+                    </td>
+                    <td className={`p-2 ${row.done ? "line-through text-muted-foreground" : ""}`}>
+                      {item.exercise_name}
+                    </td>
+                    {isAthletik && (
+                      <td className="p-2">
+                        {item.exercise_id ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setResultsOpenId(item.id)}
+                          >
+                            <DumbbellIcon />
+                            {getResult(item.exercise_id).sets.length > 0
+                              ? `${getResult(item.exercise_id).sets.length} Satz${getResult(item.exercise_id).sets.length > 1 ? "e" : ""}`
+                              : "Ergebnis"}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    )}
+                    <td className="p-2">{item.reps_or_duration || "—"}</td>
+                    <td className="p-2">{item.sets || "—"}</td>
+                    <td className="p-2">{item.rest_time || "—"}</td>
+                    <td className="p-2">
+                      <div className="flex items-center gap-1">
+                        {item.notes ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setNotesOpenId(item.id)}
+                          >
+                            <NotebookTextIcon /> Hinweise
+                          </Button>
+                        ) : null}
+                        {item.link_url ? (
+                          <a
+                            href={item.link_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs hover:bg-muted"
+                          >
+                            <LinkIcon className="size-3.5" /> Link
+                          </a>
+                        ) : null}
+                        {!item.notes && !item.link_url && (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-2">
+                      <Input
+                        value={row.actual_value}
+                        onChange={(e) => updateActualValue(item.id, e.target.value)}
+                        onBlur={() => saveActualValue(item.id)}
+                        placeholder="z. B. tatsächliche Wiederholungen"
+                        className="min-w-40"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {isAthletik && cardioItems.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold">Cardio</h3>
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="w-8 p-2" />
+                  <th className="p-2 text-left font-medium">Übung</th>
+                  <th className="p-2 text-left font-medium">Belastung</th>
+                  <th className="p-2 text-left font-medium">Pause</th>
+                  <th className="p-2 text-left font-medium">Runden</th>
+                  <th className="p-2 text-left font-medium">Rundenpause</th>
+                  <th className="p-2 text-left font-medium">Herzfrequenz (on)</th>
+                  <th className="p-2 text-left font-medium">Herzfrequenz (off)</th>
+                  <th className="p-2 text-left font-medium">Hinweise / Link</th>
+                  <th className="p-2 text-left font-medium">Ist-Wert / Notiz</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cardioItems.map((item) => {
+                  const row = getRow(item.id);
+                  return (
+                    <tr key={item.id} className={`border-t ${row.done ? "bg-muted/30" : ""}`}>
+                      <td className="p-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={row.done}
+                          onChange={(e) => toggleDone(item.id, e.target.checked)}
+                          aria-label="Erledigt"
+                        />
+                      </td>
+                      <td className={`p-2 ${row.done ? "line-through text-muted-foreground" : ""}`}>
+                        {item.exercise_name}
+                      </td>
+                      <td className="p-2">{item.reps_or_duration || "—"}</td>
+                      <td className="p-2">{item.rest_time || "—"}</td>
+                      <td className="p-2">{item.sets || "—"}</td>
+                      <td className="p-2">{item.round_rest || "—"}</td>
+                      <td className="p-2">{item.heart_rate_on || "—"}</td>
+                      <td className="p-2">{item.heart_rate_off || "—"}</td>
+                      <td className="p-2">
+                        <div className="flex items-center gap-1">
+                          {item.notes ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setNotesOpenId(item.id)}
+                            >
+                              <NotebookTextIcon /> Hinweise
+                            </Button>
+                          ) : null}
+                          {item.link_url ? (
+                            <a
+                              href={item.link_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs hover:bg-muted"
+                            >
+                              <LinkIcon className="size-3.5" /> Link
+                            </a>
+                          ) : null}
+                          {!item.notes && !item.link_url && (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          value={row.actual_value}
+                          onChange={(e) => updateActualValue(item.id, e.target.value)}
+                          onBlur={() => saveActualValue(item.id)}
+                          placeholder="z. B. gefühlte Anstrengung"
+                          className="min-w-40"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <Dialog open={notesOpenId !== null} onOpenChange={(open) => !open && setNotesOpenId(null)}>
         <DialogContent>

@@ -14,7 +14,6 @@ import {
 } from "@/lib/health-status";
 import { computeExerciseTrends } from "@/lib/exercise-trend";
 import { ExerciseTrendList } from "@/components/athletik/exercise-trend-list";
-import { CategoryBadge } from "@/components/plans/category-badge";
 import { cn } from "@/lib/utils";
 
 const INDIVIDUAL_PLAN_COLOR = "#4b3793";
@@ -199,10 +198,7 @@ export default async function AthleteTodayPage({
               }}
             >
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-base">{plan.title}</CardTitle>
-                  {plan.category_label && <CategoryBadge label={plan.category_label} />}
-                </div>
+                <CardTitle className="text-base">{plan.title}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
