@@ -59,7 +59,7 @@ export default async function AthleteTodayPage({
       user
         ? supabase
             .from("exercise_results")
-            .select("exercise_id, date, value, unit, exercises(name)")
+            .select("exercise_id, date, value, unit, set_type, exercises(name)")
             .eq("athlete_id", user.id)
             .order("date")
         : Promise.resolve({ data: [] }),
@@ -75,6 +75,7 @@ export default async function AthleteTodayPage({
         date: r.date,
         value: r.value,
         unit: r.unit,
+        set_type: r.set_type,
       }))
   );
 
@@ -139,20 +140,7 @@ export default async function AthleteTodayPage({
         </Card>
       </div>
 
-      {date === today && (
-        <HealthCheckinCard
-          date={date}
-          initial={
-            healthLog
-              ? {
-                  hrv: healthLog.hrv,
-                  restingHr: healthLog.resting_hr,
-                  wellbeing: healthLog.wellbeing,
-                }
-              : null
-          }
-        />
-      )}
+      {date === today && !healthLog && <HealthCheckinCard date={date} />}
 
       <div className="flex items-center justify-between rounded-md border bg-background p-2">
         <Link

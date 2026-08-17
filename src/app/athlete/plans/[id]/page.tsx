@@ -5,6 +5,7 @@ import { PlanFeedbackTable } from "@/components/athlete/plan-feedback-table";
 import { PlanMetaForm } from "@/components/plans/plan-meta-form";
 import { PlanTableEditor } from "@/components/plans/plan-table-editor";
 import { PlanActions } from "@/components/plans/plan-actions";
+import type { ExerciseSet } from "@/components/athletik/exercise-set-entry-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeftIcon } from "lucide-react";
 
@@ -45,17 +46,21 @@ export default async function AthletePlanPage({
   const { data: existingResults } = isAthletik && user && exerciseIds.length
     ? await supabase
         .from("exercise_results")
-        .select("exercise_id, set_number, value, reps, unit")
+        .select("exercise_id, set_number, value, reps, unit, set_type")
         .eq("athlete_id", user.id)
         .eq("date", plan.date)
         .in("exercise_id", exerciseIds)
         .order("set_number")
     : { data: [] };
 
-  const resultsByExercise: Record<string, { sets: { weight: string; reps: string }[]; unit: string }> = {};
+  const resultsByExercise: Record<string, { sets: ExerciseSet[]; unit: string }> = {};
   for (const r of existingResults ?? []) {
     const entry = resultsByExercise[r.exercise_id] ?? { sets: [], unit: r.unit ?? "kg" };
-    entry.sets.push({ weight: String(r.value), reps: r.reps != null ? String(r.reps) : "" });
+    entry.sets.push({
+      weight: String(r.value),
+      reps: r.reps != null ? String(r.reps) : "",
+      type: r.set_type === "aufwaermsatz" ? "aufwaermsatz" : "arbeitssatz",
+    });
     entry.unit = r.unit ?? entry.unit;
     resultsByExercise[r.exercise_id] = entry;
   }
@@ -125,7 +130,7 @@ export default async function AthletePlanPage({
   const { data: feedbackRows } = itemIds.length
     ? await supabase
         .from("athlete_feedback")
-        .select("training_plan_item_id, done, actual_value")
+        .select("training_plan_item_id, actual_value")
         .eq("athlete_id", user?.id ?? "")
         .in("training_plan_item_id", itemIds)
     : { data: [] };
@@ -133,7 +138,7 @@ export default async function AthletePlanPage({
   const initialFeedback = Object.fromEntries(
     (feedbackRows ?? []).map((f) => [
       f.training_plan_item_id,
-      { done: f.done, actual_value: f.actual_value ?? "" },
+      { actual_value: f.actual_value ?? "" },
     ])
   );
 

@@ -11,7 +11,8 @@ export async function upsertExerciseResultAction(
   weight: number,
   reps: number | null,
   unit: string,
-  planId: string
+  planId: string,
+  setType: "aufwaermsatz" | "arbeitssatz" = "arbeitssatz"
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const {
@@ -29,6 +30,7 @@ export async function upsertExerciseResultAction(
       reps,
       unit: unit.trim() || null,
       training_plan_id: planId,
+      set_type: setType,
     },
     { onConflict: "athlete_id,exercise_id,date,set_number" }
   );

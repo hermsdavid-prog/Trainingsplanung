@@ -32,7 +32,7 @@ type Item = {
   heart_rate_off?: string | null;
 };
 
-type FeedbackMap = Record<string, { done: boolean; actual_value: string }>;
+type FeedbackMap = Record<string, { actual_value: string }>;
 type ResultEntry = { sets: ExerciseSet[]; unit: string };
 type ResultMap = Record<string, ResultEntry>;
 
@@ -60,19 +60,11 @@ export function PlanFeedbackTable({
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
 
   function getRow(id: string) {
-    return feedback[id] ?? { done: false, actual_value: "" };
+    return feedback[id] ?? { actual_value: "" };
   }
 
   function getResult(exerciseId: string): ResultEntry {
     return results[exerciseId] ?? { sets: [], unit: "kg" };
-  }
-
-  function toggleDone(id: string, done: boolean) {
-    setFeedback((prev) => ({ ...prev, [id]: { ...getRow(id), done } }));
-    startTransition(async () => {
-      const result = await upsertFeedbackAction(id, { done });
-      if (result.error) toast.error(result.error);
-    });
   }
 
   function updateActualValue(id: string, actual_value: string) {
@@ -110,7 +102,6 @@ export function PlanFeedbackTable({
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="w-8 p-2" />
                 <th className="p-2 text-left font-medium">Übung</th>
                 {isAthletik && <th className="p-2 text-left font-medium">Ergebnis</th>}
                 <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
@@ -124,18 +115,8 @@ export function PlanFeedbackTable({
               {kraftItems.map((item) => {
                 const row = getRow(item.id);
                 return (
-                  <tr key={item.id} className={`border-t ${row.done ? "bg-muted/30" : ""}`}>
-                    <td className="p-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={row.done}
-                        onChange={(e) => toggleDone(item.id, e.target.checked)}
-                        aria-label="Erledigt"
-                      />
-                    </td>
-                    <td className={`p-2 ${row.done ? "line-through text-muted-foreground" : ""}`}>
-                      {item.exercise_name}
-                    </td>
+                  <tr key={item.id} className="border-t">
+                    <td className="p-2">{item.exercise_name}</td>
                     {isAthletik && (
                       <td className="p-2">
                         {item.exercise_id ? (
@@ -209,7 +190,6 @@ export function PlanFeedbackTable({
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="w-8 p-2" />
                   <th className="p-2 text-left font-medium">Übung</th>
                   <th className="p-2 text-left font-medium">Belastung</th>
                   <th className="p-2 text-left font-medium">Pause</th>
@@ -225,18 +205,8 @@ export function PlanFeedbackTable({
                 {cardioItems.map((item) => {
                   const row = getRow(item.id);
                   return (
-                    <tr key={item.id} className={`border-t ${row.done ? "bg-muted/30" : ""}`}>
-                      <td className="p-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={row.done}
-                          onChange={(e) => toggleDone(item.id, e.target.checked)}
-                          aria-label="Erledigt"
-                        />
-                      </td>
-                      <td className={`p-2 ${row.done ? "line-through text-muted-foreground" : ""}`}>
-                        {item.exercise_name}
-                      </td>
+                    <tr key={item.id} className="border-t">
+                      <td className="p-2">{item.exercise_name}</td>
                       <td className="p-2">{item.reps_or_duration || "—"}</td>
                       <td className="p-2">{item.rest_time || "—"}</td>
                       <td className="p-2">{item.sets || "—"}</td>

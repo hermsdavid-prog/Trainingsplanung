@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { cn } from "@/lib/utils";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -60,11 +61,14 @@ export function AppShell({
                 </span>
               </div>
             </div>
-            <form action={logoutAction} className="sm:hidden">
-              <Button type="submit" variant="outline" size="sm">
-                Abmelden
-              </Button>
-            </form>
+            <div className="flex items-center gap-2 sm:hidden">
+              <ThemeToggle />
+              <form action={logoutAction}>
+                <Button type="submit" variant="outline" size="sm">
+                  Abmelden
+                </Button>
+              </form>
+            </div>
           </div>
           <nav className="flex items-center gap-1">
             {nav.map((item) => {
@@ -89,11 +93,14 @@ export function AppShell({
               );
             })}
           </nav>
-          <form action={logoutAction} className="hidden sm:block">
-            <Button type="submit" variant="outline" size="sm">
-              Abmelden
-            </Button>
-          </form>
+          <div className="hidden items-center gap-2 sm:flex">
+            <ThemeToggle />
+            <form action={logoutAction}>
+              <Button type="submit" variant="outline" size="sm">
+                Abmelden
+              </Button>
+            </form>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>

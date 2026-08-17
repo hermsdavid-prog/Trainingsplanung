@@ -15,11 +15,19 @@ import {
 } from "@/components/ui/dialog";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 
-export type ExerciseSet = { weight: string; reps: string };
+export type SetType = "aufwaermsatz" | "arbeitssatz";
+export type ExerciseSet = { weight: string; reps: string; type: SetType };
+
+const SET_TYPE_LABEL: Record<SetType, string> = {
+  aufwaermsatz: "Aufwärmsatz",
+  arbeitssatz: "Arbeitssatz",
+};
 
 // One dialog per exercise: enter reps + weight for every set at once, in a
 // stacked layout with large touch targets — this is the primary way
-// athletes log a workout, almost always from a phone.
+// athletes log a workout, almost always from a phone. Sets are tagged as
+// Aufwärmsatz or Arbeitssatz so warm-ups don't skew the progress trend
+// (only Arbeitssätze count toward the "top set" per day).
 export function ExerciseSetEntryDialog({
   open,
   onOpenChange,
@@ -46,17 +54,21 @@ export function ExerciseSetEntryDialog({
   const [sets, setSets] = useState<ExerciseSet[]>(
     initialSets.length > 0
       ? initialSets
-      : Array.from({ length: Math.max(1, suggestedSetCount) }, () => ({ weight: "", reps: "" }))
+      : Array.from({ length: Math.max(1, suggestedSetCount) }, () => ({
+          weight: "",
+          reps: "",
+          type: "arbeitssatz" as SetType,
+        }))
   );
   const [unit, setUnit] = useState(initialUnit ?? "kg");
   const [isPending, startTransition] = useTransition();
 
-  function updateSet(index: number, field: keyof ExerciseSet, value: string) {
+  function updateSet(index: number, field: "weight" | "reps", value: string) {
     setSets((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
   }
 
-  function addSet() {
-    setSets((prev) => [...prev, { weight: "", reps: "" }]);
+  function addSet(type: SetType) {
+    setSets((prev) => [...prev, { weight: "", reps: "", type }]);
   }
 
   function removeSet(index: number) {
@@ -80,7 +92,8 @@ export function ExerciseSetEntryDialog({
           weight,
           reps,
           unit,
-          planId
+          planId,
+          set.type
         );
         if (result.error) {
           toast.error(result.error);
@@ -95,6 +108,8 @@ export function ExerciseSetEntryDialog({
       onOpenChange(false);
     });
   }
+
+  const typeCounts: Partial<Record<SetType, number>> = {};
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,46 +137,64 @@ export function ExerciseSetEntryDialog({
             </div>
 
             <div className="flex flex-col gap-3">
-              {sets.map((set, index) => (
-                <div key={index} className="flex items-end gap-2">
-                  <span className="w-12 pb-2.5 text-sm font-medium text-muted-foreground">
-                    Satz {index + 1}
-                  </span>
-                  <div className="flex flex-1 flex-col gap-1">
-                    <Label className="text-xs text-muted-foreground">Wdh.</Label>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      value={set.reps}
-                      onChange={(e) => updateSet(index, "reps", e.target.value)}
-                      placeholder="10"
-                    />
+              {sets.map((set, index) => {
+                typeCounts[set.type] = (typeCounts[set.type] ?? 0) + 1;
+                return (
+                  <div key={index} className="flex items-end gap-2">
+                    <span className="w-24 pb-2.5 text-sm font-medium text-muted-foreground">
+                      {SET_TYPE_LABEL[set.type]} {typeCounts[set.type]}
+                    </span>
+                    <div className="flex flex-1 flex-col gap-1">
+                      <Label className="text-xs text-muted-foreground">Wdh.</Label>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        value={set.reps}
+                        onChange={(e) => updateSet(index, "reps", e.target.value)}
+                        placeholder="10"
+                      />
+                    </div>
+                    <div className="flex flex-1 flex-col gap-1">
+                      <Label className="text-xs text-muted-foreground">Gewicht</Label>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        value={set.weight}
+                        onChange={(e) => updateSet(index, "weight", e.target.value)}
+                        placeholder="60"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => removeSet(index)}
+                      aria-label="Satz entfernen"
+                    >
+                      <Trash2Icon />
+                    </Button>
                   </div>
-                  <div className="flex flex-1 flex-col gap-1">
-                    <Label className="text-xs text-muted-foreground">Gewicht</Label>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      value={set.weight}
-                      onChange={(e) => updateSet(index, "weight", e.target.value)}
-                      placeholder="60"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => removeSet(index)}
-                    aria-label="Satz entfernen"
-                  >
-                    <Trash2Icon />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
 
-              <Button type="button" variant="outline" size="sm" onClick={addSet}>
-                <PlusIcon /> Satz hinzufügen
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addSet("aufwaermsatz")}
+                >
+                  <PlusIcon /> Aufwärmsatz hinzufügen
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addSet("arbeitssatz")}
+                >
+                  <PlusIcon /> Arbeitssatz hinzufügen
+                </Button>
+              </div>
             </div>
           </div>
         )}

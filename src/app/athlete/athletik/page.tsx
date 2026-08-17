@@ -42,16 +42,18 @@ export default async function AthleteAthletikPage({
   const { data: rawResults } = user && selectedExercise
     ? await supabase
         .from("exercise_results")
-        .select("date, value, unit")
+        .select("date, value, unit, set_type")
         .eq("athlete_id", user.id)
         .eq("exercise_id", selectedExercise)
         .order("date")
     : { data: [] };
 
-  // Multiple sets can exist per day now — collapse to the heaviest set per
-  // day so the curve and table show one clean point per session.
+  // Multiple sets can exist per day now — collapse to the heaviest Arbeitssatz
+  // per day so the curve and table show one clean point per session, without
+  // warm-up sets skewing the trend.
   const resultsByDate = new Map<string, { date: string; value: number; unit: string | null }>();
   for (const r of rawResults ?? []) {
+    if (r.set_type === "aufwaermsatz") continue;
     const existing = resultsByDate.get(r.date);
     if (!existing || r.value > existing.value) resultsByDate.set(r.date, r);
   }

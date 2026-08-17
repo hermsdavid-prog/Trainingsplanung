@@ -4,6 +4,7 @@ export type ExerciseResultRow = {
   date: string;
   value: number;
   unit: string | null;
+  set_type?: string | null;
 };
 
 export type ExerciseTrend = {
@@ -17,11 +18,13 @@ export type ExerciseTrend = {
 };
 
 // Rows are one-per-set now, so a day can have several. Collapse each
-// exercise/day down to its heaviest set — the "top set" is what's usually
-// tracked for a strength trend, not an average across warm-up sets too.
+// exercise/day down to its heaviest Arbeitssatz — the "top set" is what's
+// usually tracked for a strength trend, so Aufwärmsätze are excluded
+// entirely rather than just relying on them being lighter.
 function collapseToTopSetPerDay(rows: ExerciseResultRow[]): ExerciseResultRow[] {
   const byExerciseAndDate = new Map<string, ExerciseResultRow>();
   for (const row of rows) {
+    if (row.set_type === "aufwaermsatz") continue;
     const key = `${row.exercise_id}|${row.date}`;
     const existing = byExerciseAndDate.get(key);
     if (!existing || row.value > existing.value) byExerciseAndDate.set(key, row);

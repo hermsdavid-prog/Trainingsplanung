@@ -6,7 +6,7 @@ export type ActionResult = { error?: string };
 
 export async function upsertFeedbackAction(
   itemId: string,
-  data: { done?: boolean; actual_value?: string }
+  data: { actual_value?: string }
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const {

@@ -10,17 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-export function HealthCheckinCard({
-  date,
-  initial,
-}: {
-  date: string;
-  initial: { hrv: number | null; restingHr: number | null; wellbeing: number | null } | null;
-}) {
-  const [hrv, setHrv] = useState(initial?.hrv?.toString() ?? "");
-  const [restingHr, setRestingHr] = useState(initial?.restingHr?.toString() ?? "");
-  const [wellbeing, setWellbeing] = useState<number | null>(initial?.wellbeing ?? null);
-  const [saved, setSaved] = useState(!!initial);
+export function HealthCheckinCard({ date }: { date: string }) {
+  const [hrv, setHrv] = useState("");
+  const [restingHr, setRestingHr] = useState("");
+  const [wellbeing, setWellbeing] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -35,7 +28,8 @@ export function HealthCheckinCard({
         toast.error(result.error);
       } else {
         toast.success("Gesundheitsdaten gespeichert.");
-        setSaved(true);
+        // The parent hides this card once today's health log exists, so a
+        // refresh is enough — no local "saved" state needed here.
         router.refresh();
       }
     });
@@ -55,10 +49,7 @@ export function HealthCheckinCard({
               type="number"
               inputMode="decimal"
               value={hrv}
-              onChange={(e) => {
-                setHrv(e.target.value);
-                setSaved(false);
-              }}
+              onChange={(e) => setHrv(e.target.value)}
               placeholder="optional"
             />
           </div>
@@ -69,10 +60,7 @@ export function HealthCheckinCard({
               type="number"
               inputMode="decimal"
               value={restingHr}
-              onChange={(e) => {
-                setRestingHr(e.target.value);
-                setSaved(false);
-              }}
+              onChange={(e) => setRestingHr(e.target.value)}
               placeholder="optional"
             />
           </div>
@@ -85,10 +73,7 @@ export function HealthCheckinCard({
               <button
                 key={n}
                 type="button"
-                onClick={() => {
-                  setWellbeing(n);
-                  setSaved(false);
-                }}
+                onClick={() => setWellbeing(n)}
                 className={cn(
                   "flex size-11 items-center justify-center rounded-md border text-sm transition-colors",
                   wellbeing === n
@@ -103,7 +88,7 @@ export function HealthCheckinCard({
         </div>
 
         <Button onClick={handleSave} disabled={isPending} className="self-start">
-          {isPending ? "Wird gespeichert…" : saved ? "Aktualisieren" : "Speichern"}
+          {isPending ? "Wird gespeichert…" : "Speichern"}
         </Button>
       </CardContent>
     </Card>
