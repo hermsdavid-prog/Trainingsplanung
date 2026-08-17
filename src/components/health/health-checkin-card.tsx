@@ -90,7 +90,7 @@ export function HealthCheckinCard({
                   setSaved(false);
                 }}
                 className={cn(
-                  "flex size-9 items-center justify-center rounded-md border text-sm transition-colors",
+                  "flex size-11 items-center justify-center rounded-md border text-sm transition-colors",
                   wellbeing === n
                     ? "border-primary bg-primary text-primary-foreground"
                     : "hover:bg-muted"

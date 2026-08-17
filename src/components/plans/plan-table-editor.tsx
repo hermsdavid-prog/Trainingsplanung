@@ -3,7 +3,10 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { savePlanItemsAction } from "@/lib/actions/plans";
-import { upsertExerciseResultAction } from "@/lib/actions/exercise-results";
+import {
+  ExerciseSetEntryDialog,
+  type ExerciseSet,
+} from "@/components/athletik/exercise-set-entry-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon } from "lucide-react";
+import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, DumbbellIcon } from "lucide-react";
 
 type Row = {
   exercise_name: string;
@@ -24,7 +27,7 @@ type Row = {
   notes: string;
   link_url: string;
   exercise_id?: string | null;
-  result_value?: string;
+  result_sets?: ExerciseSet[];
   result_unit?: string;
 };
 
@@ -36,8 +39,8 @@ const EMPTY_ROW: Row = {
   notes: "",
   link_url: "",
   exercise_id: null,
-  result_value: "",
-  result_unit: "",
+  result_sets: [],
+  result_unit: "kg",
 };
 
 const EXERCISE_LIST_ID = "exercise-library-options";
@@ -62,6 +65,7 @@ export function PlanTableEditor({
   );
   const [notesOpenIndex, setNotesOpenIndex] = useState<number | null>(null);
   const [linkOpenIndex, setLinkOpenIndex] = useState<number | null>(null);
+  const [resultsOpenIndex, setResultsOpenIndex] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
@@ -74,7 +78,7 @@ export function PlanTableEditor({
         const next = { ...row, [field]: value };
         if (field === "exercise_name") {
           const match = nameByLowercase.get(value.trim().toLowerCase());
-          next.exercise_id = match?.id ?? null;
+          next.exercise_id = match?.id ?? row.exercise_id ?? null;
         }
         return next;
       })
@@ -97,13 +101,29 @@ export function PlanTableEditor({
         return;
       }
 
-      if (trackResults && planDate) {
-        for (const row of rows) {
-          if (!row.exercise_id || !row.result_value?.trim()) continue;
-          const value = Number(row.result_value.replace(",", "."));
-          if (Number.isNaN(value)) continue;
-          await upsertExerciseResultAction(row.exercise_id, planDate, value, row.result_unit ?? "", planId);
-        }
+      // Rows lacking an exercise_id (a not-yet-catalogued exercise name) get
+      // one auto-created server-side — sync it back so the "Ergebnis" dialog
+      // becomes usable immediately, without reloading the page. Server
+      // positions are indexed over the non-empty rows only, in the same
+      // order, matching what was just sent to savePlanItemsAction.
+      const savedItems = result.items;
+      if (savedItems) {
+        const nonEmptyIndices = rows.reduce<number[]>((acc, r, i) => {
+          if (r.exercise_name.trim()) acc.push(i);
+          return acc;
+        }, []);
+        setRows((prev) => {
+          const next = [...prev];
+          for (const item of savedItems) {
+            const rowIndex = nonEmptyIndices[item.position];
+            if (rowIndex === undefined) continue;
+            next[rowIndex] = {
+              ...next[rowIndex],
+              exercise_id: item.exercise_id ?? next[rowIndex].exercise_id ?? null,
+            };
+          }
+          return next;
+        });
       }
 
       toast.success("Übungstabelle gespeichert.");
@@ -125,12 +145,12 @@ export function PlanTableEditor({
           <thead className="bg-muted/50">
             <tr>
               <th className="p-2 text-left font-medium">Übung</th>
-              <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
-              <th className="p-2 text-left font-medium">Sätze</th>
-              <th className="p-2 text-left font-medium">Pause</th>
               {isAthletik && trackResults && (
                 <th className="p-2 text-left font-medium">Ergebnis</th>
               )}
+              <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
+              <th className="p-2 text-left font-medium">Sätze</th>
+              <th className="p-2 text-left font-medium">Pause</th>
               <th className="p-2 text-left font-medium">Hinweise / Link</th>
               <th className="w-8 p-2" />
             </tr>
@@ -147,6 +167,22 @@ export function PlanTableEditor({
                     list={isAthletik ? EXERCISE_LIST_ID : undefined}
                   />
                 </td>
+                {isAthletik && trackResults && (
+                  <td className="p-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setResultsOpenIndex(index)}
+                      disabled={!row.exercise_name.trim()}
+                    >
+                      <DumbbellIcon />
+                      {row.result_sets && row.result_sets.length > 0
+                        ? `${row.result_sets.length} Satz${row.result_sets.length > 1 ? "e" : ""}`
+                        : "Ergebnis"}
+                    </Button>
+                  </td>
+                )}
                 <td className="p-2">
                   <Input
                     value={row.reps_or_duration}
@@ -171,31 +207,6 @@ export function PlanTableEditor({
                     className="w-24"
                   />
                 </td>
-                {isAthletik && trackResults && (
-                  <td className="p-2">
-                    {row.exercise_id ? (
-                      <div className="flex gap-1">
-                        <Input
-                          type="number"
-                          value={row.result_value ?? ""}
-                          onChange={(e) => updateRow(index, "result_value", e.target.value)}
-                          placeholder="z. B. 60"
-                          className="w-20"
-                        />
-                        <Input
-                          value={row.result_unit ?? ""}
-                          onChange={(e) => updateRow(index, "result_unit", e.target.value)}
-                          placeholder="kg"
-                          className="w-16"
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        Übung aus Bibliothek wählen
-                      </span>
-                    )}
-                  </td>
-                )}
                 <td className="p-2">
                   <div className="flex gap-1">
                     <Button
@@ -238,8 +249,9 @@ export function PlanTableEditor({
 
       {isAthletik && trackResults && (
         <p className="text-xs text-muted-foreground">
-          Trage bei Übungen aus der Athletik-Bibliothek ein Ergebnis ein (z. B. Gewicht,
-          Höhe, Zeit) — das wird für die Fortschrittskurve gespeichert.
+          Trage bei Übungen aus der Athletik-Bibliothek Wiederholungen und Gewicht je Satz
+          ein — das wird für die Fortschrittskurve gespeichert. Bei einer neuen Übung zuerst
+          die Übungstabelle speichern, danach lässt sich das Ergebnis erfassen.
         </p>
       )}
 
@@ -302,6 +314,31 @@ export function PlanTableEditor({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {resultsOpenIndex !== null && planDate && (
+        <ExerciseSetEntryDialog
+          key={resultsOpenIndex}
+          open={resultsOpenIndex !== null}
+          onOpenChange={(open) => !open && setResultsOpenIndex(null)}
+          exerciseName={rows[resultsOpenIndex].exercise_name}
+          exerciseId={rows[resultsOpenIndex].exercise_id ?? null}
+          planId={planId}
+          planDate={planDate}
+          initialSets={rows[resultsOpenIndex].result_sets ?? []}
+          initialUnit={rows[resultsOpenIndex].result_unit}
+          suggestedSetCount={Number(rows[resultsOpenIndex].sets) || 1}
+          onSaved={(sets, unit) => {
+            const idx = resultsOpenIndex;
+            setRows((prev) =>
+              prev.map((row, i) =>
+                i === idx
+                  ? { ...row, result_sets: sets.filter((s) => s.weight.trim()), result_unit: unit }
+                  : row
+              )
+            );
+          }}
+        />
+      )}
     </div>
   );
 }

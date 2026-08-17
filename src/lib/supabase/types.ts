@@ -66,6 +66,8 @@ export type Database = {
           date: string
           exercise_id: string
           id: string
+          reps: number | null
+          set_number: number
           training_plan_id: string | null
           unit: string | null
           updated_at: string
@@ -77,6 +79,8 @@ export type Database = {
           date: string
           exercise_id: string
           id?: string
+          reps?: number | null
+          set_number?: number
           training_plan_id?: string | null
           unit?: string | null
           updated_at?: string
@@ -88,6 +92,8 @@ export type Database = {
           date?: string
           exercise_id?: string
           id?: string
+          reps?: number | null
+          set_number?: number
           training_plan_id?: string | null
           unit?: string | null
           updated_at?: string

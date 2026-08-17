@@ -44,15 +44,20 @@ export default async function AthletePlanPage({
   const { data: existingResults } = isAthletik && user && exerciseIds.length
     ? await supabase
         .from("exercise_results")
-        .select("exercise_id, value, unit")
+        .select("exercise_id, set_number, value, reps, unit")
         .eq("athlete_id", user.id)
         .eq("date", plan.date)
         .in("exercise_id", exerciseIds)
+        .order("set_number")
     : { data: [] };
 
-  const resultsByExercise = Object.fromEntries(
-    (existingResults ?? []).map((r) => [r.exercise_id, { value: String(r.value), unit: r.unit ?? "" }])
-  );
+  const resultsByExercise: Record<string, { sets: { weight: string; reps: string }[]; unit: string }> = {};
+  for (const r of existingResults ?? []) {
+    const entry = resultsByExercise[r.exercise_id] ?? { sets: [], unit: r.unit ?? "kg" };
+    entry.sets.push({ weight: String(r.value), reps: r.reps != null ? String(r.reps) : "" });
+    entry.unit = r.unit ?? entry.unit;
+    resultsByExercise[r.exercise_id] = entry;
+  }
 
   const isOwnPlan = plan.created_by === user?.id;
 
@@ -104,8 +109,8 @@ export default async function AthletePlanPage({
             notes: item.notes ?? "",
             link_url: item.link_url ?? "",
             exercise_id: item.exercise_id,
-            result_value: item.exercise_id ? resultsByExercise[item.exercise_id]?.value ?? "" : "",
-            result_unit: item.exercise_id ? resultsByExercise[item.exercise_id]?.unit ?? "" : "",
+            result_sets: item.exercise_id ? resultsByExercise[item.exercise_id]?.sets ?? [] : [],
+            result_unit: item.exercise_id ? resultsByExercise[item.exercise_id]?.unit ?? "kg" : "kg",
           }))}
         />
       </div>

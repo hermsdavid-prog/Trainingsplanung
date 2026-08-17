@@ -229,11 +229,55 @@ function normalizeUrl(value: string): string | null {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+export type SavedPlanItem = { position: number; exercise_id: string | null };
+
 export async function savePlanItemsAction(
   planId: string,
   items: PlanItemInput[]
-): Promise<ActionResult> {
-  const { supabase } = await requirePlanEditAccess(planId);
+): Promise<ActionResult & { items?: SavedPlanItem[] }> {
+  const { supabase, userId } = await requirePlanEditAccess(planId);
+
+  // Fetch this up front (not just series_id) so a not-yet-catalogued exercise
+  // name can be resolved/auto-created below before the rows are built.
+  const { data: plan } = await supabase
+    .from("training_plans")
+    .select("series_id, category_label")
+    .eq("id", planId)
+    .single();
+
+  const isAthletik = plan?.category_label?.trim().toLowerCase() === "athletik";
+  const filteredItems = items.filter((item) => item.exercise_name.trim());
+
+  // Athletes and trainers can both type an exercise name that doesn't exist
+  // in the shared library yet (e.g. "Schwungdrücken") — auto-create it so
+  // the item still links to an exercise_id and can be progress-tracked.
+  const resolvedExerciseIds: (string | null)[] = [];
+  if (isAthletik) {
+    for (const item of filteredItems) {
+      if (item.exercise_id) {
+        resolvedExerciseIds.push(item.exercise_id);
+        continue;
+      }
+      const name = item.exercise_name.trim();
+      const { data: existing } = await supabase
+        .from("exercises")
+        .select("id")
+        .ilike("name", name)
+        .maybeSingle();
+      if (existing) {
+        resolvedExerciseIds.push(existing.id);
+        continue;
+      }
+      const { data: created } = await supabase
+        .from("exercises")
+        .insert({ name, created_by: userId })
+        .select("id")
+        .single();
+      resolvedExerciseIds.push(created?.id ?? null);
+    }
+  } else {
+    for (const item of filteredItems) resolvedExerciseIds.push(item.exercise_id ?? null);
+  }
 
   const { error: deleteError } = await supabase
     .from("training_plan_items")
@@ -241,34 +285,31 @@ export async function savePlanItemsAction(
     .eq("training_plan_id", planId);
   if (deleteError) return { error: "Speichern fehlgeschlagen." };
 
-  const rows = items
-    .filter((item) => item.exercise_name.trim())
-    .map((item, index) => ({
-      training_plan_id: planId,
-      position: index,
-      exercise_name: item.exercise_name.trim(),
-      exercise_id: item.exercise_id ?? null,
-      reps_or_duration: item.reps_or_duration.trim() || null,
-      sets: item.sets.trim() || null,
-      rest_time: item.rest_time.trim() || null,
-      link_url: normalizeUrl(item.link_url),
-      notes: item.notes.trim() || null,
-    }));
+  const rows = filteredItems.map((item, index) => ({
+    training_plan_id: planId,
+    position: index,
+    exercise_name: item.exercise_name.trim(),
+    exercise_id: resolvedExerciseIds[index],
+    reps_or_duration: item.reps_or_duration.trim() || null,
+    sets: item.sets.trim() || null,
+    rest_time: item.rest_time.trim() || null,
+    link_url: normalizeUrl(item.link_url),
+    notes: item.notes.trim() || null,
+  }));
 
+  let savedItems: SavedPlanItem[] = [];
   if (rows.length > 0) {
-    const { error: insertError } = await supabase.from("training_plan_items").insert(rows);
+    const { data: inserted, error: insertError } = await supabase
+      .from("training_plan_items")
+      .insert(rows)
+      .select("position, exercise_id");
     if (insertError) return { error: "Speichern fehlgeschlagen." };
+    savedItems = inserted ?? [];
   }
 
   // For recurring plans, propagate these exercises to sibling occurrences
   // that haven't been individually customized yet (still have zero items).
   // Once a sibling gets its own items, it "detaches" from auto-sync.
-  const { data: plan } = await supabase
-    .from("training_plans")
-    .select("series_id")
-    .eq("id", planId)
-    .single();
-
   if (plan?.series_id) {
     const { data: siblings } = await supabase
       .from("training_plans")
@@ -291,7 +332,7 @@ export async function savePlanItemsAction(
   revalidatePath(`/trainer/plans/${planId}/edit`);
   revalidatePath("/trainer/plans");
   revalidatePath(`/athlete/plans/${planId}`);
-  return {};
+  return { items: savedItems };
 }
 
 export async function reschedulePlanAction(

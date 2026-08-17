@@ -50,7 +50,7 @@ export default async function TrainerAthletikPage({
 
   const selectedExercise = params.exercise && exerciseMap.has(params.exercise) ? params.exercise : exercises[0]?.id;
 
-  const { data: results } = selectedAthlete && selectedExercise
+  const { data: rawResults } = selectedAthlete && selectedExercise
     ? await supabase
         .from("exercise_results")
         .select("date, value, unit")
@@ -58,6 +58,15 @@ export default async function TrainerAthletikPage({
         .eq("exercise_id", selectedExercise)
         .order("date")
     : { data: [] };
+
+  // Multiple sets can exist per day now — collapse to the heaviest set per
+  // day so the curve and table show one clean point per session.
+  const resultsByDate = new Map<string, { date: string; value: number; unit: string | null }>();
+  for (const r of rawResults ?? []) {
+    const existing = resultsByDate.get(r.date);
+    if (!existing || r.value > existing.value) resultsByDate.set(r.date, r);
+  }
+  const results = Array.from(resultsByDate.values()).sort((a, b) => (a.date < b.date ? -1 : 1));
 
   return (
     <div className="flex flex-col gap-6">

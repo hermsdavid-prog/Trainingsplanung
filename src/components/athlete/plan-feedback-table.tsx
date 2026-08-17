@@ -3,7 +3,10 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { upsertFeedbackAction } from "@/lib/actions/feedback";
-import { upsertExerciseResultAction } from "@/lib/actions/exercise-results";
+import {
+  ExerciseSetEntryDialog,
+  type ExerciseSet,
+} from "@/components/athletik/exercise-set-entry-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { NotebookTextIcon, LinkIcon } from "lucide-react";
+import { NotebookTextIcon, LinkIcon, DumbbellIcon } from "lucide-react";
 
 type Item = {
   id: string;
@@ -26,7 +29,8 @@ type Item = {
 };
 
 type FeedbackMap = Record<string, { done: boolean; actual_value: string }>;
-type ResultMap = Record<string, { value: string; unit: string }>;
+type ResultEntry = { sets: ExerciseSet[]; unit: string };
+type ResultMap = Record<string, ResultEntry>;
 
 export function PlanFeedbackTable({
   items,
@@ -46,6 +50,7 @@ export function PlanFeedbackTable({
   const [feedback, setFeedback] = useState<FeedbackMap>(initialFeedback);
   const [results, setResults] = useState<ResultMap>(initialResults);
   const [notesOpenId, setNotesOpenId] = useState<string | null>(null);
+  const [resultsOpenId, setResultsOpenId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
@@ -54,8 +59,8 @@ export function PlanFeedbackTable({
     return feedback[id] ?? { done: false, actual_value: "" };
   }
 
-  function getResult(exerciseId: string) {
-    return results[exerciseId] ?? { value: "", unit: "" };
+  function getResult(exerciseId: string): ResultEntry {
+    return results[exerciseId] ?? { sets: [], unit: "kg" };
   }
 
   function toggleDone(id: string, done: boolean) {
@@ -79,22 +84,8 @@ export function PlanFeedbackTable({
     });
   }
 
-  function updateResultField(exerciseId: string, field: "value" | "unit", value: string) {
-    setResults((prev) => ({ ...prev, [exerciseId]: { ...getResult(exerciseId), [field]: value } }));
-  }
-
-  function saveResult(exerciseId: string) {
-    if (!planDate || !planId) return;
-    const row = getResult(exerciseId);
-    const value = Number(row.value.replace(",", "."));
-    if (!row.value.trim() || Number.isNaN(value)) return;
-    startTransition(async () => {
-      const result = await upsertExerciseResultAction(exerciseId, planDate, value, row.unit, planId);
-      if (result.error) toast.error(result.error);
-    });
-  }
-
   const notesItem = items.find((i) => i.id === notesOpenId);
+  const resultsItem = items.find((i) => i.id === resultsOpenId);
 
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -103,12 +94,12 @@ export function PlanFeedbackTable({
           <tr>
             <th className="w-8 p-2" />
             <th className="p-2 text-left font-medium">Übung</th>
+            {isAthletik && <th className="p-2 text-left font-medium">Ergebnis</th>}
             <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
             <th className="p-2 text-left font-medium">Sätze</th>
             <th className="p-2 text-left font-medium">Pause</th>
             <th className="p-2 text-left font-medium">Hinweise / Link</th>
             <th className="p-2 text-left font-medium">Ist-Wert / Notiz</th>
-            {isAthletik && <th className="p-2 text-left font-medium">Ergebnis</th>}
           </tr>
         </thead>
         <tbody>
@@ -127,6 +118,25 @@ export function PlanFeedbackTable({
                 <td className={`p-2 ${row.done ? "line-through text-muted-foreground" : ""}`}>
                   {item.exercise_name}
                 </td>
+                {isAthletik && (
+                  <td className="p-2">
+                    {item.exercise_id ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setResultsOpenId(item.id)}
+                      >
+                        <DumbbellIcon />
+                        {getResult(item.exercise_id).sets.length > 0
+                          ? `${getResult(item.exercise_id).sets.length} Satz${getResult(item.exercise_id).sets.length > 1 ? "e" : ""}`
+                          : "Ergebnis"}
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                )}
                 <td className="p-2">{item.reps_or_duration || "—"}</td>
                 <td className="p-2">{item.sets || "—"}</td>
                 <td className="p-2">{item.rest_time || "—"}</td>
@@ -166,35 +176,6 @@ export function PlanFeedbackTable({
                     className="min-w-40"
                   />
                 </td>
-                {isAthletik && (
-                  <td className="p-2">
-                    {item.exercise_id ? (
-                      <div className="flex gap-1">
-                        <Input
-                          type="number"
-                          value={getResult(item.exercise_id).value}
-                          onChange={(e) =>
-                            updateResultField(item.exercise_id!, "value", e.target.value)
-                          }
-                          onBlur={() => saveResult(item.exercise_id!)}
-                          placeholder="z. B. 60"
-                          className="w-20"
-                        />
-                        <Input
-                          value={getResult(item.exercise_id).unit}
-                          onChange={(e) =>
-                            updateResultField(item.exercise_id!, "unit", e.target.value)
-                          }
-                          onBlur={() => saveResult(item.exercise_id!)}
-                          placeholder="kg"
-                          className="w-16"
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                )}
               </tr>
             );
           })}
@@ -211,6 +192,27 @@ export function PlanFeedbackTable({
           <p className="whitespace-pre-wrap text-sm">{notesItem?.notes}</p>
         </DialogContent>
       </Dialog>
+
+      {resultsItem && resultsItem.exercise_id && planId && planDate && (
+        <ExerciseSetEntryDialog
+          key={resultsOpenId}
+          open={resultsOpenId !== null}
+          onOpenChange={(open) => !open && setResultsOpenId(null)}
+          exerciseName={resultsItem.exercise_name}
+          exerciseId={resultsItem.exercise_id}
+          planId={planId}
+          planDate={planDate}
+          initialSets={getResult(resultsItem.exercise_id).sets}
+          initialUnit={getResult(resultsItem.exercise_id).unit}
+          suggestedSetCount={Number(resultsItem.sets) || 1}
+          onSaved={(sets, unit) => {
+            setResults((prev) => ({
+              ...prev,
+              [resultsItem.exercise_id!]: { sets: sets.filter((s) => s.weight.trim()), unit },
+            }));
+          }}
+        />
+      )}
     </div>
   );
 }
