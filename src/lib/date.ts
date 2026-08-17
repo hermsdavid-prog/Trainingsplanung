@@ -12,6 +12,12 @@ export function shiftDateISO(dateStr: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+// Formats a YYYY-MM-DD calendar date as dd/mm/yyyy for compact display.
+export function formatDateShort(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 export function formatDateLabel(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));

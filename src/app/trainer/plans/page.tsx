@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { buttonVariants } from "@/components/ui/button";
 import { CategoryBadge } from "@/components/plans/category-badge";
 import { DeletePlanRowButton } from "@/components/plans/delete-plan-row-button";
+import { formatDateShort } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -63,7 +64,7 @@ export default async function TrainerPlansPage() {
               plan.scope_type === "group";
             return (
               <TableRow key={plan.id}>
-                <TableCell>{plan.date}</TableCell>
+                <TableCell>{formatDateShort(plan.date)}</TableCell>
                 <TableCell>
                   <CategoryBadge label={plan.category_label} />
                 </TableCell>

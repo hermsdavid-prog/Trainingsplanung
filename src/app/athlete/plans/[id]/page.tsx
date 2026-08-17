@@ -7,6 +7,7 @@ import { PlanTableEditor } from "@/components/plans/plan-table-editor";
 import { PlanActions } from "@/components/plans/plan-actions";
 import type { ExerciseSet } from "@/components/athletik/exercise-set-entry-dialog";
 import { Badge } from "@/components/ui/badge";
+import { formatDateShort } from "@/lib/date";
 import { ChevronLeftIcon } from "lucide-react";
 
 export default async function AthletePlanPage({
@@ -154,7 +155,7 @@ export default async function AthletePlanPage({
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{plan.title}</h1>
         <p className="text-sm text-muted-foreground">
-          {plan.date} ·{" "}
+          {formatDateShort(plan.date)} ·{" "}
           {plan.scope_type === "group"
             ? `Gruppentraining · ${plan.groups?.name ?? ""}`
             : "Einzeltraining für dich"}
