@@ -169,23 +169,26 @@ export function CalendarGrid({
                 </span>
               )}
               <div className="flex flex-col gap-0.5">
-                {items.slice(0, 3).map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.href}
-                    draggable={dragDropActive}
-                    onDragStart={dragDropActive ? (e) => handleDragStart(e, item) : undefined}
-                    onClick={(e) => e.stopPropagation()}
-                    className={cn(
-                      "truncate rounded px-1 py-0.5 text-[0.65rem] text-white",
-                      dragDropActive && "cursor-grab active:cursor-grabbing"
-                    )}
-                    style={{ backgroundColor: item.color, opacity: item.status === "proposed" ? 0.6 : 1 }}
-                    title={item.title}
-                  >
-                    {item.title}
-                  </a>
-                ))}
+                {items.slice(0, 3).map((item) => {
+                  const label = item.subtitle ? `${item.title} · ${item.subtitle}` : item.title;
+                  return (
+                    <a
+                      key={item.id}
+                      href={item.href}
+                      draggable={dragDropActive}
+                      onDragStart={dragDropActive ? (e) => handleDragStart(e, item) : undefined}
+                      onClick={(e) => e.stopPropagation()}
+                      className={cn(
+                        "truncate rounded px-1 py-0.5 text-[0.65rem] text-white",
+                        dragDropActive && "cursor-grab active:cursor-grabbing"
+                      )}
+                      style={{ backgroundColor: item.color, opacity: item.status === "proposed" ? 0.6 : 1 }}
+                      title={label}
+                    >
+                      {label}
+                    </a>
+                  );
+                })}
                 {items.length > 3 && (
                   <span className="text-[0.65rem] text-muted-foreground">
                     +{items.length - 3} mehr

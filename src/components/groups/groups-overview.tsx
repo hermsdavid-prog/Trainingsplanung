@@ -8,7 +8,7 @@ export async function GroupsOverview({ isAdmin }: { isAdmin: boolean }) {
 
   const [{ data: groups }, { data: trainerProfiles }, { data: athleteProfiles }] =
     await Promise.all([
-      supabase.from("groups").select("id, name, description, color").order("name"),
+      supabase.from("groups").select("id, name, description, color, short_name").order("name"),
       supabase.from("profiles").select("id, full_name").eq("role", "trainer").order("full_name"),
       supabase.from("profiles").select("id, full_name").eq("role", "athlete").order("full_name"),
     ]);
@@ -68,6 +68,11 @@ export async function GroupsOverview({ isAdmin }: { isAdmin: boolean }) {
                     style={{ backgroundColor: group.color }}
                   />
                   <CardTitle className="text-base">{group.name}</CardTitle>
+                  {group.short_name && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                      {group.short_name}
+                    </span>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">

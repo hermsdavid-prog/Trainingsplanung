@@ -30,12 +30,12 @@ export default async function AthleteCalendarPage({
 
   const { data: myGroups } = await supabase
     .from("group_athletes")
-    .select("groups(id, name, color)");
+    .select("groups(id, name, color, short_name)");
   const groups = (myGroups ?? [])
     .map((row) => row.groups)
-    .filter((g): g is { id: string; name: string; color: string } => !!g);
+    .filter((g): g is { id: string; name: string; color: string; short_name: string | null } => !!g);
   const groupColor = new Map(groups.map((g) => [g.id, g.color]));
-  const groupName = new Map(groups.map((g) => [g.id, g.name]));
+  const groupLabel = new Map(groups.map((g) => [g.id, g.short_name || g.name]));
 
   const [{ data: plans }, { data: events }] = await Promise.all([
     supabase
@@ -61,7 +61,7 @@ export default async function AthleteCalendarPage({
           ? groupColor.get(plan.group_id ?? "") ?? INDIVIDUAL_PLAN_COLOR
           : INDIVIDUAL_PLAN_COLOR,
       href: `/athlete/plans/${plan.id}`,
-      subtitle: plan.scope_type === "group" ? groupName.get(plan.group_id ?? "") : "Einzelplan",
+      subtitle: plan.scope_type === "group" ? groupLabel.get(plan.group_id ?? "") : "Einzelplan",
       kind: "plan" as const,
     };
     itemsByDate[plan.date] = [...(itemsByDate[plan.date] ?? []), item];

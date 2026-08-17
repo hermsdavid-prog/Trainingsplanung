@@ -296,6 +296,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          short_name: string | null
         }
         Insert: {
           color?: string
@@ -304,6 +305,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          short_name?: string | null
         }
         Update: {
           color?: string
@@ -312,6 +314,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          short_name?: string | null
         }
         Relationships: [
           {

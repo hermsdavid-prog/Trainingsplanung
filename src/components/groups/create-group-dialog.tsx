@@ -67,6 +67,13 @@ export function CreateGroupDialog() {
             <Input id="name" name="name" required />
           </div>
           <div className="flex flex-col gap-2">
+            <Label htmlFor="short_name">Kürzel (optional)</Label>
+            <Input id="short_name" name="short_name" maxLength={8} className="w-24" placeholder="z. B. KU" />
+            <p className="text-xs text-muted-foreground">
+              Erscheint im Kalender statt des vollen Gruppennamens.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
             <Label htmlFor="description">Beschreibung (optional)</Label>
             <Textarea id="description" name="description" rows={2} />
           </div>

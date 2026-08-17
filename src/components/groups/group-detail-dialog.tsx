@@ -31,7 +31,13 @@ export function GroupDetailDialog({
   assignedAthleteIds,
   canDelete,
 }: {
-  group: { id: string; name: string; description: string | null; color: string };
+  group: {
+    id: string;
+    name: string;
+    description: string | null;
+    color: string;
+    short_name: string | null;
+  };
   trainers: Person[];
   athletes: Person[];
   assignedTrainerIds: string[];
@@ -91,6 +97,17 @@ export function GroupDetailDialog({
           <div className="flex flex-col gap-2">
             <Label htmlFor={`name-${group.id}`}>Name</Label>
             <Input id={`name-${group.id}`} name="name" defaultValue={group.name} required />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`short-name-${group.id}`}>Kürzel (optional)</Label>
+            <Input
+              id={`short-name-${group.id}`}
+              name="short_name"
+              maxLength={8}
+              className="w-24"
+              defaultValue={group.short_name ?? ""}
+              placeholder="z. B. KU"
+            />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`desc-${group.id}`}>Beschreibung</Label>

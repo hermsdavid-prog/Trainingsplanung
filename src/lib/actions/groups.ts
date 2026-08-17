@@ -63,6 +63,7 @@ export async function createGroupAction(
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const color = String(formData.get("color") ?? "#6366f1");
+  const shortName = String(formData.get("short_name") ?? "").trim();
 
   if (!name) {
     return { error: "Bitte einen Namen für die Gruppe angeben." };
@@ -70,7 +71,13 @@ export async function createGroupAction(
 
   const { data: group, error } = await supabase
     .from("groups")
-    .insert({ name, description: description || null, color, created_by: userId })
+    .insert({
+      name,
+      description: description || null,
+      color,
+      short_name: shortName || null,
+      created_by: userId,
+    })
     .select("id")
     .single();
 
@@ -98,6 +105,7 @@ export async function updateGroupAction(
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const color = String(formData.get("color") ?? "#6366f1");
+  const shortName = String(formData.get("short_name") ?? "").trim();
 
   if (!groupId || !name) {
     return { error: "Bitte einen Namen für die Gruppe angeben." };
@@ -107,7 +115,7 @@ export async function updateGroupAction(
 
   const { error } = await supabase
     .from("groups")
-    .update({ name, description: description || null, color })
+    .update({ name, description: description || null, color, short_name: shortName || null })
     .eq("id", groupId);
 
   if (error) {

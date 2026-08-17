@@ -36,7 +36,7 @@ export default async function TrainerCalendarPage({
   const supabase = await createClient();
 
   const [{ data: groups }, { data: groupAthleteRows }] = await Promise.all([
-    supabase.from("groups").select("id, name, color").order("name"),
+    supabase.from("groups").select("id, name, color, short_name").order("name"),
     supabase.from("group_athletes").select("athlete_id, profiles(full_name)"),
   ]);
 
@@ -49,7 +49,7 @@ export default async function TrainerCalendarPage({
     full_name,
   }));
   const groupColor = new Map((groups ?? []).map((g) => [g.id, g.color]));
-  const groupName = new Map((groups ?? []).map((g) => [g.id, g.name]));
+  const groupLabel = new Map((groups ?? []).map((g) => [g.id, g.short_name || g.name]));
 
   const showPlans = params.type !== undefined ? params.type === "training" : true;
   const showEvents = params.type ? params.type !== "training" : true;
@@ -87,7 +87,7 @@ export default async function TrainerCalendarPage({
       title: plan.title,
       color: plan.scope_type === "group" ? groupColor.get(plan.group_id ?? "") ?? INDIVIDUAL_PLAN_COLOR : INDIVIDUAL_PLAN_COLOR,
       href: `/trainer/plans/${plan.id}/edit`,
-      subtitle: plan.scope_type === "group" ? groupName.get(plan.group_id ?? "") : "Einzelplan",
+      subtitle: plan.scope_type === "group" ? groupLabel.get(plan.group_id ?? "") : "Einzelplan",
       kind: "plan" as const,
     };
     itemsByDate[plan.date] = [...(itemsByDate[plan.date] ?? []), item];
