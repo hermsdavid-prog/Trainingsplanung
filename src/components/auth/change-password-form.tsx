@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { changePasswordAction, type ActionResult } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 
 const initialState: ActionResult = {};
@@ -18,10 +18,9 @@ export function ChangePasswordForm() {
     <form action={formAction} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">Neues Passwort</Label>
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           minLength={8}
           required
@@ -29,10 +28,9 @@ export function ChangePasswordForm() {
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="passwordConfirm">Neues Passwort bestätigen</Label>
-        <Input
+        <PasswordInput
           id="passwordConfirm"
           name="passwordConfirm"
-          type="password"
           autoComplete="new-password"
           minLength={8}
           required

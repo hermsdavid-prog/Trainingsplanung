@@ -7,28 +7,40 @@ import {
   type HealthLog,
 } from "@/lib/health-status";
 import { HealthChart } from "@/components/health/health-chart";
+import { HealthGroupFilter } from "@/components/health/health-group-filter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-export default async function TrainerHealthPage() {
+export default async function TrainerHealthPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ group?: string }>;
+}) {
+  const params = await searchParams;
   const today = todayISO();
   const rangeStart = shiftDateISO(today, -30);
 
   const supabase = await createClient();
 
-  const { data: groupAthleteRows } = await supabase
-    .from("group_athletes")
-    .select("athlete_id, profiles(full_name)");
+  const { data: groups } = await supabase.from("groups").select("id, name").order("name");
 
-  const athleteMap = new Map<string, string>();
-  for (const row of groupAthleteRows ?? []) {
-    if (row.profiles?.full_name) athleteMap.set(row.athlete_id, row.profiles.full_name);
-  }
-  const athletes = Array.from(athleteMap.entries()).map(([id, full_name]) => ({
-    id,
-    full_name,
-  }));
+  const selectedGroup =
+    params.group && (groups ?? []).some((g) => g.id === params.group)
+      ? params.group
+      : groups?.[0]?.id;
+
+  const { data: groupAthleteRows } = selectedGroup
+    ? await supabase
+        .from("group_athletes")
+        .select("athlete_id, profiles(full_name)")
+        .eq("group_id", selectedGroup)
+    : { data: [] };
+
+  const athletes = (groupAthleteRows ?? [])
+    .filter((row) => row.profiles?.full_name)
+    .map((row) => ({ id: row.athlete_id, full_name: row.profiles!.full_name }))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   const athleteIds = athletes.map((a) => a.id);
   const { data: logs } = athleteIds.length
@@ -55,10 +67,16 @@ export default async function TrainerHealthPage() {
         </p>
       </div>
 
-      {athletes.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Noch keine Athleten in deinen Gruppen.
-        </p>
+      {(!groups || groups.length === 0) && (
+        <p className="text-sm text-muted-foreground">Noch keine Gruppen angelegt.</p>
+      )}
+
+      {groups && groups.length > 0 && (
+        <HealthGroupFilter key={selectedGroup} groups={groups} />
+      )}
+
+      {selectedGroup && athletes.length === 0 && (
+        <p className="text-sm text-muted-foreground">Noch keine Athleten in dieser Gruppe.</p>
       )}
 
       <div className="flex flex-col gap-4">
