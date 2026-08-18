@@ -35,6 +35,9 @@ export async function createEventAction(input: CreateEventInput): Promise<Action
   if (!input.title.trim() || !input.date) {
     return { error: "Bitte Titel und Datum angeben." };
   }
+  if (input.repeatUntil && input.repeatUntil < input.date) {
+    return { error: "Das Wiederholungsdatum muss nach dem Startdatum liegen." };
+  }
 
   const dates = input.repeatUntil
     ? weeklyOccurrences(input.date, input.repeatUntil)
@@ -164,12 +167,16 @@ export async function rescheduleEventAction(
     newEnd = new Date(new Date(newStart).getTime() + durationMs).toISOString();
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("events")
     .update({ start_at: newStart, end_at: newEnd })
-    .eq("id", eventId);
+    .eq("id", eventId)
+    .select("id");
 
   if (error) return { error: "Termin konnte nicht verschoben werden." };
+  if (!data || data.length === 0) {
+    return { error: "Keine Berechtigung, diesen Termin zu verschieben." };
+  }
 
   revalidatePath("/trainer/calendar");
   revalidatePath("/athlete/calendar");
@@ -179,12 +186,16 @@ export async function rescheduleEventAction(
 export async function confirmEventAction(eventId: string): Promise<ActionResult> {
   const { supabase } = await requireUser();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("events")
     .update({ status: "confirmed" })
-    .eq("id", eventId);
+    .eq("id", eventId)
+    .select("id");
 
   if (error) return { error: "Termin konnte nicht bestätigt werden." };
+  if (!data || data.length === 0) {
+    return { error: "Keine Berechtigung, diesen Termin zu bestätigen." };
+  }
 
   revalidatePath("/trainer/calendar");
   revalidatePath("/athlete/calendar");
@@ -194,8 +205,16 @@ export async function confirmEventAction(eventId: string): Promise<ActionResult>
 export async function deleteEventAction(eventId: string): Promise<ActionResult> {
   const { supabase } = await requireUser();
 
-  const { error } = await supabase.from("events").delete().eq("id", eventId);
+  const { data, error } = await supabase
+    .from("events")
+    .delete()
+    .eq("id", eventId)
+    .select("id");
+
   if (error) return { error: "Termin konnte nicht gelöscht werden." };
+  if (!data || data.length === 0) {
+    return { error: "Keine Berechtigung, diesen Termin zu löschen." };
+  }
 
   revalidatePath("/trainer/calendar");
   revalidatePath("/athlete/calendar");

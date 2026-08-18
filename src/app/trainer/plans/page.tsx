@@ -21,13 +21,16 @@ export default async function TrainerPlansPage() {
     data: { user: currentUser },
   } = await supabase.auth.getUser();
 
+  // Capped so this list stays fast as plan history grows; older plans are still
+  // reachable via the calendar's date navigation.
   const [{ data: plans }, { data: profile }] = await Promise.all([
     supabase
       .from("training_plans")
       .select(
         "id, title, category_label, date, scope_type, created_by, groups(name), profiles!training_plans_athlete_id_fkey(full_name)"
       )
-      .order("date", { ascending: false }),
+      .order("date", { ascending: false })
+      .limit(300),
     currentUser
       ? supabase.from("profiles").select("role").eq("id", currentUser.id).single()
       : Promise.resolve({ data: null }),

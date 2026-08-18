@@ -118,6 +118,9 @@ export async function createPlanAction(
   if (scopeType === "athlete" && !athleteId) {
     return { error: "Bitte einen Athleten auswählen." };
   }
+  if (repeatUntil && repeatUntil < date) {
+    return { error: "Das Wiederholungsdatum muss nach dem Startdatum liegen." };
+  }
 
   const dates = repeatUntil ? weeklyOccurrences(date, repeatUntil) : [date];
   const seriesId = dates.length > 1 ? randomUUID() : null;
@@ -269,10 +272,11 @@ export async function savePlanItemsAction(
       continue;
     }
     const name = item.exercise_name.trim();
+    const escapedName = name.replace(/[%_\\]/g, (char) => `\\${char}`);
     const { data: existing } = await supabase
       .from("exercises")
       .select("id")
-      .ilike("name", name)
+      .ilike("name", escapedName)
       .maybeSingle();
     if (existing) {
       resolvedExerciseIds.push(existing.id);
@@ -350,7 +354,7 @@ export async function reschedulePlanAction(
   planId: string,
   newDate: string
 ): Promise<ActionResult> {
-  const { supabase } = await requireTrainerOrAdmin();
+  const { supabase } = await requirePlanEditAccess(planId);
 
   const { error } = await supabase
     .from("training_plans")
@@ -368,7 +372,7 @@ export async function duplicatePlanToDateAction(
   planId: string,
   newDate: string
 ): Promise<ActionResult> {
-  const { supabase, userId } = await requireTrainerOrAdmin();
+  const { supabase, userId } = await requirePlanEditAccess(planId);
 
   const { data: sourcePlan } = await supabase
     .from("training_plans")

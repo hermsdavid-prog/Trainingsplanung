@@ -21,12 +21,22 @@ export async function upsertHealthLogAction(input: {
     return { error: "Bitte Wohlbefinden auf einer Skala von 1-10 angeben." };
   }
 
+  const hrv = input.hrv.trim() ? Number(input.hrv) : null;
+  if (hrv !== null && (!Number.isFinite(hrv) || hrv < 0)) {
+    return { error: "Bitte einen gültigen HRV-Wert angeben." };
+  }
+
+  const restingHr = input.restingHr.trim() ? Number(input.restingHr) : null;
+  if (restingHr !== null && (!Number.isFinite(restingHr) || restingHr < 0)) {
+    return { error: "Bitte einen gültigen Ruhepuls angeben." };
+  }
+
   const { error } = await supabase.from("health_logs").upsert(
     {
       athlete_id: user.id,
       date: input.date,
-      hrv: input.hrv ? Number(input.hrv) : null,
-      resting_hr: input.restingHr ? Number(input.restingHr) : null,
+      hrv,
+      resting_hr: restingHr,
       wellbeing: input.wellbeing,
     },
     { onConflict: "athlete_id,date" }
