@@ -2,44 +2,47 @@
 
 import { useActionState } from "react";
 import { changePasswordAction, type ActionResult } from "@/lib/actions/auth";
-import { Button } from "@/components/ui/button";
-import { PasswordInput } from "@/components/ui/password-input";
-import { Label } from "@/components/ui/label";
 
 const initialState: ActionResult = {};
 
 export function ChangePasswordForm() {
-  const [state, formAction, isPending] = useActionState(
-    changePasswordAction,
-    initialState
-  );
+  const [state, formAction, isPending] = useActionState(changePasswordAction, initialState);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="password">Neues Passwort</Label>
-        <PasswordInput
+    <form action={formAction} className="flex flex-col">
+      <div className="field">
+        <label htmlFor="password">Neues Passwort</label>
+        <input
           id="password"
           name="password"
+          type="password"
           autoComplete="new-password"
           minLength={8}
           required
+          className="input"
+          placeholder="mindestens acht Zeichen"
         />
       </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="passwordConfirm">Neues Passwort bestätigen</Label>
-        <PasswordInput
+      <div className="field mt-3.5">
+        <label htmlFor="passwordConfirm">Wiederholen</label>
+        <input
           id="passwordConfirm"
           name="passwordConfirm"
+          type="password"
           autoComplete="new-password"
           minLength={8}
           required
+          className="input"
         />
       </div>
-      {state.error && <p className="text-sm text-destructive">{state.error}</p>}
-      <Button type="submit" disabled={isPending} className="mt-2">
-        {isPending ? "Speichern…" : "Passwort speichern"}
-      </Button>
+      {state.error && (
+        <div className="mt-3 text-[13px]" style={{ color: "var(--dc-accent-2-700)" }}>
+          {state.error}
+        </div>
+      )}
+      <button type="submit" disabled={isPending} className="btn btn-primary btn-block mt-5">
+        {isPending ? "Speichern…" : "Speichern und weiter"}
+      </button>
     </form>
   );
 }

@@ -1,14 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { AthletikFilters } from "@/components/athletik/athletik-filters";
 import { ExerciseProgressChart } from "@/components/athletik/exercise-progress-chart";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { formatDateShort } from "@/lib/date";
 
 export default async function AthleteAthletikPage({
   searchParams,
@@ -38,6 +31,7 @@ export default async function AthleteAthletikPage({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const selectedExercise = params.exercise && exerciseMap.has(params.exercise) ? params.exercise : exercises[0]?.id;
+  const selectedName = exercises.find((e) => e.id === selectedExercise)?.name ?? "";
 
   const { data: rawResults } = user && selectedExercise
     ? await supabase
@@ -48,9 +42,6 @@ export default async function AthleteAthletikPage({
         .order("date")
     : { data: [] };
 
-  // Multiple sets can exist per day now — collapse to the heaviest Arbeitssatz
-  // per day so the curve and table show one clean point per session, without
-  // warm-up sets skewing the trend.
   const resultsByDate = new Map<string, { date: string; value: number; unit: string | null }>();
   for (const r of rawResults ?? []) {
     if (r.set_type === "aufwaermsatz") continue;
@@ -58,52 +49,64 @@ export default async function AthleteAthletikPage({
     if (!existing || r.value > existing.value) resultsByDate.set(r.date, r);
   }
   const results = Array.from(resultsByDate.values()).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const best = results.length ? Math.max(...results.map((r) => r.value)) : null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Athletik-Fortschritt</h1>
-        <p className="text-sm text-muted-foreground">
-          Deine Entwicklung in einzelnen Athletik-Übungen über die Zeit.
-        </p>
-      </div>
+    <div>
+      <div className="kicker">Athletik</div>
+      <h2 className="mt-2.5 text-[27px] leading-[1.08]">{selectedName || "Athletik-Fortschritt"}</h2>
 
-      {exercises.length === 0 && (
-        <p className="text-sm text-muted-foreground">
+      {exercises.length === 0 ? (
+        <p className="mt-4 text-sm text-muted">
           Noch keine Athletik-Ergebnisse eingetragen. Trage in einem Training der Kategorie
-          &bdquo;Athletik&rdquo; Ergebnisse zu Übungen aus der Bibliothek ein.
+          „Athletik“ Ergebnisse zu Übungen aus der Bibliothek ein.
         </p>
-      )}
+      ) : (
+        <>
+          <div className="mt-4">
+            <AthletikFilters exercises={exercises} />
+          </div>
 
-      {exercises.length > 0 && <AthletikFilters exercises={exercises} />}
+          {best != null && (
+            <div className="mt-4 flex items-baseline gap-2.5">
+              <span className="text-[28px] leading-none font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
+                {best}
+              </span>
+              <span className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                bester Wert
+              </span>
+            </div>
+          )}
 
-      {selectedExercise && (results?.length ?? 0) > 0 && (
-        <div className="flex flex-col gap-4">
-          <ExerciseProgressChart data={results ?? []} />
+          {selectedExercise && results.length > 0 && (
+            <div className="mt-4">
+              <ExerciseProgressChart data={results} />
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Datum</TableHead>
-                <TableHead>Ergebnis</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(results ?? [])
-                .slice()
-                .reverse()
-                .map((r) => (
-                  <TableRow key={r.date}>
-                    <TableCell>{r.date}</TableCell>
-                    <TableCell>
-                      {r.value}
-                      {r.unit ? ` ${r.unit}` : ""}
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-        </div>
+              <table className="table mt-4">
+                <thead>
+                  <tr>
+                    <th>Datum</th>
+                    <th>Ergebnis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results
+                    .slice()
+                    .reverse()
+                    .map((r) => (
+                      <tr key={r.date}>
+                        <td>{formatDateShort(r.date)}</td>
+                        <td>
+                          {r.value}
+                          {r.unit ? ` ${r.unit}` : ""}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/current-user";
-import { AppShell } from "@/components/shell/app-shell";
+import { AdminShell } from "@/components/shell/admin-shell";
 
 export default async function AdminLayout({
   children,
@@ -10,9 +10,5 @@ export default async function AdminLayout({
   const profile = await getCurrentProfile();
   if (profile.role !== "admin") redirect("/");
 
-  return (
-    <AppShell role={profile.role} fullName={profile.full_name}>
-      {children}
-    </AppShell>
-  );
+  return <AdminShell fullName={profile.full_name}>{children}</AdminShell>;
 }

@@ -1,55 +1,52 @@
 "use client";
 
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { HealthLog } from "@/lib/health-status";
 
 function MiniChart({
   data,
   dataKey,
-  color,
   domain,
 }: {
   data: HealthLog[];
   dataKey: "wellbeing" | "hrv" | "resting_hr";
-  color: string;
   domain?: [number, number];
 }) {
   return (
-    <ResponsiveContainer width="100%" height={64}>
-      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+    <ResponsiveContainer width="100%" height={78}>
+      <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
         <XAxis dataKey="date" hide />
         <YAxis hide domain={domain ?? ["auto", "auto"]} />
-        <Tooltip
-          labelFormatter={(label) => label}
-          contentStyle={{ fontSize: 12, padding: "4px 8px" }}
-        />
-        <Line
+        <Tooltip labelFormatter={(label) => label} contentStyle={{ fontSize: 12, padding: "4px 8px", borderRadius: 2 }} />
+        <Area
           type="monotone"
           dataKey={dataKey}
-          stroke={color}
-          strokeWidth={2}
+          stroke="#0088b0"
+          strokeWidth={1.25}
+          fill="#e9f8ff"
           dot={false}
           connectNulls
+          activeDot={{ r: 4, stroke: "#f3f2f2", strokeWidth: 1.5 }}
         />
-      </LineChart>
+      </AreaChart>
     </ResponsiveContainer>
   );
 }
 
 export function HealthChart({ data }: { data: HealthLog[] }) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
       <div>
-        <p className="mb-1 text-xs text-muted-foreground">Wohlbefinden</p>
-        <MiniChart data={data} dataKey="wellbeing" color="#10b981" domain={[1, 10]} />
+        <p className="kicker-muted mb-1.5">Wohlbefinden</p>
+        <MiniChart data={data} dataKey="wellbeing" domain={[1, 10]} />
       </div>
       <div>
-        <p className="mb-1 text-xs text-muted-foreground">HRV</p>
-        <MiniChart data={data} dataKey="hrv" color="#6366f1" />
+        <p className="kicker-muted mb-1.5">HRV</p>
+        <MiniChart data={data} dataKey="hrv" />
       </div>
       <div>
-        <p className="mb-1 text-xs text-muted-foreground">Ruheherzfrequenz</p>
-        <MiniChart data={data} dataKey="resting_hr" color="#ef4444" />
+        <p className="kicker-muted mb-1.5">Ruhe-HF</p>
+        <MiniChart data={data} dataKey="resting_hr" />
       </div>
     </div>
   );

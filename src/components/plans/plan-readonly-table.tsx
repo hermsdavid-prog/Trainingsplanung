@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { NotebookTextIcon, LinkIcon } from "lucide-react";
+import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 
 type Row = {
   exercise_name: string;
@@ -30,11 +28,7 @@ export function PlanReadOnlyTable({
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
 
   if (items.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Für diesen Plan wurden noch keine Übungen eingetragen.
-      </p>
-    );
+    return <p className="text-sm text-muted">Für diesen Plan wurden noch keine Übungen eingetragen.</p>;
   }
 
   const indexed = items.map((row, index) => ({ row, index }));
@@ -44,50 +38,86 @@ export function PlanReadOnlyTable({
   const notesRow = notesOpenIndex !== null ? items[notesOpenIndex] : undefined;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        {isAthletik && <h3 className="text-sm font-semibold">Kraft</h3>}
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
+    <div className="flex flex-col gap-8">
+      <div>
+        {isAthletik && <div className="kicker-muted mb-2">Kraft</div>}
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Übung</th>
+              <th>Anzahl / Dauer</th>
+              <th>Sätze</th>
+              <th>Pause</th>
+              <th>Hinweise / Link</th>
+            </tr>
+          </thead>
+          <tbody>
+            {kraftRows.map(({ row, index }) => (
+              <tr key={index}>
+                <td className="text-[15px]">{row.exercise_name}</td>
+                <td>{row.reps_or_duration || "—"}</td>
+                <td>{row.sets || "—"}</td>
+                <td>{row.rest_time || "—"}</td>
+                <td>
+                  <div className="flex items-center gap-2">
+                    {row.notes && (
+                      <button type="button" className="btn btn-ghost" onClick={() => setNotesOpenIndex(index)}>
+                        Hinweise
+                      </button>
+                    )}
+                    {row.link_url && (
+                      <a href={row.link_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                        Link
+                      </a>
+                    )}
+                    {!row.notes && !row.link_url && <span className="text-muted">—</span>}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {isAthletik && cardioRows.length > 0 && (
+        <div>
+          <div className="kicker-accent-2 mb-2">Cardio</div>
+          <table className="table">
+            <thead>
               <tr>
-                <th className="p-2 text-left font-medium">Übung</th>
-                <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
-                <th className="p-2 text-left font-medium">Sätze</th>
-                <th className="p-2 text-left font-medium">Pause</th>
-                <th className="p-2 text-left font-medium">Hinweise / Link</th>
+                <th>Übung</th>
+                <th>Belastung</th>
+                <th>Pause</th>
+                <th>Runden</th>
+                <th>Rundenpause</th>
+                <th>HF on</th>
+                <th>HF off</th>
+                <th>Hinweise / Link</th>
               </tr>
             </thead>
             <tbody>
-              {kraftRows.map(({ row, index }) => (
-                <tr key={index} className="border-t">
-                  <td className="p-2">{row.exercise_name}</td>
-                  <td className="p-2">{row.reps_or_duration || "—"}</td>
-                  <td className="p-2">{row.sets || "—"}</td>
-                  <td className="p-2">{row.rest_time || "—"}</td>
-                  <td className="p-2">
-                    <div className="flex items-center gap-1">
-                      {row.notes ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setNotesOpenIndex(index)}
-                        >
-                          <NotebookTextIcon /> Hinweise
-                        </Button>
-                      ) : null}
-                      {row.link_url ? (
-                        <a
-                          href={row.link_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs hover:bg-muted"
-                        >
-                          <LinkIcon className="size-3.5" /> Link
+              {cardioRows.map(({ row, index }) => (
+                <tr key={index}>
+                  <td className="text-[15px]">{row.exercise_name}</td>
+                  <td>{row.reps_or_duration || "—"}</td>
+                  <td>{row.rest_time || "—"}</td>
+                  <td>{row.sets || "—"}</td>
+                  <td>{row.round_rest || "—"}</td>
+                  <td>{row.heart_rate_on || "—"}</td>
+                  <td>{row.heart_rate_off || "—"}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      {row.notes && (
+                        <button type="button" className="btn btn-ghost" onClick={() => setNotesOpenIndex(index)}>
+                          Hinweise
+                        </button>
+                      )}
+                      {row.link_url && (
+                        <a href={row.link_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                          Link
                         </a>
-                      ) : null}
-                      {!row.notes && !row.link_url && <span className="text-muted-foreground">—</span>}
+                      )}
+                      {!row.notes && !row.link_url && <span className="text-muted">—</span>}
                     </div>
                   </td>
                 </tr>
@@ -95,80 +125,21 @@ export function PlanReadOnlyTable({
             </tbody>
           </table>
         </div>
-      </div>
-
-      {isAthletik && cardioRows.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold">Cardio</h3>
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="p-2 text-left font-medium">Übung</th>
-                  <th className="p-2 text-left font-medium">Belastung</th>
-                  <th className="p-2 text-left font-medium">Pause</th>
-                  <th className="p-2 text-left font-medium">Runden</th>
-                  <th className="p-2 text-left font-medium">Rundenpause</th>
-                  <th className="p-2 text-left font-medium">Herzfrequenz (on)</th>
-                  <th className="p-2 text-left font-medium">Herzfrequenz (off)</th>
-                  <th className="p-2 text-left font-medium">Hinweise / Link</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cardioRows.map(({ row, index }) => (
-                  <tr key={index} className="border-t">
-                    <td className="p-2">{row.exercise_name}</td>
-                    <td className="p-2">{row.reps_or_duration || "—"}</td>
-                    <td className="p-2">{row.rest_time || "—"}</td>
-                    <td className="p-2">{row.sets || "—"}</td>
-                    <td className="p-2">{row.round_rest || "—"}</td>
-                    <td className="p-2">{row.heart_rate_on || "—"}</td>
-                    <td className="p-2">{row.heart_rate_off || "—"}</td>
-                    <td className="p-2">
-                      <div className="flex items-center gap-1">
-                        {row.notes ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setNotesOpenIndex(index)}
-                          >
-                            <NotebookTextIcon /> Hinweise
-                          </Button>
-                        ) : null}
-                        {row.link_url ? (
-                          <a
-                            href={row.link_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs hover:bg-muted"
-                          >
-                            <LinkIcon className="size-3.5" /> Link
-                          </a>
-                        ) : null}
-                        {!row.notes && !row.link_url && <span className="text-muted-foreground">—</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
       )}
 
-      <Dialog
-        open={notesOpenIndex !== null}
-        onOpenChange={(open) => !open && setNotesOpenIndex(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+      <Dialog open={notesOpenIndex !== null} onOpenChange={(open) => !open && setNotesOpenIndex(null)}>
+        <DialogPortal>
+          <DialogOverlay />
+          <DialogContent showCloseButton={false} className="dc-dialog max-w-[440px]">
+            <div className="kicker-muted">
               Hinweise {notesRow?.exercise_name && `— ${notesRow.exercise_name}`}
-            </DialogTitle>
-          </DialogHeader>
-          <p className="whitespace-pre-wrap text-sm">{notesRow?.notes}</p>
-        </DialogContent>
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-sm">{notesRow?.notes}</p>
+            <button type="button" className="btn btn-primary mt-2 self-start" onClick={() => setNotesOpenIndex(null)}>
+              Schließen
+            </button>
+          </DialogContent>
+        </DialogPortal>
       </Dialog>
     </div>
   );

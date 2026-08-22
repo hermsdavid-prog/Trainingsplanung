@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { weeklyOccurrences } from "@/lib/date";
+import { weeklyOccurrences, appWallTimeToUTCISOString } from "@/lib/date";
 
 export type ActionResult = { error?: string };
 
@@ -49,7 +49,7 @@ export async function createEventAction(input: CreateEventInput): Promise<Action
     description: input.description.trim() || null,
     event_type: input.eventType.trim() || "Termin",
     color: input.color,
-    start_at: input.allDay ? `${date}T00:00:00Z` : `${date}T${input.time || "00:00"}:00Z`,
+    start_at: input.allDay ? `${date}T00:00:00Z` : appWallTimeToUTCISOString(date, input.time || "00:00"),
     all_day: input.allDay,
     group_id: input.groupId,
     athlete_id: input.athleteId,

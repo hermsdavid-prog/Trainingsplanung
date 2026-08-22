@@ -1,13 +1,15 @@
 "use client";
 
+import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+type Hit = {
+  key: string;
+  label: string;
+  meta: string;
+  paramKey: "group" | "athlete" | "type";
+  paramValue: string;
+};
 
 export function CalendarFilters({
   groups,
@@ -21,82 +23,119 @@ export function CalendarFilters({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  function setParam(key: string, value: string) {
+  const allEntries: Hit[] = useMemo(() => {
+    const entries: Hit[] = [
+      { key: "type:training", label: "Training", meta: "Trainingspläne", paramKey: "type", paramValue: "training" },
+    ];
+    for (const g of groups) {
+      entries.push({ key: `group:${g.id}`, label: g.name, meta: "Gruppe", paramKey: "group", paramValue: g.id });
+    }
+    for (const a of athletes) {
+      entries.push({
+        key: `athlete:${a.id}`,
+        label: a.full_name,
+        meta: "Athlet",
+        paramKey: "athlete",
+        paramValue: a.id,
+      });
+    }
+    for (const t of eventTypes) {
+      entries.push({ key: `type:${t}`, label: t, meta: "Terminart", paramKey: "type", paramValue: t });
+    }
+    return entries;
+  }, [groups, athletes, eventTypes]);
+
+  const hits = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return allEntries.filter((e) => e.label.toLowerCase().includes(q)).slice(0, 8);
+  }, [allEntries, query]);
+
+  const activeLabel = useMemo(() => {
+    const groupId = searchParams.get("group");
+    const athleteId = searchParams.get("athlete");
+    const type = searchParams.get("type");
+    if (groupId) return groups.find((g) => g.id === groupId)?.name ?? "Gruppe";
+    if (athleteId) return athletes.find((a) => a.id === athleteId)?.full_name ?? "Athlet";
+    if (type === "training") return "Training";
+    if (type) return type;
+    return "keine";
+  }, [searchParams, groups, athletes]);
+
+  function pick(hit: Hit) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value === "all") params.delete(key);
-    else params.set(key, value);
+    params.delete("group");
+    params.delete("athlete");
+    params.delete("type");
     params.delete("date");
+    params.set(hit.paramKey, hit.paramValue);
     router.push(`${pathname}?${params.toString()}`);
+    setQuery(hit.label);
+    setOpen(false);
+    inputRef.current?.blur();
   }
 
-  const groupItems = { all: "Alle Gruppen", ...Object.fromEntries(groups.map((g) => [g.id, g.name])) };
-  const athleteItems = {
-    all: "Alle Sportler",
-    ...Object.fromEntries(athletes.map((a) => [a.id, a.full_name])),
-  };
-  const typeItems = {
-    all: "Alle Typen",
-    training: "Training",
-    ...Object.fromEntries(eventTypes.map((t) => [t, t])),
-  };
+  function reset() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("group");
+    params.delete("athlete");
+    params.delete("type");
+    params.delete("date");
+    router.push(`${pathname}?${params.toString()}`);
+    setQuery("");
+    setOpen(false);
+  }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <Select
-        items={groupItems}
-        defaultValue={searchParams.get("group") ?? "all"}
-        onValueChange={(v) => setParam("group", String(v))}
-      >
-        <SelectTrigger className="w-40">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Alle Gruppen</SelectItem>
-          {groups.map((g) => (
-            <SelectItem key={g.id} value={g.id}>
-              {g.name}
-            </SelectItem>
+    <div className="relative">
+      <div className="field">
+        <label htmlFor="calQuery">Filter · aktiv: {activeLabel}</label>
+        <input
+          id="calQuery"
+          ref={inputRef}
+          className="input"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => query && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 120)}
+          placeholder="Buchstaben tippen, z. B. u18"
+          autoComplete="off"
+        />
+      </div>
+      {open && query.trim() && (
+        <div className="absolute z-10 mt-1 w-full" style={{ background: "var(--dc-surface)" }}>
+          {hits.map((h) => (
+            <button
+              key={h.key}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(h)}
+              className="block w-full text-left"
+              style={{ padding: "8px 10px", fontFamily: "var(--dc-font-body)", fontSize: "13px", lineHeight: 1.3, background: "transparent", border: 0, cursor: "pointer", color: "var(--dc-text)" }}
+            >
+              {h.label}
+              <span className="block text-[11px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                {h.meta}
+              </span>
+            </button>
           ))}
-        </SelectContent>
-      </Select>
-
-      <Select
-        items={athleteItems}
-        defaultValue={searchParams.get("athlete") ?? "all"}
-        onValueChange={(v) => setParam("athlete", String(v))}
-      >
-        <SelectTrigger className="w-40">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Alle Sportler</SelectItem>
-          {athletes.map((a) => (
-            <SelectItem key={a.id} value={a.id}>
-              {a.full_name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select
-        items={typeItems}
-        defaultValue={searchParams.get("type") ?? "all"}
-        onValueChange={(v) => setParam("type", String(v))}
-      >
-        <SelectTrigger className="w-40">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Alle Typen</SelectItem>
-          <SelectItem value="training">Training</SelectItem>
-          {eventTypes.map((t) => (
-            <SelectItem key={t} value={t}>
-              {t}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          {hits.length === 0 && (
+            <div className="text-xs" style={{ padding: "8px 10px", color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+              Nichts gefunden.
+            </div>
+          )}
+        </div>
+      )}
+      <button type="button" className="btn btn-ghost mt-1.5" onClick={reset}>
+        Filter zurücksetzen
+      </button>
     </div>
   );
 }

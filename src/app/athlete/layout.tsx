@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/current-user";
-import { AppShell } from "@/components/shell/app-shell";
+import { AthleteShell } from "@/components/shell/athlete-shell";
 
 export default async function AthleteLayout({
   children,
@@ -10,9 +10,5 @@ export default async function AthleteLayout({
   const profile = await getCurrentProfile();
   if (profile.role !== "athlete") redirect("/");
 
-  return (
-    <AppShell role={profile.role} fullName={profile.full_name}>
-      {children}
-    </AppShell>
-  );
+  return <AthleteShell fullName={profile.full_name}>{children}</AthleteShell>;
 }

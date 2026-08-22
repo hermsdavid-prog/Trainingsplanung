@@ -3,16 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { upsertExerciseResultAction, deleteExerciseResultSetAction } from "@/lib/actions/exercise-results";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 
 export type SetType = "aufwaermsatz" | "arbeitssatz";
@@ -113,98 +104,94 @@ export function ExerciseSetEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Ergebnis — {exerciseName}</DialogTitle>
-        </DialogHeader>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogContent showCloseButton={false} className="dc-dialog max-w-[420px]">
+          <div className="kicker-muted">Ergebnis — {exerciseName}</div>
 
-        {!exerciseId ? (
-          <p className="text-sm text-muted-foreground">
-            Bitte zuerst die Übungstabelle speichern — danach kann hier ein Ergebnis erfasst
-            werden.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="result-unit">Einheit</Label>
-              <Input
-                id="result-unit"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                placeholder="kg"
-                className="w-24"
-              />
-            </div>
+          {!exerciseId ? (
+            <p className="mt-2 text-sm text-muted">
+              Bitte zuerst den Plan zuweisen — danach kann hier ein Ergebnis erfasst
+              werden.
+            </p>
+          ) : (
+            <div className="mt-3 flex flex-col gap-3">
+              <div className="field">
+                <label htmlFor="result-unit">Einheit</label>
+                <input
+                  id="result-unit"
+                  className="input w-24"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  placeholder="kg"
+                />
+              </div>
 
-            <div className="flex flex-col gap-3">
-              {sets.map((set, index) => {
-                typeCounts[set.type] = (typeCounts[set.type] ?? 0) + 1;
-                return (
-                  <div key={index} className="flex items-end gap-2">
-                    <span className="w-24 pb-2.5 text-sm font-medium text-muted-foreground">
-                      {SET_TYPE_LABEL[set.type]} {typeCounts[set.type]}
-                    </span>
-                    <div className="flex flex-1 flex-col gap-1">
-                      <Label className="text-xs text-muted-foreground">Wdh.</Label>
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        value={set.reps}
-                        onChange={(e) => updateSet(index, "reps", e.target.value)}
-                        placeholder="10"
-                      />
+              <div className="flex flex-col gap-2.5">
+                {sets.map((set, index) => {
+                  typeCounts[set.type] = (typeCounts[set.type] ?? 0) + 1;
+                  return (
+                    <div key={index} className="flex items-end gap-2">
+                      <span
+                        className="w-[92px] pb-2 text-[13px]"
+                        style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}
+                      >
+                        {SET_TYPE_LABEL[set.type]} {typeCounts[set.type]}
+                      </span>
+                      <div className="field flex-1">
+                        <label className="!text-[11px]">Wdh.</label>
+                        <input
+                          className="input"
+                          inputMode="decimal"
+                          value={set.reps}
+                          onChange={(e) => updateSet(index, "reps", e.target.value)}
+                          placeholder="10"
+                        />
+                      </div>
+                      <div className="field flex-1">
+                        <label className="!text-[11px]">Gewicht</label>
+                        <input
+                          className="input"
+                          inputMode="decimal"
+                          value={set.weight}
+                          onChange={(e) => updateSet(index, "weight", e.target.value)}
+                          placeholder="60"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => removeSet(index)}
+                        aria-label="Satz entfernen"
+                      >
+                        <Trash2Icon />
+                      </button>
                     </div>
-                    <div className="flex flex-1 flex-col gap-1">
-                      <Label className="text-xs text-muted-foreground">Gewicht</Label>
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        value={set.weight}
-                        onChange={(e) => updateSet(index, "weight", e.target.value)}
-                        placeholder="60"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => removeSet(index)}
-                      aria-label="Satz entfernen"
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  </div>
-                );
-              })}
+                  );
+                })}
 
-              <div className="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addSet("aufwaermsatz")}
-                >
-                  <PlusIcon /> Aufwärmsatz hinzufügen
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addSet("arbeitssatz")}
-                >
-                  <PlusIcon /> Arbeitssatz hinzufügen
-                </Button>
+                <div className="mt-1 flex gap-2">
+                  <button type="button" className="btn btn-secondary" onClick={() => addSet("aufwaermsatz")}>
+                    <PlusIcon /> Aufwärmsatz
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => addSet("arbeitssatz")}>
+                    <PlusIcon /> Arbeitssatz
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <DialogFooter>
-          <Button onClick={handleSave} disabled={isPending || !exerciseId} className="w-full sm:w-auto">
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            onClick={handleSave}
+            disabled={isPending || !exerciseId}
+          >
             {isPending ? "Wird gespeichert…" : "Speichern"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+          </button>
+        </DialogContent>
+      </DialogPortal>
     </Dialog>
   );
 }

@@ -53,6 +53,23 @@ export async function updateSession(request: NextRequest) {
       url.pathname = "/change-password";
       return NextResponse.redirect(url);
     }
+
+    // Once the first-login password flow is done, every role must have accepted the
+    // privacy terms (athletes are additionally asked about health-data consent, but
+    // that's handled on the /consent screen itself — here we only gate on terms).
+    if (pathname !== "/consent") {
+      const { data: consent } = await supabase
+        .from("athlete_consents")
+        .select("terms_accepted")
+        .eq("athlete_id", user.id)
+        .maybeSingle();
+
+      if (!consent?.terms_accepted) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/consent";
+        return NextResponse.redirect(url);
+      }
+    }
   }
 
   if (user && isPublicPath) {

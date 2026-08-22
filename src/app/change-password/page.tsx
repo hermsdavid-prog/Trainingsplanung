@@ -1,23 +1,26 @@
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ChangePasswordPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 px-4">
-      <span className="flex size-12 items-center justify-center rounded-lg bg-brand text-lg font-bold text-brand-foreground">
-        TP
-      </span>
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-xl text-brand">Passwort ändern</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Beim ersten Login muss ein neues, persönliches Passwort vergeben werden.
-          </p>
-        </CardHeader>
-        <CardContent>
+    <div
+      className="flex min-h-screen items-center justify-center p-4 sm:p-8"
+      style={{ background: "var(--dc-neutral-200)" }}
+    >
+      <div
+        className="w-full max-w-[520px] p-6 sm:p-10"
+        style={{ background: "var(--dc-bg)", boxShadow: "var(--dc-shadow-md)" }}
+      >
+        <div className="kicker">Erstes Login</div>
+        <h2 className="mt-2.5 text-[28px] leading-[1.06] sm:text-[30px] sm:leading-[1.05]">
+          Passwort festlegen
+        </h2>
+        <p className="mt-2.5 text-sm leading-[1.6]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+          Das Einmal-Passwort gilt nur für diese Anmeldung.
+        </p>
+        <div className="mt-6">
           <ChangePasswordForm />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

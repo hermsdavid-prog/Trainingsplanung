@@ -1,13 +1,6 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export function HealthGroupFilter({ groups }: { groups: { id: string; name: string }[] }) {
   const router = useRouter();
@@ -21,21 +14,24 @@ export function HealthGroupFilter({ groups }: { groups: { id: string; name: stri
   }
 
   return (
-    <Select
-      items={Object.fromEntries(groups.map((g) => [g.id, g.name]))}
-      defaultValue={searchParams.get("group") ?? groups[0]?.id}
-      onValueChange={(v) => setGroup(String(v))}
-    >
-      <SelectTrigger className="w-56">
-        <SelectValue placeholder="Gruppe wählen" />
-      </SelectTrigger>
-      <SelectContent>
-        {groups.map((g) => (
-          <SelectItem key={g.id} value={g.id}>
+    <div className="flex flex-wrap gap-2">
+      {groups.map((g) => {
+        const active = (searchParams.get("group") ?? groups[0]?.id) === g.id;
+        return (
+          <button
+            key={g.id}
+            type="button"
+            className="chip"
+            onClick={() => setGroup(g.id)}
+            style={{
+              background: active ? "var(--dc-accent)" : "transparent",
+              color: active ? "var(--dc-bg)" : "var(--dc-text)",
+            }}
+          >
             {g.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+          </button>
+        );
+      })}
+    </div>
   );
 }

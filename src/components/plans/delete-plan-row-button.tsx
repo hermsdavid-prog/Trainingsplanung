@@ -3,9 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2Icon } from "lucide-react";
 import { deletePlanAction } from "@/lib/actions/plans";
-import { Button } from "@/components/ui/button";
 
 export function DeletePlanRowButton({ planId, title }: { planId: string; title: string }) {
   const [isPending, startTransition] = useTransition();
@@ -25,14 +23,14 @@ export function DeletePlanRowButton({ planId, title }: { planId: string; title: 
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
+    <button
+      type="button"
+      className="btn btn-ghost"
       onClick={handleDelete}
       disabled={isPending}
       aria-label="Plan löschen"
     >
-      <Trash2Icon />
-    </Button>
+      löschen
+    </button>
   );
 }

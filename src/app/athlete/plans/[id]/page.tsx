@@ -2,13 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PlanFeedbackTable } from "@/components/athlete/plan-feedback-table";
-import { PlanMetaForm } from "@/components/plans/plan-meta-form";
 import { PlanTableEditor } from "@/components/plans/plan-table-editor";
 import { PlanActions } from "@/components/plans/plan-actions";
 import type { ExerciseSet } from "@/components/athletik/exercise-set-entry-dialog";
-import { Badge } from "@/components/ui/badge";
 import { formatDateShort } from "@/lib/date";
-import { ChevronLeftIcon } from "lucide-react";
 
 export default async function AthletePlanPage({
   params,
@@ -25,13 +22,13 @@ export default async function AthletePlanPage({
   const [{ data: plan }, { data: items }] = await Promise.all([
     supabase
       .from("training_plans")
-      .select("id, title, category_label, date, scope_type, created_by, groups(name)")
+      .select("id, title, category_label, date, time, scope_type, created_by, groups(name)")
       .eq("id", id)
       .single(),
     supabase
       .from("training_plan_items")
       .select(
-        "id, exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id, section, round_rest, heart_rate_on, heart_rate_off"
+        "id, exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id, section, round_rest, heart_rate_on, heart_rate_off, description, duration_mode"
       )
       .eq("training_plan_id", id)
       .order("position"),
@@ -43,6 +40,14 @@ export default async function AthletePlanPage({
   const exerciseIds = Array.from(
     new Set((items ?? []).map((i) => i.exercise_id).filter((x): x is string => !!x))
   );
+
+  const { data: instructionRows } = exerciseIds.length
+    ? await supabase
+        .from("exercise_instructions")
+        .select("exercise_id, steps, video_url")
+        .in("exercise_id", exerciseIds)
+    : { data: [] };
+  const instructionsByExerciseId = new Map((instructionRows ?? []).map((r) => [r.exercise_id, r]));
 
   const { data: existingResults } = isAthletik && user && exerciseIds.length
     ? await supabase
@@ -69,60 +74,54 @@ export default async function AthletePlanPage({
   const isOwnPlan = plan.created_by === user?.id;
 
   if (isOwnPlan) {
-    const { data: exerciseLibrary } = isAthletik
-      ? await supabase.from("exercises").select("id, name").order("name")
-      : { data: [] };
+    const { data: exerciseLibrary } = await supabase.from("exercises").select("id, name").order("name");
 
     return (
-      <div className="flex flex-col gap-6">
-        <Link
-          href="/athlete"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeftIcon className="size-4" /> Zurück zur Übersicht
-        </Link>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold">{plan.title}</h1>
-              <Badge variant="secondary">Eigenes Training</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Nur du und dein Trainer können dieses Training sehen.
-            </p>
-          </div>
-          <PlanActions planId={plan.id} />
+      <div>
+        <div className="mt-6 flex flex-col gap-6">
+          <PlanTableEditor
+            planId={plan.id}
+            categoryLabel={plan.category_label}
+            exerciseLibrary={exerciseLibrary ?? []}
+            trackResults
+            initialTitle={plan.title}
+            initialDate={plan.date}
+            initialTime={plan.time}
+            kicker="Eigenes Training"
+            backHref="/athlete"
+            subtitle="Nur du und dein Trainer können dieses Training sehen."
+            headerActions={<PlanActions planId={plan.id} />}
+            initialItems={(items ?? []).map((item) => {
+              const instruction = item.exercise_id ? instructionsByExerciseId.get(item.exercise_id) : undefined;
+              const section = !isAthletik
+                ? "runden"
+                : item.section === "cardio"
+                  ? "cardio"
+                  : item.section === "sprung"
+                    ? "sprung"
+                    : "kraft";
+              return {
+                exercise_name: item.exercise_name,
+                reps_or_duration: item.reps_or_duration ?? "",
+                sets: item.sets ?? "",
+                rest_time: item.rest_time ?? "",
+                notes: item.notes ?? "",
+                link_url: item.link_url ?? "",
+                exercise_id: item.exercise_id,
+                section,
+                round_rest: item.round_rest ?? "",
+                heart_rate_on: item.heart_rate_on ?? "",
+                heart_rate_off: item.heart_rate_off ?? "",
+                description: item.description ?? "",
+                duration_mode: item.duration_mode === "duration" ? "duration" : "reps",
+                instruction_steps: instruction?.steps ?? [],
+                instruction_video_url: instruction?.video_url ?? "",
+                result_sets: item.exercise_id ? resultsByExercise[item.exercise_id]?.sets ?? [] : [],
+                result_unit: item.exercise_id ? resultsByExercise[item.exercise_id]?.unit ?? "kg" : "kg",
+              };
+            })}
+          />
         </div>
-
-        <PlanMetaForm
-          planId={plan.id}
-          categoryLabel={plan.category_label}
-          date={plan.date}
-        />
-
-        <PlanTableEditor
-          planId={plan.id}
-          categoryLabel={plan.category_label}
-          exerciseLibrary={exerciseLibrary ?? []}
-          trackResults
-          planDate={plan.date}
-          initialItems={(items ?? []).map((item) => ({
-            exercise_name: item.exercise_name,
-            reps_or_duration: item.reps_or_duration ?? "",
-            sets: item.sets ?? "",
-            rest_time: item.rest_time ?? "",
-            notes: item.notes ?? "",
-            link_url: item.link_url ?? "",
-            exercise_id: item.exercise_id,
-            section: item.section === "cardio" ? "cardio" : "kraft",
-            round_rest: item.round_rest ?? "",
-            heart_rate_on: item.heart_rate_on ?? "",
-            heart_rate_off: item.heart_rate_off ?? "",
-            result_sets: item.exercise_id ? resultsByExercise[item.exercise_id]?.sets ?? [] : [],
-            result_unit: item.exercise_id ? resultsByExercise[item.exercise_id]?.unit ?? "kg" : "kg",
-          }))}
-        />
       </div>
     );
   }
@@ -144,32 +143,38 @@ export default async function AthletePlanPage({
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <Link
-        href="/athlete"
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeftIcon className="size-4" /> Zurück zur Übersicht
+    <div>
+      <Link href="/athlete" className="btn btn-ghost">
+        ← Startseite
       </Link>
 
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">{plan.title}</h1>
-        <p className="text-sm text-muted-foreground">
-          {formatDateShort(plan.date)} ·{" "}
-          {plan.scope_type === "group"
-            ? `Gruppentraining · ${plan.groups?.name ?? ""}`
-            : "Einzeltraining für dich"}
-        </p>
+      <div className="mt-3 flex flex-col items-start justify-between gap-3 sm:flex-row">
+        <div>
+          <h2 className="text-[27px] leading-[1.08]">{plan.title}</h2>
+          <p className="mt-1 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+            {formatDateShort(plan.date)} ·{" "}
+            {plan.scope_type === "group"
+              ? `Gruppentraining · ${plan.groups?.name ?? ""}`
+              : "Einzeltraining für dich"}
+          </p>
+        </div>
+        {(items ?? []).length > 0 && (
+          <Link href={`/athlete/plans/${plan.id}/session`} className="btn btn-primary">
+            Training starten
+          </Link>
+        )}
       </div>
 
-      <PlanFeedbackTable
-        items={items ?? []}
-        initialFeedback={initialFeedback}
-        categoryLabel={plan.category_label}
-        planId={plan.id}
-        planDate={plan.date}
-        initialResults={resultsByExercise}
-      />
+      <div className="mt-5">
+        <PlanFeedbackTable
+          items={items ?? []}
+          initialFeedback={initialFeedback}
+          categoryLabel={plan.category_label}
+          planId={plan.id}
+          planDate={plan.date}
+          initialResults={resultsByExercise}
+        />
+      </div>
     </div>
   );
 }

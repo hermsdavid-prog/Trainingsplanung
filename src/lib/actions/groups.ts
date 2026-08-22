@@ -28,7 +28,13 @@ async function requireTrainerOrAdmin() {
 // A trainer may only manage groups they are actually assigned to (or created);
 // admins may manage any group. Prevents a trainer from mutating an arbitrary
 // group_id they merely guessed or that isn't shown to them in the UI.
-async function requireGroupManageAccess(groupId: string) {
+//
+// When `requireHead` is set, and the group already has a head trainer, only
+// that head trainer (or an admin) may proceed — matches the design's "Der
+// Haupttrainer darf zusätzlich Gruppe und Team ändern." Groups that don't
+// have a head trainer yet (e.g. created before this feature, or nobody has
+// been promoted) fall back to the old behaviour so nobody gets locked out.
+async function requireGroupManageAccess(groupId: string, options?: { requireHead?: boolean }) {
   const { supabase, userId, role } = await requireTrainerOrAdmin();
 
   if (role === "admin") return { supabase, userId, role };
@@ -40,16 +46,28 @@ async function requireGroupManageAccess(groupId: string) {
     .maybeSingle();
   if (!group) throw new Error("Gruppe nicht gefunden.");
 
-  if (group.created_by === userId) return { supabase, userId, role };
-
   const { data: link } = await supabase
     .from("group_trainers")
-    .select("group_id")
+    .select("group_id, is_head")
     .eq("group_id", groupId)
     .eq("trainer_id", userId)
     .maybeSingle();
 
-  if (!link) throw new Error("Du verwaltest diese Gruppe nicht.");
+  const isAssigned = !!link || group.created_by === userId;
+  if (!isAssigned) throw new Error("Du verwaltest diese Gruppe nicht.");
+
+  if (options?.requireHead) {
+    const { data: headRow } = await supabase
+      .from("group_trainers")
+      .select("trainer_id")
+      .eq("group_id", groupId)
+      .eq("is_head", true)
+      .maybeSingle();
+
+    if (headRow && !link?.is_head) {
+      throw new Error("Nur der Haupttrainer darf Gruppe und Team ändern.");
+    }
+  }
 
   return { supabase, userId, role };
 }
@@ -86,10 +104,11 @@ export async function createGroupAction(
   }
 
   // Trainers must be assigned to their own group, otherwise RLS hides it from them immediately.
+  // The creator starts out as head trainer, matching the design's default.
   if (role === "trainer") {
     await supabase
       .from("group_trainers")
-      .insert({ group_id: group.id, trainer_id: userId });
+      .insert({ group_id: group.id, trainer_id: userId, is_head: true });
   }
 
   revalidatePath("/admin/groups");
@@ -111,7 +130,7 @@ export async function updateGroupAction(
     return { error: "Bitte einen Namen für die Gruppe angeben." };
   }
 
-  const { supabase } = await requireGroupManageAccess(groupId);
+  const { supabase } = await requireGroupManageAccess(groupId, { requireHead: true });
 
   const { error } = await supabase
     .from("groups")
@@ -148,7 +167,7 @@ export async function setGroupTrainerAction(
   trainerId: string,
   assign: boolean
 ): Promise<ActionResult> {
-  const { supabase } = await requireGroupManageAccess(groupId);
+  const { supabase } = await requireGroupManageAccess(groupId, { requireHead: true });
 
   const { error } = assign
     ? await supabase.from("group_trainers").insert({ group_id: groupId, trainer_id: trainerId })
@@ -181,6 +200,34 @@ export async function setGroupAthleteAction(
         .eq("athlete_id", athleteId);
 
   if (error) return { error: "Änderung konnte nicht gespeichert werden." };
+
+  revalidatePath("/admin/groups");
+  revalidatePath("/trainer/groups");
+  return {};
+}
+
+// Promotes a trainer to head trainer for a group. The unique partial index
+// (one head per group) means we must clear any existing head first — two
+// sequential updates, since Supabase doesn't expose client-side transactions.
+export async function promoteHeadTrainerAction(
+  groupId: string,
+  trainerId: string
+): Promise<ActionResult> {
+  const { supabase } = await requireGroupManageAccess(groupId, { requireHead: true });
+
+  const { error: clearError } = await supabase
+    .from("group_trainers")
+    .update({ is_head: false })
+    .eq("group_id", groupId)
+    .eq("is_head", true);
+  if (clearError) return { error: "Haupttrainer konnte nicht geändert werden." };
+
+  const { error } = await supabase
+    .from("group_trainers")
+    .update({ is_head: true })
+    .eq("group_id", groupId)
+    .eq("trainer_id", trainerId);
+  if (error) return { error: "Haupttrainer konnte nicht gesetzt werden." };
 
   revalidatePath("/admin/groups");
   revalidatePath("/trainer/groups");

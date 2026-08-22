@@ -1,14 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO } from "@/lib/date";
-import {
-  computeHealthStatus,
-  HEALTH_STATUS_LABEL,
-  HEALTH_STATUS_DOT,
-} from "@/lib/health-status";
+import { computeHealthStatus, HEALTH_STATUS_LABEL, type HealthStatusLevel } from "@/lib/health-status";
 import { HealthChart } from "@/components/health/health-chart";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { PrivacyPolicyDialog } from "@/components/shell/privacy-policy-dialog";
+
+const LEVEL_TAG: Record<HealthStatusLevel, string> = {
+  red: "tag-accent-2",
+  yellow: "tag-accent",
+  green: "tag-neutral",
+  none: "tag-outline",
+};
 
 export default async function AthleteHealthPage() {
   const today = todayISO();
@@ -31,46 +32,33 @@ export default async function AthleteHealthPage() {
   const { level, today: todayLog } = computeHealthStatus(logs ?? [], today);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Gesundheit</h1>
-        <p className="text-sm text-muted-foreground">
-          Dein Wohlbefinden, HRV und Ruheherzfrequenz der letzten 30 Tage.
-        </p>
+    <div>
+      <div className="kicker">Bereitschaft und Verläufe</div>
+      <h2 className="mt-2.5 text-[27px] leading-[1.08]">Gesundheit</h2>
+      <p className="mt-2.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+        Dein Wohlbefinden, HRV und Ruheherzfrequenz der letzten 30 Tage.
+      </p>
+
+      <div className="mt-5 flex items-center gap-2.5">
+        <span className={`tag ${LEVEL_TAG[level]}`}>{HEALTH_STATUS_LABEL[level]}</span>
+        <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+          {todayLog
+            ? `Heute: Wohlbefinden ${todayLog.wellbeing ?? "—"}${
+                todayLog.hrv != null ? ` · HRV ${todayLog.hrv}` : ""
+              }${todayLog.resting_hr != null ? ` · Ruhe-HF ${todayLog.resting_hr}` : ""}`
+            : "Noch keine Eingabe für heute"}
+        </span>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={cn("size-2.5 rounded-full", HEALTH_STATUS_DOT[level])} />
-            <CardTitle className="text-base">Trainingsbereitschaft</CardTitle>
-            <Badge variant={level === "red" ? "destructive" : "secondary"}>
-              {HEALTH_STATUS_LABEL[level]}
-            </Badge>
-            {todayLog && (
-              <span className="text-xs text-muted-foreground">
-                Heute: Wohlbefinden {todayLog.wellbeing ?? "—"}
-                {todayLog.hrv != null && ` · HRV ${todayLog.hrv}`}
-                {todayLog.resting_hr != null && ` · Ruhe-HF ${todayLog.resting_hr}`}
-              </span>
-            )}
-            {!todayLog && (
-              <span className="text-xs text-muted-foreground">
-                Noch keine Eingabe für heute
-              </span>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {(logs?.length ?? 0) > 0 ? (
-            <HealthChart data={logs ?? []} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Noch keine Gesundheitsdaten vorhanden — trag sie auf der Startseite ein.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <div className="mt-6">
+        {(logs?.length ?? 0) > 0 ? (
+          <HealthChart data={logs ?? []} />
+        ) : (
+          <p className="text-sm text-muted">Noch keine Gesundheitsdaten vorhanden — trag sie auf der Startseite ein.</p>
+        )}
+      </div>
+
+      <PrivacyPolicyDialog trigger="Datenschutzerklärung" triggerClassName="btn btn-ghost mt-6" />
     </div>
   );
 }

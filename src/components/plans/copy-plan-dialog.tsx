@@ -2,24 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { copyPlanAction, type ActionResult } from "@/lib/actions/plans";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
+  DialogPortal,
+  DialogOverlay,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 const initialState: ActionResult = {};
@@ -39,99 +26,99 @@ export function CopyPlanDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline">Plan kopieren</Button>} />
-      <DialogContent>
-        <form action={formAction} className="flex flex-col gap-4">
-          <DialogHeader>
-            <DialogTitle>Plan kopieren</DialogTitle>
-            <DialogDescription>
+      <button type="button" className="btn btn-secondary" onClick={() => setOpen(true)}>
+        Plan kopieren
+      </button>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogContent showCloseButton={false} className="dc-dialog max-w-[460px]">
+          <form action={formAction} className="flex flex-col">
+            <div className="kicker-muted">Plan kopieren</div>
+            <p className="mt-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
               Erstellt eine Kopie dieses Plans (als Entwurf) auf ein neues Datum.
-            </DialogDescription>
-          </DialogHeader>
-          <input type="hidden" name="source_plan_id" value={planId} />
+            </p>
+            <input type="hidden" name="source_plan_id" value={planId} />
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="copy-date">Neues Datum</Label>
-            <Input id="copy-date" name="date" type="date" required />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label>Für wen?</Label>
-            <div className="flex gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="scope_type"
-                  value="group"
-                  checked={scopeType === "group"}
-                  onChange={() => setScopeType("group")}
-                />
-                Gruppe
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="scope_type"
-                  value="athlete"
-                  checked={scopeType === "athlete"}
-                  onChange={() => setScopeType("athlete")}
-                />
-                Einzelner Athlet
-              </label>
+            <div className="field mt-4">
+              <label htmlFor="copy-date">Neues Datum</label>
+              <input id="copy-date" name="date" type="date" required className="input" />
             </div>
-          </div>
 
-          {scopeType === "group" ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="copy-group">Gruppe</Label>
-              <Select
-                name="group_id"
-                required
-                items={Object.fromEntries(groups.map((g) => [g.id, g.name]))}
-              >
-                <SelectTrigger id="copy-group" className="w-full">
-                  <SelectValue placeholder="Gruppe wählen" />
-                </SelectTrigger>
-                <SelectContent>
+            <div className="mt-3.5">
+              <span className="mb-1.5 block text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 70%, transparent)" }}>
+                Für wen?
+              </span>
+              <div className="seg">
+                <label className="seg-opt">
+                  <input
+                    type="radio"
+                    name="scope_type"
+                    value="group"
+                    checked={scopeType === "group"}
+                    onChange={() => setScopeType("group")}
+                  />
+                  Gruppe
+                </label>
+                <label className="seg-opt">
+                  <input
+                    type="radio"
+                    name="scope_type"
+                    value="athlete"
+                    checked={scopeType === "athlete"}
+                    onChange={() => setScopeType("athlete")}
+                  />
+                  Einzelner Athlet
+                </label>
+              </div>
+            </div>
+
+            {scopeType === "group" ? (
+              <div className="field mt-3.5">
+                <label htmlFor="copy-group">Gruppe</label>
+                <select id="copy-group" name="group_id" required className="input" defaultValue="">
+                  <option value="" disabled>
+                    Gruppe wählen
+                  </option>
                   {groups.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
+                    <option key={g.id} value={g.id}>
                       {g.name}
-                    </SelectItem>
+                    </option>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="copy-athlete">Athlet</Label>
-              <Select
-                name="athlete_id"
-                required
-                items={Object.fromEntries(athletes.map((a) => [a.id, a.full_name]))}
-              >
-                <SelectTrigger id="copy-athlete" className="w-full">
-                  <SelectValue placeholder="Athlet wählen" />
-                </SelectTrigger>
-                <SelectContent>
+                </select>
+              </div>
+            ) : (
+              <div className="field mt-3.5">
+                <label htmlFor="copy-athlete">Athlet</label>
+                <select id="copy-athlete" name="athlete_id" required className="input" defaultValue="">
+                  <option value="" disabled>
+                    Athlet wählen
+                  </option>
                   {athletes.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
+                    <option key={a.id} value={a.id}>
                       {a.full_name}
-                    </SelectItem>
+                    </option>
                   ))}
-                </SelectContent>
-              </Select>
+                </select>
+              </div>
+            )}
+
+            {state.error && (
+              <div className="mt-3 text-[13px]" style={{ color: "var(--dc-accent-2-700)" }}>
+                {state.error}
+              </div>
+            )}
+
+            <div className="mt-[18px] flex gap-2">
+              <button type="submit" className="btn btn-primary" disabled={isPending}>
+                {isPending ? "Wird kopiert…" : "Kopieren"}
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
+                Abbrechen
+              </button>
             </div>
-          )}
-
-          {state.error && <p className="text-sm text-destructive">{state.error}</p>}
-
-          <DialogFooter>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Wird kopiert…" : "Kopieren"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+          </form>
+        </DialogContent>
+      </DialogPortal>
     </Dialog>
   );
 }

@@ -4,7 +4,6 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { deletePlanAction } from "@/lib/actions/plans";
-import { Button } from "@/components/ui/button";
 
 export function PlanActions({ planId }: { planId: string }) {
   const [isPending, startTransition] = useTransition();
@@ -23,8 +22,8 @@ export function PlanActions({ planId }: { planId: string }) {
   }
 
   return (
-    <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+    <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={isPending}>
       Löschen
-    </Button>
+    </button>
   );
 }

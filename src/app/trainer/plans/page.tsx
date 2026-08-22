@@ -1,20 +1,16 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { buttonVariants } from "@/components/ui/button";
-import { CategoryBadge } from "@/components/plans/category-badge";
 import { DeletePlanRowButton } from "@/components/plans/delete-plan-row-button";
 import { formatDateShort } from "@/lib/date";
-import { cn } from "@/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
 
-export default async function TrainerPlansPage() {
+export default async function TrainerPlansPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>;
+}) {
+  const { type } = await searchParams;
+  const category = isValidPlanType(type ?? "") ? (type as string) : PLAN_TYPES[0];
   const supabase = await createClient();
 
   const {
@@ -27,8 +23,9 @@ export default async function TrainerPlansPage() {
     supabase
       .from("training_plans")
       .select(
-        "id, title, category_label, date, scope_type, created_by, groups(name), profiles!training_plans_athlete_id_fkey(full_name)"
+        "id, title, category_label, date, time, scope_type, created_by, groups(name), profiles!training_plans_athlete_id_fkey(full_name)"
       )
+      .eq("category_label", category)
       .order("date", { ascending: false })
       .limit(300),
     currentUser
@@ -36,71 +33,74 @@ export default async function TrainerPlansPage() {
       : Promise.resolve({ data: null }),
   ]);
 
+  const isKarate = category === "Sportartspezifisch";
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <div className="flex items-start justify-between gap-5">
         <div>
-          <h1 className="text-2xl font-semibold">Trainingspläne</h1>
-          <p className="text-sm text-muted-foreground">
-            Gruppen- und Einzelpläne erstellen und verwalten.
-          </p>
+          <div className={isKarate ? "kicker-accent-2" : "kicker"}>
+            {isKarate ? "Sportartspezifisch" : "Alle Gruppen"}
+          </div>
+          <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">
+            {isKarate ? "Karate" : "Athletik"}
+          </h2>
         </div>
-        <Link href="/trainer/plans/new" className={buttonVariants()}>
-          Neuer Plan
+        <Link href={`/trainer/plans/new?type=${encodeURIComponent(category)}`} className="btn btn-primary">
+          Neues Training anlegen
         </Link>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Datum</TableHead>
-            <TableHead>Typ</TableHead>
-            <TableHead>Für</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <table className="table mt-7">
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Zeit</th>
+            <th>Titel</th>
+            <th>Für</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
           {(plans ?? []).map((plan) => {
             const canDelete =
               profile?.role === "admin" ||
               plan.created_by === currentUser?.id ||
               plan.scope_type === "group";
             return (
-              <TableRow key={plan.id}>
-                <TableCell>{formatDateShort(plan.date)}</TableCell>
-                <TableCell>
-                  <CategoryBadge label={plan.category_label} />
-                </TableCell>
-                <TableCell>
+              <tr key={plan.id}>
+                <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
+                  {formatDateShort(plan.date)}
+                </td>
+                <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
+                  {plan.time || "—"}
+                </td>
+                <td className="text-[15px]">{plan.title}</td>
+                <td className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
                   {plan.scope_type === "group"
                     ? (plan.groups?.name ?? "—")
                     : (plan.profiles?.full_name ?? "—")}
-                </TableCell>
-                <TableCell>
+                </td>
+                <td>
                   <div className="flex items-center justify-end gap-1">
-                    <Link
-                      href={`/trainer/plans/${plan.id}/edit`}
-                      className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                    >
-                      Bearbeiten
+                    <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-ghost">
+                      bearbeiten
                     </Link>
-                    {canDelete && (
-                      <DeletePlanRowButton planId={plan.id} title={plan.title} />
-                    )}
+                    {canDelete && <DeletePlanRowButton planId={plan.id} title={plan.title} />}
                   </div>
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             );
           })}
           {(!plans || plans.length === 0) && (
-            <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground">
+            <tr>
+              <td colSpan={5} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
                 Noch keine Trainingspläne angelegt.
-              </TableCell>
-            </TableRow>
+              </td>
+            </tr>
           )}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
     </div>
   );
 }

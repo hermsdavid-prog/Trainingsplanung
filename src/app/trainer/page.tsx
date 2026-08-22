@@ -1,19 +1,19 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { todayISO, shiftDateISO } from "@/lib/date";
+import { todayISO, shiftDateISO, formatDateLabel } from "@/lib/date";
 import {
   computeHealthStatus,
   HEALTH_STATUS_LABEL,
-  HEALTH_STATUS_DOT,
-  HEALTH_STATUS_BORDER,
   type HealthLog,
   type HealthStatusLevel,
 } from "@/lib/health-status";
-import { buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 
 const LEVEL_ORDER: Record<HealthStatusLevel, number> = { red: 0, yellow: 1, none: 2, green: 3 };
+const LEVEL_TAG: Record<HealthStatusLevel, string> = {
+  red: "tag-accent-2",
+  yellow: "tag-accent",
+  green: "tag-neutral",
+  none: "tag-outline",
+};
 
 export default async function TrainerDashboardPage() {
   const today = todayISO();
@@ -21,9 +21,13 @@ export default async function TrainerDashboardPage() {
 
   const supabase = await createClient();
 
-  const { data: groupAthleteRows } = await supabase
-    .from("group_athletes")
-    .select("athlete_id, profiles(full_name)");
+  const [{ data: groupAthleteRows }, { data: todaysPlans }] = await Promise.all([
+    supabase.from("group_athletes").select("athlete_id, profiles(full_name)"),
+    supabase
+      .from("training_plans")
+      .select("id, title, category_label, scope_type, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
+      .eq("date", today),
+  ]);
 
   const athleteMap = new Map<string, string>();
   for (const row of groupAthleteRows ?? []) {
@@ -58,71 +62,74 @@ export default async function TrainerDashboardPage() {
     .sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]);
 
   const redCount = rows.filter((r) => r.level === "red").length;
-  const yellowCount = rows.filter((r) => r.level === "yellow").length;
   const checkedInCount = rows.filter((r) => r.todayLog).length;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Trainingsbereitschaft</h1>
-          <p className="text-sm text-muted-foreground">
-            Wie fit sind deine Athleten heute — auf Basis von Wohlbefinden, HRV und
-            Ruheherzfrequenz.
-          </p>
+    <div>
+      <div className="kicker">{formatDateLabel(today)}</div>
+      <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">
+        Übersicht
+      </h2>
+      <p className="mt-3 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+        {(todaysPlans ?? []).length} Einheiten heute geplant · {checkedInCount} von {athletes.length}{" "}
+        Athleten eingecheckt{redCount > 0 ? ` · ${redCount} rote Bereitschaft${redCount > 1 ? "en" : ""}` : ""}
+      </p>
+
+      {(todaysPlans ?? []).length > 0 && (
+        <div className="mt-6 flex flex-col gap-2.5">
+          {(todaysPlans ?? []).map((plan) => (
+            <div
+              key={plan.id}
+              className="p-3.5"
+              style={{ background: "var(--dc-surface)", borderLeft: "2px solid var(--dc-accent)" }}
+            >
+              <div className="flex items-baseline justify-between gap-2.5">
+                <span className="text-[16px]">{plan.title}</span>
+                <span className="tag tag-outline">{plan.category_label}</span>
+              </div>
+              <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                {plan.scope_type === "group"
+                  ? (plan.groups?.name ?? "Gruppe")
+                  : (plan.profiles?.full_name ?? "Einzeltraining")}
+              </div>
+            </div>
+          ))}
         </div>
-        <Link href="/trainer/health" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          Verlaufskurven ansehen
-        </Link>
-      </div>
+      )}
 
+      <div className="kicker-muted mt-8">Trainingsbereitschaft</div>
       {athletes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Noch keine Athleten in deinen Gruppen.</p>
+        <p className="mt-3 text-sm text-muted">Noch keine Athleten in deinen Gruppen.</p>
       ) : (
-        <>
-          <div className="flex flex-wrap gap-3 text-sm">
-            <span className="rounded-md border bg-background px-3 py-1.5">
-              {checkedInCount} / {athletes.length} heute eingecheckt
-            </span>
-            {redCount > 0 && (
-              <span className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-red-700">
-                {redCount} deutliche Abweichung{redCount > 1 ? "en" : ""}
-              </span>
-            )}
-            {yellowCount > 0 && (
-              <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-amber-700">
-                {yellowCount} leichte Abweichung{yellowCount > 1 ? "en" : ""}
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-col divide-y rounded-md border">
+        <table className="table mt-3">
+          <thead>
+            <tr>
+              <th>Athlet</th>
+              <th>Bereitschaft</th>
+              <th>Heute</th>
+            </tr>
+          </thead>
+          <tbody>
             {rows.map(({ athlete, level, todayLog }) => (
-              <div
-                key={athlete.id}
-                className={cn(
-                  "flex flex-wrap items-center justify-between gap-2 border-l-4 p-3",
-                  HEALTH_STATUS_BORDER[level]
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={cn("size-2.5 rounded-full", HEALTH_STATUS_DOT[level])} />
-                  <span className="font-medium">{athlete.full_name}</span>
-                  <Badge variant={level === "red" ? "destructive" : "secondary"}>
-                    {HEALTH_STATUS_LABEL[level]}
-                  </Badge>
-                </div>
-                <span className="text-xs text-muted-foreground">
+              <tr key={athlete.id}>
+                <td className="text-[15px]">{athlete.full_name}</td>
+                <td>
+                  <span className={`tag ${LEVEL_TAG[level]}`}>{HEALTH_STATUS_LABEL[level]}</span>
+                </td>
+                <td
+                  className="text-[13px]"
+                  style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                >
                   {todayLog
-                    ? `Heute: Wohlbefinden ${todayLog.wellbeing ?? "—"}${
+                    ? `Wohlbefinden ${todayLog.wellbeing ?? "—"}${
                         todayLog.hrv != null ? ` · HRV ${todayLog.hrv}` : ""
                       }${todayLog.resting_hr != null ? ` · Ruhe-HF ${todayLog.resting_hr}` : ""}`
                     : "Noch keine Eingabe für heute"}
-                </span>
-              </div>
+                </td>
+              </tr>
             ))}
-          </div>
-        </>
+          </tbody>
+        </table>
       )}
     </div>
   );

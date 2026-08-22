@@ -103,12 +103,18 @@ export async function createPlanAction(
 
   const categoryLabelRaw = String(formData.get("category_label") ?? "").trim();
   const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
+  const title = String(formData.get("title") ?? "").trim();
   const date = String(formData.get("date") ?? "");
+  const time = String(formData.get("time") ?? "").trim() || null;
   const scopeType = String(formData.get("scope_type") ?? "") as PlanScope;
   const groupId = String(formData.get("group_id") ?? "") || null;
   const athleteId = String(formData.get("athlete_id") ?? "") || null;
   const repeatUntil = String(formData.get("repeat_until") ?? "") || null;
+  const templateId = String(formData.get("template_id") ?? "") || null;
 
+  if (!title) {
+    return { error: "Bitte einen Titel angeben." };
+  }
   if (!date) {
     return { error: "Bitte ein Datum angeben." };
   }
@@ -129,9 +135,10 @@ export async function createPlanAction(
     .from("training_plans")
     .insert(
       dates.map((occurrenceDate) => ({
-        title: categoryLabel,
+        title,
         category_label: categoryLabel,
         date: occurrenceDate,
+        time,
         scope_type: scopeType,
         group_id: scopeType === "group" ? groupId : null,
         athlete_id: scopeType === "athlete" ? athleteId : null,
@@ -146,6 +153,37 @@ export async function createPlanAction(
     return { error: "Plan konnte nicht angelegt werden." };
   }
 
+  // "Vorlage wählen" step 1 — prefill the new plan's exercise table from the
+  // chosen plan_templates row so the trainer lands in a pre-populated editor
+  // instead of a blank one.
+  if (templateId) {
+    const { data: template } = await supabase
+      .from("plan_templates")
+      .select("items")
+      .eq("id", templateId)
+      .maybeSingle();
+    const rawItems: unknown[] = Array.isArray(template?.items) ? (template.items as unknown[]) : [];
+    const templateItems: PlanItemInput[] = rawItems
+      .filter((it): it is Record<string, unknown> => typeof it === "object" && it !== null && !Array.isArray(it))
+      .map((it) => ({
+        exercise_name: String(it.exercise_name ?? ""),
+        reps_or_duration: String(it.reps_or_duration ?? ""),
+        sets: String(it.sets ?? ""),
+        rest_time: String(it.rest_time ?? ""),
+        notes: String(it.notes ?? ""),
+        link_url: String(it.link_url ?? ""),
+        section: (it.section as PlanItemInput["section"]) ?? "kraft",
+        round_rest: String(it.round_rest ?? ""),
+        heart_rate_on: String(it.heart_rate_on ?? ""),
+        heart_rate_off: String(it.heart_rate_off ?? ""),
+        description: String(it.description ?? ""),
+        duration_mode: (it.duration_mode as PlanItemInput["duration_mode"]) ?? null,
+      }));
+    if (templateItems.length > 0) {
+      await savePlanItemsAction(plans[0].id, templateItems);
+    }
+  }
+
   redirect(`/trainer/plans/${plans[0].id}/edit`);
 }
 
@@ -157,8 +195,13 @@ export async function createOwnPlanAction(
 
   const categoryLabelRaw = String(formData.get("category_label") ?? "").trim();
   const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
+  const title = String(formData.get("title") ?? "").trim();
   const date = String(formData.get("date") ?? "");
+  const time = String(formData.get("time") ?? "").trim() || null;
 
+  if (!title) {
+    return { error: "Bitte einen Titel angeben." };
+  }
   if (!date) {
     return { error: "Bitte ein Datum angeben." };
   }
@@ -166,9 +209,10 @@ export async function createOwnPlanAction(
   const { data: plan, error } = await supabase
     .from("training_plans")
     .insert({
-      title: categoryLabel,
+      title,
       category_label: categoryLabel,
       date,
+      time,
       scope_type: "athlete",
       athlete_id: userId,
       created_by: userId,
@@ -184,26 +228,31 @@ export async function createOwnPlanAction(
   redirect(`/athlete/plans/${plan.id}`);
 }
 
+// Called directly (not via useActionState) from the combined "Plan zuweisen"
+// button in PlanTableEditor, alongside savePlanItemsAction, so the whole
+// editor (rahmendaten + rows) saves in one action. category_label is fixed
+// at creation time (implied by the Athletik/Karate nav entry point that was
+// used to create the plan) and isn't editable here.
 export async function updatePlanMetaAction(
-  _prevState: ActionResult,
-  formData: FormData
+  planId: string,
+  meta: { title: string; date: string; time: string }
 ): Promise<ActionResult> {
-  const planId = String(formData.get("plan_id") ?? "");
-  if (!planId) return { error: "Bitte ein Datum angeben." };
-
   const { supabase } = await requirePlanEditAccess(planId);
 
-  const categoryLabelRaw = String(formData.get("category_label") ?? "").trim();
-  const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
-  const date = String(formData.get("date") ?? "");
+  const title = meta.title.trim();
+  const date = meta.date;
+  const time = meta.time.trim() || null;
 
+  if (!title) {
+    return { error: "Bitte einen Titel angeben." };
+  }
   if (!date) {
     return { error: "Bitte ein Datum angeben." };
   }
 
   const { error } = await supabase
     .from("training_plans")
-    .update({ title: categoryLabel, category_label: categoryLabel, date })
+    .update({ title, date, time })
     .eq("id", planId);
 
   if (error) return { error: "Änderungen konnten nicht gespeichert werden." };
@@ -212,6 +261,8 @@ export async function updatePlanMetaAction(
   revalidatePath("/trainer/plans");
   revalidatePath(`/athlete/plans/${planId}`);
   revalidatePath("/athlete");
+  revalidatePath("/trainer/calendar");
+  revalidatePath("/athlete/calendar");
   return {};
 }
 
@@ -223,10 +274,12 @@ type PlanItemInput = {
   notes: string;
   link_url: string;
   exercise_id?: string | null;
-  section?: "kraft" | "cardio";
+  section?: "kraft" | "cardio" | "sprung" | "runden";
   round_rest?: string;
   heart_rate_on?: string;
   heart_rate_off?: string;
+  description?: string;
+  duration_mode?: "reps" | "duration" | null;
 };
 
 // Prefix bare domains/paths with https:// so links always navigate instead
@@ -253,17 +306,18 @@ export async function savePlanItemsAction(
     .eq("id", planId)
     .single();
 
-  const isAthletik = plan?.category_label?.trim().toLowerCase() === "athletik";
   const filteredItems = items.filter((item) => item.exercise_name.trim());
 
   // Athletes and trainers can both type an exercise name that doesn't exist
   // in the shared library yet (e.g. "Schwungdrücken") — auto-create it so
-  // the item still links to an exercise_id and can be progress-tracked.
-  // Cardio rows never resolve to a library exercise — the weight/rep-based
-  // result tracking doesn't apply to them.
+  // the item still links to an exercise_id and can be progress-tracked, and
+  // so a Sportartspezifisch row has something to hang its
+  // exercise_instructions (steps/video) off of. Cardio and Leistungsdiagnostik
+  // (sprung) rows never resolve to a library exercise — weight/rep-based
+  // result tracking and per-exercise instructions don't apply to them.
   const resolvedExerciseIds: (string | null)[] = [];
   for (const item of filteredItems) {
-    if (!isAthletik || item.section === "cardio") {
+    if (item.section === "cardio" || item.section === "sprung") {
       resolvedExerciseIds.push(item.exercise_id ?? null);
       continue;
     }
@@ -310,6 +364,8 @@ export async function savePlanItemsAction(
     heart_rate_off: item.heart_rate_off?.trim() || null,
     link_url: normalizeUrl(item.link_url),
     notes: item.notes.trim() || null,
+    description: item.description?.trim() || null,
+    duration_mode: item.duration_mode ?? null,
   }));
 
   let savedItems: SavedPlanItem[] = [];
@@ -376,7 +432,7 @@ export async function duplicatePlanToDateAction(
 
   const { data: sourcePlan } = await supabase
     .from("training_plans")
-    .select("title, category_label, scope_type, group_id, athlete_id")
+    .select("title, category_label, time, scope_type, group_id, athlete_id")
     .eq("id", planId)
     .single();
 
@@ -385,7 +441,7 @@ export async function duplicatePlanToDateAction(
   const { data: sourceItems } = await supabase
     .from("training_plan_items")
     .select(
-      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes"
+      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes, description, duration_mode"
     )
     .eq("training_plan_id", planId)
     .order("position");
@@ -396,6 +452,7 @@ export async function duplicatePlanToDateAction(
       title: sourcePlan.title,
       category_label: sourcePlan.category_label,
       date: newDate,
+      time: sourcePlan.time,
       scope_type: sourcePlan.scope_type,
       group_id: sourcePlan.group_id,
       athlete_id: sourcePlan.athlete_id,
@@ -422,6 +479,8 @@ export async function duplicatePlanToDateAction(
         heart_rate_off: item.heart_rate_off,
         link_url: item.link_url,
         notes: item.notes,
+        description: item.description,
+        duration_mode: item.duration_mode,
       }))
     );
     if (itemsError) {
@@ -470,7 +529,7 @@ export async function copyPlanAction(
 
   const { data: sourcePlan } = await supabase
     .from("training_plans")
-    .select("title, category_label")
+    .select("title, category_label, time")
     .eq("id", sourcePlanId)
     .single();
 
@@ -479,7 +538,7 @@ export async function copyPlanAction(
   const { data: sourceItems } = await supabase
     .from("training_plan_items")
     .select(
-      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes"
+      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes, description, duration_mode"
     )
     .eq("training_plan_id", sourcePlanId)
     .order("position");
@@ -490,6 +549,7 @@ export async function copyPlanAction(
       title: sourcePlan.title,
       category_label: sourcePlan.category_label,
       date,
+      time: sourcePlan.time,
       scope_type: scopeType,
       group_id: scopeType === "group" ? groupId : null,
       athlete_id: scopeType === "athlete" ? athleteId : null,
@@ -518,6 +578,8 @@ export async function copyPlanAction(
         heart_rate_off: item.heart_rate_off,
         link_url: item.link_url,
         notes: item.notes,
+        description: item.description,
+        duration_mode: item.duration_mode,
       }))
     );
     if (itemsError) {

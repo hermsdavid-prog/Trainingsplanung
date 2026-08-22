@@ -7,15 +7,8 @@ import {
   ExerciseSetEntryDialog,
   type ExerciseSet,
 } from "@/components/athletik/exercise-set-entry-dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { NotebookTextIcon, LinkIcon, DumbbellIcon } from "lucide-react";
+import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
+import { DumbbellIcon } from "lucide-react";
 
 type Item = {
   id: string;
@@ -87,92 +80,130 @@ export function PlanFeedbackTable({
   const cardioItems = items.filter((i) => isAthletik && i.section === "cardio");
 
   if (items.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Für diesen Plan wurden noch keine Übungen eingetragen.
-      </p>
-    );
+    return <p className="text-sm text-muted">Für diesen Plan wurden noch keine Übungen eingetragen.</p>;
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        {isAthletik && <h3 className="text-sm font-semibold">Kraft</h3>}
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
+    <div className="flex flex-col gap-8">
+      <div>
+        {isAthletik && <div className="kicker-muted mb-2">Kraft</div>}
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Übung</th>
+              {isAthletik && <th>Ergebnis</th>}
+              <th>Anzahl / Dauer</th>
+              <th>Sätze</th>
+              <th>Pause</th>
+              <th>Hinweise / Link</th>
+              <th>Ist-Wert / Notiz</th>
+            </tr>
+          </thead>
+          <tbody>
+            {kraftItems.map((item) => {
+              const row = getRow(item.id);
+              return (
+                <tr key={item.id}>
+                  <td className="text-[15px]">{item.exercise_name}</td>
+                  {isAthletik && (
+                    <td>
+                      {item.exercise_id ? (
+                        <button type="button" className="btn btn-secondary" onClick={() => setResultsOpenId(item.id)}>
+                          <DumbbellIcon />
+                          {getResult(item.exercise_id).sets.length > 0
+                            ? `${getResult(item.exercise_id).sets.length} ${getResult(item.exercise_id).sets.length > 1 ? "Sätze" : "Satz"}`
+                            : "Ergebnis"}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted">—</span>
+                      )}
+                    </td>
+                  )}
+                  <td>{item.reps_or_duration || "—"}</td>
+                  <td>{item.sets || "—"}</td>
+                  <td>{item.rest_time || "—"}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      {item.notes && (
+                        <button type="button" className="btn btn-ghost" onClick={() => setNotesOpenId(item.id)}>
+                          Hinweise
+                        </button>
+                      )}
+                      {item.link_url && (
+                        <a href={item.link_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                          Link
+                        </a>
+                      )}
+                      {!item.notes && !item.link_url && <span className="text-muted">—</span>}
+                    </div>
+                  </td>
+                  <td>
+                    <input
+                      className="input min-w-40"
+                      value={row.actual_value}
+                      onChange={(e) => updateActualValue(item.id, e.target.value)}
+                      onBlur={() => saveActualValue(item.id)}
+                      placeholder="z. B. tatsächliche Wiederholungen"
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {isAthletik && cardioItems.length > 0 && (
+        <div>
+          <div className="kicker-accent-2 mb-2">Cardio</div>
+          <table className="table">
+            <thead>
               <tr>
-                <th className="p-2 text-left font-medium">Übung</th>
-                {isAthletik && <th className="p-2 text-left font-medium">Ergebnis</th>}
-                <th className="p-2 text-left font-medium">Anzahl / Dauer</th>
-                <th className="p-2 text-left font-medium">Sätze</th>
-                <th className="p-2 text-left font-medium">Pause</th>
-                <th className="p-2 text-left font-medium">Hinweise / Link</th>
-                <th className="p-2 text-left font-medium">Ist-Wert / Notiz</th>
+                <th>Übung</th>
+                <th>Belastung</th>
+                <th>Pause</th>
+                <th>Runden</th>
+                <th>Rundenpause</th>
+                <th>HF on</th>
+                <th>HF off</th>
+                <th>Hinweise / Link</th>
+                <th>Ist-Wert / Notiz</th>
               </tr>
             </thead>
             <tbody>
-              {kraftItems.map((item) => {
+              {cardioItems.map((item) => {
                 const row = getRow(item.id);
                 return (
-                  <tr key={item.id} className="border-t">
-                    <td className="p-2">{item.exercise_name}</td>
-                    {isAthletik && (
-                      <td className="p-2">
-                        {item.exercise_id ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setResultsOpenId(item.id)}
-                          >
-                            <DumbbellIcon />
-                            {getResult(item.exercise_id).sets.length > 0
-                              ? `${getResult(item.exercise_id).sets.length} Satz${getResult(item.exercise_id).sets.length > 1 ? "e" : ""}`
-                              : "Ergebnis"}
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
+                  <tr key={item.id}>
+                    <td className="text-[15px]">{item.exercise_name}</td>
+                    <td>{item.reps_or_duration || "—"}</td>
+                    <td>{item.rest_time || "—"}</td>
+                    <td>{item.sets || "—"}</td>
+                    <td>{item.round_rest || "—"}</td>
+                    <td>{item.heart_rate_on || "—"}</td>
+                    <td>{item.heart_rate_off || "—"}</td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        {item.notes && (
+                          <button type="button" className="btn btn-ghost" onClick={() => setNotesOpenId(item.id)}>
+                            Hinweise
+                          </button>
                         )}
-                      </td>
-                    )}
-                    <td className="p-2">{item.reps_or_duration || "—"}</td>
-                    <td className="p-2">{item.sets || "—"}</td>
-                    <td className="p-2">{item.rest_time || "—"}</td>
-                    <td className="p-2">
-                      <div className="flex items-center gap-1">
-                        {item.notes ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setNotesOpenId(item.id)}
-                          >
-                            <NotebookTextIcon /> Hinweise
-                          </Button>
-                        ) : null}
-                        {item.link_url ? (
-                          <a
-                            href={item.link_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs hover:bg-muted"
-                          >
-                            <LinkIcon className="size-3.5" /> Link
+                        {item.link_url && (
+                          <a href={item.link_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                            Link
                           </a>
-                        ) : null}
-                        {!item.notes && !item.link_url && (
-                          <span className="text-muted-foreground">—</span>
                         )}
+                        {!item.notes && !item.link_url && <span className="text-muted">—</span>}
                       </div>
                     </td>
-                    <td className="p-2">
-                      <Input
+                    <td>
+                      <input
+                        className="input min-w-40"
                         value={row.actual_value}
                         onChange={(e) => updateActualValue(item.id, e.target.value)}
                         onBlur={() => saveActualValue(item.id)}
-                        placeholder="z. B. tatsächliche Wiederholungen"
-                        className="min-w-40"
+                        placeholder="z. B. gefühlte Anstrengung"
                       />
                     </td>
                   </tr>
@@ -181,92 +212,19 @@ export function PlanFeedbackTable({
             </tbody>
           </table>
         </div>
-      </div>
-
-      {isAthletik && cardioItems.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold">Cardio</h3>
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="p-2 text-left font-medium">Übung</th>
-                  <th className="p-2 text-left font-medium">Belastung</th>
-                  <th className="p-2 text-left font-medium">Pause</th>
-                  <th className="p-2 text-left font-medium">Runden</th>
-                  <th className="p-2 text-left font-medium">Rundenpause</th>
-                  <th className="p-2 text-left font-medium">Herzfrequenz (on)</th>
-                  <th className="p-2 text-left font-medium">Herzfrequenz (off)</th>
-                  <th className="p-2 text-left font-medium">Hinweise / Link</th>
-                  <th className="p-2 text-left font-medium">Ist-Wert / Notiz</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cardioItems.map((item) => {
-                  const row = getRow(item.id);
-                  return (
-                    <tr key={item.id} className="border-t">
-                      <td className="p-2">{item.exercise_name}</td>
-                      <td className="p-2">{item.reps_or_duration || "—"}</td>
-                      <td className="p-2">{item.rest_time || "—"}</td>
-                      <td className="p-2">{item.sets || "—"}</td>
-                      <td className="p-2">{item.round_rest || "—"}</td>
-                      <td className="p-2">{item.heart_rate_on || "—"}</td>
-                      <td className="p-2">{item.heart_rate_off || "—"}</td>
-                      <td className="p-2">
-                        <div className="flex items-center gap-1">
-                          {item.notes ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setNotesOpenId(item.id)}
-                            >
-                              <NotebookTextIcon /> Hinweise
-                            </Button>
-                          ) : null}
-                          {item.link_url ? (
-                            <a
-                              href={item.link_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs hover:bg-muted"
-                            >
-                              <LinkIcon className="size-3.5" /> Link
-                            </a>
-                          ) : null}
-                          {!item.notes && !item.link_url && (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <Input
-                          value={row.actual_value}
-                          onChange={(e) => updateActualValue(item.id, e.target.value)}
-                          onBlur={() => saveActualValue(item.id)}
-                          placeholder="z. B. gefühlte Anstrengung"
-                          className="min-w-40"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
       )}
 
       <Dialog open={notesOpenId !== null} onOpenChange={(open) => !open && setNotesOpenId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Hinweise {notesItem && `— ${notesItem.exercise_name}`}
-            </DialogTitle>
-          </DialogHeader>
-          <p className="whitespace-pre-wrap text-sm">{notesItem?.notes}</p>
-        </DialogContent>
+        <DialogPortal>
+          <DialogOverlay />
+          <DialogContent showCloseButton={false} className="dc-dialog max-w-[440px]">
+            <div className="kicker-muted">Hinweise {notesItem && `— ${notesItem.exercise_name}`}</div>
+            <p className="mt-2 whitespace-pre-wrap text-sm">{notesItem?.notes}</p>
+            <button type="button" className="btn btn-primary self-start" onClick={() => setNotesOpenId(null)}>
+              Schließen
+            </button>
+          </DialogContent>
+        </DialogPortal>
       </Dialog>
 
       {resultsItem && resultsItem.exercise_id && planId && planDate && (

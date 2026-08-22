@@ -1,22 +1,23 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { todayISO, shiftDateISO, formatDateLabel } from "@/lib/date";
 import { HealthCheckinCard } from "@/components/health/health-checkin-card";
+import { CheckinGate } from "@/components/health/checkin-gate";
 import {
   computeHealthStatus,
   HEALTH_STATUS_LABEL,
-  HEALTH_STATUS_DOT,
-  HEALTH_STATUS_BORDER,
+  type HealthStatusLevel,
 } from "@/lib/health-status";
 import { computeExerciseTrends } from "@/lib/exercise-trend";
 import { ExerciseTrendList } from "@/components/athletik/exercise-trend-list";
-import { cn } from "@/lib/utils";
+import { HealthChart } from "@/components/health/health-chart";
 
-const INDIVIDUAL_PLAN_COLOR = "#4b3793";
+const LEVEL_TAG: Record<HealthStatusLevel, string> = {
+  red: "tag-accent-2",
+  yellow: "tag-accent",
+  green: "tag-neutral",
+  none: "tag-outline",
+};
 
 export default async function AthleteTodayPage({
   searchParams,
@@ -26,7 +27,7 @@ export default async function AthleteTodayPage({
   const { date: dateParam } = await searchParams;
   const today = todayISO();
   const date = dateParam || today;
-  const rangeStart = shiftDateISO(today, -30);
+  const rangeStart = shiftDateISO(today, -14);
 
   const supabase = await createClient();
   const {
@@ -79,125 +80,118 @@ export default async function AthleteTodayPage({
       }))
   );
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Training</h1>
-          <p className="text-sm text-muted-foreground">
-            Deine Gruppen- und Einzelpläne für den ausgewählten Tag.
-          </p>
-        </div>
-        <Link href="/athlete/plans/new" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          <PlusIcon /> Neues Training
-        </Link>
-      </div>
+  const showCheckin = date === today && !healthLog;
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className={cn("border-l-4", HEALTH_STATUS_BORDER[readiness.level])}>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <span className={cn("size-2.5 rounded-full", HEALTH_STATUS_DOT[readiness.level])} />
-              <CardTitle className="text-base">Trainingsbereitschaft</CardTitle>
-              <Badge variant={readiness.level === "red" ? "destructive" : "secondary"}>
-                {HEALTH_STATUS_LABEL[readiness.level]}
-              </Badge>
+  return (
+    <div>
+      <div className="kicker">{formatDateLabel(date)}</div>
+
+      <CheckinGate
+        showCheckin={showCheckin}
+        checkin={
+          <>
+            <h2 className="mt-1.5 text-[27px] leading-[1.08]">Wie geht es dir heute?</h2>
+            <p className="mt-2 text-[13px] leading-[1.55]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+              Einmal eintragen — danach zeigt die Startseite nur noch dein Training.
+            </p>
+            <div className="mt-[22px]">
+              <HealthCheckinCard date={date} />
             </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
+          </>
+        }
+        main={
+        <>
+          <h2 className="mt-1.5 text-[27px] leading-[1.08]">Training heute</h2>
+
+          <div className="mt-4">
+            {(!plans || plans.length === 0) && (
+              <div className="p-3.5 text-[13px] leading-[1.5]" style={{ background: "var(--dc-surface)", color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+                Für heute ist kein Training geplant.
+              </div>
+            )}
+            {(plans ?? []).map((plan) => (
+              <Link key={plan.id} href={`/athlete/plans/${plan.id}`} className="block">
+                <div
+                  className="mb-2.5 p-3.5"
+                  style={{
+                    background: "var(--dc-surface)",
+                    borderLeft: `2px solid ${plan.scope_type === "group" ? plan.groups?.color ?? "#4b3793" : "#4b3793"}`,
+                  }}
+                >
+                  <div className="flex items-baseline justify-between gap-2.5">
+                    <span className="text-[17px] leading-[1.2]">{plan.title}</span>
+                    <span className="tag tag-outline">{plan.category_label}</span>
+                  </div>
+                  <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                    {plan.scope_type === "group"
+                      ? `Gruppentraining · ${plan.groups?.name ?? ""}`
+                      : "Einzeltraining für dich"}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <Link href="/athlete/plans/new" className="btn btn-secondary btn-block">
+            + Eigenes Workout erstellen
+          </Link>
+
+          <div className="kicker mt-7">Deine Werte · 14 Tage</div>
+          <div className="mt-3">
+            <HealthChart data={recentLogs ?? []} />
+          </div>
+
+          <div className="mt-6 p-3.5" style={{ background: "var(--dc-surface)" }}>
+            <div className="flex items-center gap-2.5">
+              <span className={`tag ${LEVEL_TAG[readiness.level]}`}>{HEALTH_STATUS_LABEL[readiness.level]}</span>
+              <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+                Trainingsbereitschaft
+              </span>
+            </div>
+            <p className="mt-1.5 text-[13px] leading-[1.5]">
               {readiness.today
                 ? `Heute: Wohlbefinden ${readiness.today.wellbeing ?? "—"}${
                     readiness.today.hrv != null ? ` · HRV ${readiness.today.hrv}` : ""
-                  }${
-                    readiness.today.resting_hr != null
-                      ? ` · Ruhe-HF ${readiness.today.resting_hr}`
-                      : ""
-                  }`
-                : "Noch keine Eingabe für heute — trag unten deine Werte ein."}
+                  }${readiness.today.resting_hr != null ? ` · Ruhe-HF ${readiness.today.resting_hr}` : ""}`
+                : "Noch keine Eingabe für heute."}
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="border-l-4 border-l-brand">
-          <CardHeader>
-            <CardTitle className="text-base">Athletik-Fortschritt</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ExerciseTrendList
-              trends={trends.slice(0, 4)}
-              href={(exerciseId) => `/athlete/athletik?exercise=${exerciseId}`}
-            />
-            {trends.length > 4 && (
-              <Link
-                href="/athlete/athletik"
-                className="mt-2 inline-block text-xs text-muted-foreground hover:underline"
-              >
-                Alle {trends.length} Übungen ansehen
-              </Link>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {date === today && !healthLog && <HealthCheckinCard date={date} />}
-
-      <div className="flex items-center justify-between rounded-md border bg-background p-2">
-        <Link
-          href={`/athlete?date=${shiftDateISO(date, -1)}`}
-          className="rounded-md p-2 hover:bg-muted"
-          aria-label="Vorheriger Tag"
-        >
-          <ChevronLeftIcon className="size-4" />
-        </Link>
-        <div className="flex flex-col items-center">
-          <span className="text-sm font-medium capitalize">{formatDateLabel(date)}</span>
-          {date !== today && (
-            <Link href="/athlete" className="text-xs text-muted-foreground hover:underline">
-              Zurück zu heute
-            </Link>
+          {trends.length > 0 && (
+            <>
+              <div className="kicker mt-7">Athletik-Fortschritt</div>
+              <div className="mt-3">
+                <ExerciseTrendList trends={trends.slice(0, 4)} href={(id) => `/athlete/athletik?exercise=${id}`} />
+              </div>
+              {trends.length > 4 && (
+                <Link href="/athlete/athletik" className="btn btn-ghost mt-2">
+                  Alle {trends.length} Übungen ansehen
+                </Link>
+              )}
+            </>
           )}
-        </div>
-        <Link
-          href={`/athlete?date=${shiftDateISO(date, 1)}`}
-          className="rounded-md p-2 hover:bg-muted"
-          aria-label="Nächster Tag"
-        >
-          <ChevronRightIcon className="size-4" />
+        </>
+        }
+      />
+
+      <div className="mt-6 flex items-center justify-between gap-3 p-2" style={{ background: "var(--dc-surface)" }}>
+        <Link href={`/athlete?date=${shiftDateISO(date, -1)}`} className="btn btn-ghost" aria-label="Vorheriger Tag">
+          ←
         </Link>
-      </div>
-
-      {(!plans || plans.length === 0) && (
-        <p className="text-sm text-muted-foreground">
-          Für diesen Tag ist kein Training eingetragen.
-        </p>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {(plans ?? []).map((plan) => (
-          <Link key={plan.id} href={`/athlete/plans/${plan.id}`}>
-            <Card
-              className="border-l-4 transition-colors hover:bg-muted/50"
-              style={{
-                borderLeftColor:
-                  plan.scope_type === "group"
-                    ? plan.groups?.color ?? INDIVIDUAL_PLAN_COLOR
-                    : INDIVIDUAL_PLAN_COLOR,
-              }}
-            >
-              <CardHeader>
-                <CardTitle className="text-base">{plan.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {plan.scope_type === "group"
-                    ? `Gruppentraining · ${plan.groups?.name ?? ""}`
-                    : "Einzeltraining für dich"}
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+        <span className="text-sm">
+          {date === today ? "Heute" : formatDateLabel(date)}
+          {date !== today && (
+            <>
+              {" · "}
+              <Link href="/athlete" className="underline">
+                zu heute
+              </Link>
+            </>
+          )}
+        </span>
+        <Link href={`/athlete?date=${shiftDateISO(date, 1)}`} className="btn btn-ghost" aria-label="Nächster Tag">
+          →
+        </Link>
       </div>
     </div>
   );

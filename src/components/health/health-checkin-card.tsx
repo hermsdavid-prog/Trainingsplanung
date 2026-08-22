@@ -4,11 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { upsertHealthLogAction } from "@/lib/actions/health";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { useCheckinSkip } from "@/components/health/checkin-gate";
 
 export function HealthCheckinCard({ date }: { date: string }) {
   const [hrv, setHrv] = useState("");
@@ -16,6 +12,7 @@ export function HealthCheckinCard({ date }: { date: string }) {
   const [wellbeing, setWellbeing] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const skip = useCheckinSkip();
 
   function handleSave() {
     if (!wellbeing) {
@@ -28,69 +25,70 @@ export function HealthCheckinCard({ date }: { date: string }) {
         toast.error(result.error);
       } else {
         toast.success("Gesundheitsdaten gespeichert.");
-        // The parent hides this card once today's health log exists, so a
-        // refresh is enough — no local "saved" state needed here.
         router.refresh();
       }
     });
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Wie geht es dir heute?</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="hrv">HRV (ms)</Label>
-            <Input
-              id="hrv"
-              type="number"
-              inputMode="decimal"
-              value={hrv}
-              onChange={(e) => setHrv(e.target.value)}
-              placeholder="optional"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="resting_hr">Ruheherzfrequenz (bpm)</Label>
-            <Input
-              id="resting_hr"
-              type="number"
-              inputMode="decimal"
-              value={restingHr}
-              onChange={(e) => setRestingHr(e.target.value)}
-              placeholder="optional"
-            />
-          </div>
-        </div>
+    <div>
+      <div className="kicker">Wohlbefinden</div>
+      <div className="mt-3 grid grid-cols-5 gap-2">
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => setWellbeing(n)}
+            className="flex h-12 items-center justify-center text-[18px]"
+            style={{
+              border: "1px solid var(--dc-divider)",
+              borderRadius: "var(--dc-radius-md)",
+              background: wellbeing === n ? "var(--dc-accent)" : "transparent",
+              color: wellbeing === n ? "var(--dc-bg)" : "var(--dc-text)",
+            }}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 flex justify-between text-[11px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+        <span>1 · erschöpft</span>
+        <span>10 · topfit</span>
+      </div>
 
-        <div className="flex flex-col gap-2">
-          <Label>Allgemeines Wohlbefinden (1 = schlecht, 10 = sehr gut)</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setWellbeing(n)}
-                className={cn(
-                  "flex size-11 items-center justify-center rounded-md border text-sm transition-colors",
-                  wellbeing === n
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "hover:bg-muted"
-                )}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+      <div className="mt-[18px] flex gap-3.5">
+        <div className="field flex-1">
+          <label htmlFor="hrv">HRV</label>
+          <input
+            id="hrv"
+            className="input"
+            inputMode="decimal"
+            value={hrv}
+            onChange={(e) => setHrv(e.target.value)}
+            placeholder="optional"
+          />
         </div>
+        <div className="field flex-1">
+          <label htmlFor="resting_hr">Ruhe-HF</label>
+          <input
+            id="resting_hr"
+            className="input"
+            inputMode="decimal"
+            value={restingHr}
+            onChange={(e) => setRestingHr(e.target.value)}
+            placeholder="optional"
+          />
+        </div>
+      </div>
 
-        <Button onClick={handleSave} disabled={isPending} className="self-start">
-          {isPending ? "Wird gespeichert…" : "Speichern"}
-        </Button>
-      </CardContent>
-    </Card>
+      <button type="button" onClick={handleSave} disabled={isPending} className="btn btn-primary btn-block">
+        {isPending ? "Wird gespeichert…" : "Eintragen und weiter"}
+      </button>
+      {skip && (
+        <button type="button" onClick={skip} disabled={isPending} className="btn btn-ghost btn-block">
+          Heute überspringen
+        </button>
+      )}
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/current-user";
-import { AppShell } from "@/components/shell/app-shell";
+import { TrainerShell } from "@/components/shell/trainer-shell";
 
 export default async function TrainerLayout({
   children,
@@ -11,8 +11,8 @@ export default async function TrainerLayout({
   if (profile.role !== "trainer") redirect("/");
 
   return (
-    <AppShell role={profile.role} fullName={profile.full_name}>
+    <TrainerShell role={profile.role} fullName={profile.full_name}>
       {children}
-    </AppShell>
+    </TrainerShell>
   );
 }

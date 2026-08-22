@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useSyncExternalStore, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { formatDateShort } from "@/lib/date";
 import { reschedulePlanAction, duplicatePlanToDateAction } from "@/lib/actions/plans";
 import { rescheduleEventAction, duplicateEventToDateAction } from "@/lib/actions/events";
+import { getBerlinCalendarMark } from "@/lib/berlin-holidays";
 
 export type CalendarItem = {
   id: string;
@@ -29,60 +31,33 @@ function getCoarsePointerServerSnapshot() {
   return false;
 }
 
-function buildHref(base: string, params: Record<string, string | undefined>) {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value) query.set(key, value);
-  }
-  const qs = query.toString();
-  return qs ? `${base}?${qs}` : base;
-}
-
 export function CalendarGrid({
-  baseHref,
   monthStr,
   days,
   itemsByDate,
-  selectedDate,
   todayStr,
-  activeParams,
   enableDragDrop = false,
 }: {
-  baseHref: string;
   monthStr: string;
   days: string[];
   itemsByDate: Record<string, CalendarItem[]>;
-  selectedDate?: string;
   todayStr: string;
-  activeParams: Record<string, string | undefined>;
   enableDragDrop?: boolean;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [copyMode, setCopyMode] = useState(false);
-  // Native HTML5 drag-and-drop doesn't reliably support touch, and the
-  // copy-vs-move modifier (Ctrl/Cmd) has no touch equivalent — so on
-  // touch devices, dragging can only ever "move", never "copy", with no
-  // indication why. Disable it there and rely on the ⋮ menu instead,
-  // which supports both. useSyncExternalStore avoids a hydration mismatch
-  // by rendering the server-safe default until after hydration.
+  const [dayPickDate, setDayPickDate] = useState<string | null>(null);
+  // Native HTML5 drag-and-drop doesn't reliably support touch, so on touch
+  // devices dropping onto month cells is disabled — dragging can only start
+  // from the weekly board's cards, and only with a mouse.
   const isCoarsePointer = useSyncExternalStore(
     subscribeNoop,
     getCoarsePointerSnapshot,
     getCoarsePointerServerSnapshot
   );
-
   const dragDropActive = enableDragDrop && !isCoarsePointer;
-
-  function goToDay(day: string) {
-    router.push(buildHref(baseHref, { ...activeParams, month: monthStr, date: day }));
-  }
-
-  function handleDragStart(e: React.DragEvent, item: CalendarItem) {
-    e.dataTransfer.setData("application/json", JSON.stringify({ id: item.id, kind: item.kind }));
-    e.dataTransfer.effectAllowed = "copyMove";
-  }
 
   function handleDrop(e: React.DragEvent, day: string) {
     e.preventDefault();
@@ -110,28 +85,50 @@ export function CalendarGrid({
   }
 
   return (
-    <div className="overflow-hidden rounded-md border">
-      <div className="grid grid-cols-7 bg-muted/50 text-xs font-medium text-muted-foreground">
+    <div>
+      <div
+        className="grid gap-1.5 text-[10px] uppercase"
+        style={{
+          gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+          letterSpacing: "0.08em",
+          color: "color-mix(in srgb, var(--dc-text) 50%, transparent)",
+        }}
+      >
         {WEEKDAY_LABELS.map((label) => (
-          <div key={label} className="p-2 text-center">
-            {label}
-          </div>
+          <span key={label}>{label}</span>
         ))}
       </div>
-      <div className="grid grid-cols-7">
+      <div className="mt-1.5 grid gap-1.5" style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
         {days.map((day) => {
           const inMonth = day.slice(0, 7) === monthStr;
           const items = itemsByDate[day] ?? [];
           const isToday = day === todayStr;
-          const isSelected = day === selectedDate;
           const isDragOver = day === dragOverDate;
+          const border = isDragOver
+            ? copyMode
+              ? "var(--dc-accent-2)"
+              : "var(--dc-accent)"
+            : "var(--dc-divider)";
+          const berlinMark = getBerlinCalendarMark(day);
+          const bg = isDragOver
+            ? copyMode
+              ? "color-mix(in srgb, var(--dc-accent-2) 8%, transparent)"
+              : "color-mix(in srgb, var(--dc-accent) 8%, transparent)"
+            : berlinMark?.type === "feiertag" && inMonth
+              ? "color-mix(in srgb, var(--dc-accent-2) 6%, var(--dc-surface))"
+              : berlinMark?.type === "ferien" && inMonth
+                ? "color-mix(in srgb, var(--dc-neutral-400) 12%, var(--dc-surface))"
+                : inMonth
+                  ? "var(--dc-surface)"
+                  : "transparent";
+          const fg = inMonth ? "var(--dc-text)" : "color-mix(in srgb, var(--dc-text) 40%, transparent)";
+          const mark = items[0]?.color ?? "transparent";
+
           return (
-            <div
+            <button
               key={day}
-              role="button"
-              tabIndex={0}
-              onClick={() => goToDay(day)}
-              onKeyDown={(e) => e.key === "Enter" && goToDay(day)}
+              type="button"
+              onClick={enableDragDrop ? () => setDayPickDate(day) : undefined}
               onDragOver={
                 dragDropActive
                   ? (e) => {
@@ -145,60 +142,132 @@ export function CalendarGrid({
               }
               onDragLeave={dragDropActive ? () => setDragOverDate(null) : undefined}
               onDrop={dragDropActive ? (e) => handleDrop(e, day) : undefined}
-              className={cn(
-                "flex min-h-20 cursor-pointer flex-col gap-1 border-t border-l p-1.5 text-left first:border-l-0 hover:bg-muted/40",
-                !inMonth && "bg-muted/20 text-muted-foreground",
-                isSelected && "bg-accent",
-                isDragOver &&
-                  (copyMode
-                    ? "bg-emerald-500/10 ring-2 ring-inset ring-emerald-500"
-                    : "bg-primary/10 ring-2 ring-inset ring-primary")
-              )}
+              className="flex flex-col gap-0.5 text-left"
+              style={{
+                minWidth: 0,
+                minHeight: 92,
+                padding: 5,
+                fontFamily: "var(--dc-font-body)",
+                cursor: enableDragDrop ? "pointer" : "default",
+                background: bg,
+                border: `1px solid ${border}`,
+                color: fg,
+              }}
+              title={berlinMark ? berlinMark.label : undefined}
             >
-              <span
-                className={cn(
-                  "flex size-5 items-center justify-center rounded-full text-xs",
-                  isToday && "bg-primary text-primary-foreground"
+              <span className="flex w-full items-baseline justify-between gap-1">
+                <span className="text-xs">{Number(day.slice(8, 10))}</span>
+                {isToday && (
+                  <span
+                    className="text-[8px] uppercase"
+                    style={{ letterSpacing: "0.06em", color: "var(--dc-accent)" }}
+                  >
+                    Heute
+                  </span>
                 )}
-              >
-                {Number(day.slice(8, 10))}
               </span>
-              {isDragOver && (
-                <span className="text-[0.6rem] font-medium text-emerald-600">
-                  {copyMode ? "+ Kopie" : ""}
+              {berlinMark && (
+                <span
+                  className="truncate text-[9px] leading-tight"
+                  style={{
+                    color:
+                      berlinMark.type === "feiertag"
+                        ? "var(--dc-accent-2-700)"
+                        : "color-mix(in srgb, var(--dc-text) 55%, transparent)",
+                  }}
+                >
+                  {berlinMark.label}
                 </span>
               )}
-              <div className="flex flex-col gap-0.5">
-                {items.slice(0, 3).map((item) => {
-                  const label = item.subtitle ? `${item.title} · ${item.subtitle}` : item.title;
-                  return (
-                    <a
-                      key={item.id}
-                      href={item.href}
-                      draggable={dragDropActive}
-                      onDragStart={dragDropActive ? (e) => handleDragStart(e, item) : undefined}
-                      onClick={(e) => e.stopPropagation()}
-                      className={cn(
-                        "truncate rounded px-1 py-0.5 text-[0.65rem] text-white",
-                        dragDropActive && "cursor-grab active:cursor-grabbing"
-                      )}
-                      style={{ backgroundColor: item.color, opacity: item.status === "proposed" ? 0.6 : 1 }}
-                      title={label}
-                    >
-                      {label}
-                    </a>
-                  );
-                })}
+              <span className="flex w-full flex-col gap-0.5">
+                {items.slice(0, 3).map((item) => (
+                  <span
+                    key={item.id}
+                    className="truncate text-[10px] leading-tight"
+                    style={{ color: item.color }}
+                    title={item.subtitle ? `${item.title} · ${item.subtitle}` : item.title}
+                  >
+                    {item.title}
+                  </span>
+                ))}
                 {items.length > 3 && (
-                  <span className="text-[0.65rem] text-muted-foreground">
+                  <span
+                    className="text-[9px]"
+                    style={{ color: "color-mix(in srgb, var(--dc-text) 50%, transparent)" }}
+                  >
                     +{items.length - 3} mehr
                   </span>
                 )}
-              </div>
-            </div>
+              </span>
+              <span className="mt-auto" style={{ height: 3, width: "100%", background: mark }} />
+            </button>
           );
         })}
       </div>
+
+      <div
+        className="mt-3 flex flex-wrap gap-3.5 text-[11px]"
+        style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+      >
+        <span className="flex items-center gap-1.5">
+          <span style={{ width: 10, height: 3, background: "var(--dc-accent)" }} />
+          Training
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span style={{ width: 10, height: 3, background: "var(--dc-accent-2-500)" }} />
+          Wettkampf
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span style={{ width: 10, height: 3, background: "var(--dc-neutral-400)" }} />
+          Extern
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              background: "color-mix(in srgb, var(--dc-accent-2) 6%, var(--dc-surface))",
+              border: "1px solid var(--dc-accent-2-700)",
+            }}
+          />
+          Feiertag Berlin
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              background: "color-mix(in srgb, var(--dc-neutral-400) 12%, var(--dc-surface))",
+              border: "1px solid var(--dc-divider)",
+            }}
+          />
+          Ferien Berlin
+        </span>
+      </div>
+
+      {dayPickDate && (
+        <div className="mt-3.5 max-w-[520px] p-4" style={{ background: "var(--dc-surface)" }}>
+          <div className="kicker">Neues Training am {formatDateShort(dayPickDate)}</div>
+          <div className="mt-2 text-[13px] leading-[1.5]">Welche Art von Training soll es werden?</div>
+          <div className="mt-3.5 flex flex-wrap gap-2">
+            <Link
+              href={`/trainer/plans/new?type=Athletik&date=${dayPickDate}`}
+              className="btn btn-primary"
+            >
+              Athletiktraining
+            </Link>
+            <Link
+              href={`/trainer/plans/new?type=Sportartspezifisch&date=${dayPickDate}`}
+              className="btn btn-secondary"
+            >
+              Sportartspezifisch
+            </Link>
+            <button type="button" className="btn btn-ghost" onClick={() => setDayPickDate(null)}>
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

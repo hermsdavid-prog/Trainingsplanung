@@ -3,26 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { proposeEventAction } from "@/lib/actions/events";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 
 export function ProposeEventDialog({
   defaultDate,
@@ -56,57 +37,56 @@ export function ProposeEventDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline">Termin vorschlagen</Button>} />
-      <DialogContent>
-        <form action={handleSubmit} className="flex flex-col gap-4">
-          <DialogHeader>
-            <DialogTitle>Termin vorschlagen</DialogTitle>
-            <DialogDescription>
+      <button type="button" className="btn btn-secondary" onClick={() => setOpen(true)}>
+        Termin vorschlagen
+      </button>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogContent showCloseButton={false} className="dc-dialog max-w-[460px]">
+          <form action={handleSubmit} className="flex flex-col">
+            <div className="kicker-muted">Termin vorschlagen</div>
+            <p className="mt-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
               Dein Trainer sieht den Vorschlag und kann ihn bestätigen.
-            </DialogDescription>
-          </DialogHeader>
+            </p>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="title">Titel</Label>
-            <Input id="title" name="title" required />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="description">Beschreibung</Label>
-            <Textarea id="description" name="description" rows={2} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="date">Datum</Label>
-            <Input id="date" name="date" type="date" defaultValue={defaultDate} required />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="group_id">Betrifft Gruppe</Label>
-            <Select
-              name="group_id"
-              required
-              items={Object.fromEntries(groups.map((g) => [g.id, g.name]))}
-            >
-              <SelectTrigger id="group_id" className="w-full">
-                <SelectValue placeholder="Gruppe wählen" />
-              </SelectTrigger>
-              <SelectContent>
+            <div className="field mt-4">
+              <label htmlFor="title">Titel</label>
+              <input id="title" name="title" required className="input" />
+            </div>
+            <div className="field mt-3.5">
+              <label htmlFor="description">Beschreibung</label>
+              <textarea id="description" name="description" rows={2} className="input" />
+            </div>
+            <div className="field mt-3.5">
+              <label htmlFor="date">Datum</label>
+              <input id="date" name="date" type="date" defaultValue={defaultDate} required className="input" />
+            </div>
+            <div className="field mt-3.5">
+              <label htmlFor="group_id">Betrifft Gruppe</label>
+              <select id="group_id" name="group_id" required className="input" defaultValue="">
+                <option value="" disabled>
+                  Gruppe wählen
+                </option>
                 {groups.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>
+                  <option key={g.id} value={g.id}>
                     {g.name}
-                  </SelectItem>
+                  </option>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
+              </select>
+            </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+              <div className="mt-3 text-[13px]" style={{ color: "var(--dc-accent-2-700)" }}>
+                {error}
+              </div>
+            )}
 
-          <DialogFooter>
-            <Button type="submit" disabled={isPending}>
+            <button type="submit" disabled={isPending} className="btn btn-primary btn-block">
               {isPending ? "Wird gesendet…" : "Vorschlag senden"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+            </button>
+          </form>
+        </DialogContent>
+      </DialogPortal>
     </Dialog>
   );
 }

@@ -1,18 +1,13 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export function AthletikFilters({
+  groups,
   athletes,
   exercises,
 }: {
+  groups?: { id: string; name: string; athleteCount: number }[];
   athletes?: { id: string; full_name: string }[];
   exercises: { id: string; name: string }[];
 }) {
@@ -28,42 +23,59 @@ export function AthletikFilters({
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {athletes && (
-        <Select
-          items={Object.fromEntries(athletes.map((a) => [a.id, a.full_name]))}
-          defaultValue={searchParams.get("athlete") ?? athletes[0]?.id}
-          onValueChange={(v) => setParam("athlete", String(v))}
-        >
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Athlet wählen" />
-          </SelectTrigger>
-          <SelectContent>
-            {athletes.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.full_name}
-              </SelectItem>
+    <div className="flex flex-wrap gap-3">
+      {groups && (
+        <div className="field w-auto">
+          <label>Gruppe</label>
+          <select
+            className="input"
+            defaultValue={searchParams.get("group") ?? groups[0]?.id}
+            onChange={(e) => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.set("group", e.target.value);
+              params.delete("athlete");
+              router.push(`${pathname}?${params.toString()}`);
+            }}
+          >
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name} · {g.athleteCount} Athleten
+              </option>
             ))}
-          </SelectContent>
-        </Select>
+          </select>
+        </div>
+      )}
+      {athletes && (
+        <div className="field w-auto">
+          <label>Athlet</label>
+          <select
+            className="input"
+            defaultValue={searchParams.get("athlete") ?? athletes[0]?.id}
+            onChange={(e) => setParam("athlete", e.target.value)}
+          >
+            {athletes.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.full_name}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
-      <Select
-        items={Object.fromEntries(exercises.map((e) => [e.id, e.name]))}
-        defaultValue={searchParams.get("exercise") ?? exercises[0]?.id}
-        onValueChange={(v) => setParam("exercise", String(v))}
-      >
-        <SelectTrigger className="w-56">
-          <SelectValue placeholder="Übung wählen" />
-        </SelectTrigger>
-        <SelectContent>
+      <div className="field w-auto">
+        <label>Übung</label>
+        <select
+          className="input"
+          defaultValue={searchParams.get("exercise") ?? exercises[0]?.id}
+          onChange={(e) => setParam("exercise", e.target.value)}
+        >
           {exercises.map((e) => (
-            <SelectItem key={e.id} value={e.id}>
+            <option key={e.id} value={e.id}>
               {e.name}
-            </SelectItem>
+            </option>
           ))}
-        </SelectContent>
-      </Select>
+        </select>
+      </div>
     </div>
   );
 }

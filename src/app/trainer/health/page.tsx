@@ -1,21 +1,26 @@
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO } from "@/lib/date";
-import {
-  computeHealthStatus,
-  HEALTH_STATUS_LABEL,
-  HEALTH_STATUS_DOT,
-  type HealthLog,
-} from "@/lib/health-status";
-import { HealthChart } from "@/components/health/health-chart";
+import { computeHealthStatus, HEALTH_STATUS_LABEL, type HealthLog, type HealthStatusLevel } from "@/lib/health-status";
+import { TrendChart } from "@/components/health/trend-chart";
 import { HealthGroupFilter } from "@/components/health/health-group-filter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+
+const METRICS: { key: "hrv" | "resting_hr" | "wellbeing"; label: string; unit: string; domain?: [number, number] }[] = [
+  { key: "hrv", label: "HRV", unit: "ms" },
+  { key: "resting_hr", label: "Ruhe-HF", unit: "Schläge/min" },
+  { key: "wellbeing", label: "Wohlbefinden", unit: "von 10", domain: [1, 10] },
+];
+
+const LEVEL_TAG: Record<HealthStatusLevel, string> = {
+  red: "tag-accent-2",
+  yellow: "tag-accent",
+  green: "tag-neutral",
+  none: "tag-outline",
+};
 
 export default async function TrainerHealthPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string }>;
+  searchParams: Promise<{ group?: string; athlete?: string }>;
 }) {
   const params = await searchParams;
   const today = todayISO();
@@ -57,68 +62,90 @@ export default async function TrainerHealthPage({
     logsByAthlete.set(log.athlete_id, [...(logsByAthlete.get(log.athlete_id) ?? []), log]);
   }
 
+  const selectedAthlete =
+    params.athlete && athletes.some((a) => a.id === params.athlete) ? params.athlete : athletes[0]?.id;
+  const selected = athletes.find((a) => a.id === selectedAthlete);
+  const selectedLogs = selected ? logsByAthlete.get(selected.id) ?? [] : [];
+  const { level } = selected
+    ? computeHealthStatus(selectedLogs, today)
+    : { level: "none" as HealthStatusLevel };
+
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Gesundheitsübersicht</h1>
-        <p className="text-sm text-muted-foreground">
-          Wohlbefinden, HRV und Ruheherzfrequenz der letzten 30 Tage je Athlet, mit
-          automatischer Abweichungserkennung gegenüber dem eigenen Mittelwert.
-        </p>
-      </div>
+    <div>
+      <div className="kicker">Bereitschaft und Verläufe</div>
+      <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Gesundheit</h2>
 
-      {(!groups || groups.length === 0) && (
-        <p className="text-sm text-muted-foreground">Noch keine Gruppen angelegt.</p>
-      )}
+      {(!groups || groups.length === 0) ? (
+        <p className="mt-5 text-sm text-muted">Noch keine Gruppen angelegt.</p>
+      ) : (
+        <>
+          <div className="mt-[22px]">
+            <HealthGroupFilter key={selectedGroup} groups={groups} />
+          </div>
 
-      {groups && groups.length > 0 && (
-        <HealthGroupFilter key={selectedGroup} groups={groups} />
-      )}
+          {athletes.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {athletes.map((a) => {
+                const active = a.id === selectedAthlete;
+                return (
+                  <a
+                    key={a.id}
+                    href={`/trainer/health?group=${selectedGroup}&athlete=${a.id}`}
+                    className="chip"
+                    style={{
+                      background: active ? "var(--dc-neutral-700)" : "transparent",
+                      color: active ? "var(--dc-bg)" : "var(--dc-text)",
+                    }}
+                  >
+                    {a.full_name}
+                  </a>
+                );
+              })}
+            </div>
+          )}
 
-      {selectedGroup && athletes.length === 0 && (
-        <p className="text-sm text-muted-foreground">Noch keine Athleten in dieser Gruppe.</p>
-      )}
+          {selectedGroup && athletes.length === 0 && (
+            <p className="mt-4 text-sm text-muted">Noch keine Athleten in dieser Gruppe.</p>
+          )}
 
-      <div className="flex flex-col gap-4">
-        {athletes.map((athlete) => {
-          const athleteLogs = logsByAthlete.get(athlete.id) ?? [];
-          const { level, today: todayLog } = computeHealthStatus(athleteLogs, today);
-          return (
-            <Card key={athlete.id}>
-              <CardHeader>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={cn("size-2.5 rounded-full", HEALTH_STATUS_DOT[level])} />
-                  <CardTitle className="text-base">{athlete.full_name}</CardTitle>
-                  <Badge variant={level === "red" ? "destructive" : "secondary"}>
-                    {HEALTH_STATUS_LABEL[level]}
-                  </Badge>
-                  {todayLog && (
-                    <span className="text-xs text-muted-foreground">
-                      Heute: Wohlbefinden {todayLog.wellbeing ?? "—"}
-                      {todayLog.hrv != null && ` · HRV ${todayLog.hrv}`}
-                      {todayLog.resting_hr != null && ` · Ruhe-HF ${todayLog.resting_hr}`}
-                    </span>
-                  )}
-                  {!todayLog && (
-                    <span className="text-xs text-muted-foreground">
-                      Noch keine Eingabe für heute
-                    </span>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {athleteLogs.length > 0 ? (
-                  <HealthChart data={athleteLogs} />
+          {selected && (
+            <>
+              <div className="mt-7 flex items-baseline gap-3.5">
+                <h3 className="text-[24px]">{selected.full_name}</h3>
+                <span className={`tag ${LEVEL_TAG[level]}`}>{HEALTH_STATUS_LABEL[level]}</span>
+              </div>
+              <p className="mt-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+                Dreißig Tage im Verlauf — mit dem Zeiger über eine Kurve fahren zeigt den Tageswert.
+              </p>
+
+              <div className="mt-6 max-w-[720px]">
+                {selectedLogs.length > 0 ? (
+                  <div className="flex flex-col gap-8">
+                    {METRICS.map((m) => {
+                      const points = selectedLogs
+                        .filter((l) => l[m.key] != null)
+                        .map((l) => ({ date: l.date, value: l[m.key] as number }));
+                      return points.length > 0 ? (
+                        <TrendChart
+                          key={m.key}
+                          label={m.label}
+                          unit={m.unit}
+                          data={points}
+                          domain={m.domain}
+                          height={96}
+                          todayDate={today}
+                        />
+                      ) : null;
+                    })}
+                  </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Noch keine Gesundheitsdaten vorhanden.
-                  </p>
+                  <p className="text-sm text-muted">Noch keine Gesundheitsdaten vorhanden.</p>
                 )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }

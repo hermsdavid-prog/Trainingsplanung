@@ -4,17 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { deleteUserAction } from "@/lib/actions/admin-users";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
+  DialogPortal,
+  DialogOverlay,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 export function DeleteUserDialog({
@@ -32,6 +26,14 @@ export function DeleteUserDialog({
 
   const canDelete = confirmText.trim() === fullName.trim();
 
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setConfirmText("");
+      setError(undefined);
+    }
+  }
+
   function handleDelete() {
     if (!canDelete) return;
     startTransition(async () => {
@@ -47,51 +49,55 @@ export function DeleteUserDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) {
-          setConfirmText("");
-          setError(undefined);
-        }
-      }}
-    >
-      <DialogTrigger render={<Button variant="ghost" size="sm">Löschen</Button>} />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Account endgültig löschen</DialogTitle>
-          <DialogDescription>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <button type="button" className="btn btn-ghost" onClick={() => handleOpenChange(true)}>
+        löschen
+      </button>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogContent showCloseButton={false} className="dc-dialog max-w-[480px]">
+          <div className="kicker-accent-2">Account endgültig löschen</div>
+          <p className="mt-2 text-sm leading-[1.6]">
             Diese Aktion kann nicht rückgängig gemacht werden. Individuelle Trainingspläne,
             Gesundheitsdaten und Feedback von <strong>{fullName}</strong> werden unwiderruflich
             gelöscht. Gruppenpläne und Gruppen, die diese Person erstellt hat, bleiben erhalten.
-          </DialogDescription>
-        </DialogHeader>
+          </p>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="confirm-name">
-            Gib zur Bestätigung <strong>{fullName}</strong> ein
-          </Label>
-          <Input
-            id="confirm-name"
-            value={confirmText}
-            onChange={(e) => setConfirmText(e.target.value)}
-            autoComplete="off"
-          />
-        </div>
+          <div className="field mt-4">
+            <label htmlFor="confirm-name">
+              Gib zur Bestätigung „{fullName}“ ein
+            </label>
+            <input
+              id="confirm-name"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              autoComplete="off"
+              className="input"
+            />
+          </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <div className="mt-3 text-[13px]" style={{ color: "var(--dc-accent-2-700)" }}>
+              {error}
+            </div>
+          )}
 
-        <DialogFooter>
-          <Button
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={!canDelete || isPending}
-          >
-            {isPending ? "Wird gelöscht…" : "Account endgültig löschen"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+          <div className="mt-[18px] flex gap-2">
+            <button
+              type="button"
+              className="btn"
+              style={{ background: "var(--dc-accent-2-600)", color: "var(--dc-bg)" }}
+              onClick={handleDelete}
+              disabled={!canDelete || isPending}
+            >
+              {isPending ? "Wird gelöscht…" : "Account endgültig löschen"}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
+              Abbrechen
+            </button>
+          </div>
+        </DialogContent>
+      </DialogPortal>
     </Dialog>
   );
 }
