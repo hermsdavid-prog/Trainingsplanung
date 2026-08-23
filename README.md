@@ -48,6 +48,21 @@ src/
   lib/auth/       Aktuellen Nutzer/Profil serverseitig ermitteln
 ```
 
+## Tests
+
+```bash
+npm test              # einmalig, alle Tests
+npm run test:watch    # Watch-Modus während der Entwicklung
+npm run test:coverage # mit Coverage-Report
+```
+
+Zwei Arten von Tests, in `tests/`:
+
+- **`tests/unit/`** — reine Funktionen ohne Datenbank (`date.ts`, `berlin-holidays.ts`, `health-status.ts`). Laufen überall sofort, brauchen kein `.env.local`.
+- **`tests/integration/`** — laufen gegen das **echte** Supabase-Projekt aus `.env.local` (es gibt keine separate Testdatenbank, siehe "Bekannte Lücken"). Sie legen eigene Wegwerf-Testkonten per Service-Role-Key an (`tests/helpers/supabase.ts`) und räumen sich in `afterAll` wieder vollständig auf. Decken bisher vor allem RLS-Grenzen ab (z. B. „kann Athlet B den Plan von Athlet A sehen?") und die `replace_training_plan_items`-DB-Funktion.
+
+Neue Server-Action-Tests lassen sich aktuell nicht direkt gegen die Action-Funktion schreiben — sie rufen intern `cookies()` aus `next/headers` auf, was außerhalb eines echten Next.js-Requests einen Fehler wirft. Stattdessen wie in `tests/integration/` direkt gegen die Tabellen/RPCs testen (mit einem eingeloggten Test-User-Client), das prüft ohnehin die eigentliche Sicherheitsgrenze (RLS), nicht nur die Action-Hülle drumherum.
+
 ## Bekannte Lücken
 
-Es gibt aktuell **keine automatisierten Tests** — jede Änderung wird manuell verifiziert (Testkonten anlegen, durchklicken, wieder löschen). Vor einer größeren Refaktorierung von `plans.ts` oder `plan-table-editor.tsx` lohnt es sich, das im Hinterkopf zu behalten.
+Testabdeckung ist noch dünn — die Basis-Testsuite deckt bislang gezielt die RLS-Grenzen und den Plan-Speicherpfad ab, nicht die App als Ganzes. Vor einer größeren Refaktorierung von `plans.ts` oder `plan-table-editor.tsx` lohnt es sich trotzdem, weiter mit Testkonten manuell durchzuklicken.
