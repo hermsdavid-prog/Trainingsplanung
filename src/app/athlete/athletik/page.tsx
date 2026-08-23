@@ -82,7 +82,8 @@ export default async function AthleteAthletikPage({
             <div className="mt-4">
               <ExerciseProgressChart data={results} />
 
-              <table className="table mt-4">
+              <div className="mt-4 overflow-x-auto">
+              <table className="table">
                 <thead>
                   <tr>
                     <th>Datum</th>
@@ -104,6 +105,7 @@ export default async function AthleteAthletikPage({
                     ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </>

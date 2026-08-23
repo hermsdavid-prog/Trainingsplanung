@@ -326,7 +326,8 @@ export function PlanTableEditor({
         <>
           <div>
             <div className="kicker-muted mb-2">Kraft</div>
-            <table className="table">
+            <div className="overflow-x-auto">
+            <table className="table" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
                   <th>Übung</th>
@@ -424,6 +425,7 @@ export function PlanTableEditor({
                 ))}
               </tbody>
             </table>
+            </div>
 
             {trackResults && (
               <p className="mt-2 text-xs text-muted">
@@ -440,7 +442,8 @@ export function PlanTableEditor({
 
           <div>
             <div className="kicker-accent-2 mb-2">Cardio</div>
-            <table className="table">
+            <div className="overflow-x-auto">
+            <table className="table" style={{ minWidth: 880 }}>
               <thead>
                 <tr>
                   <th>Übung</th>
@@ -548,6 +551,7 @@ export function PlanTableEditor({
                 ))}
               </tbody>
             </table>
+            </div>
 
             <button type="button" className="btn btn-secondary mt-3" onClick={() => addRow("cardio")}>
               <PlusIcon /> Übung hinzufügen
@@ -556,7 +560,8 @@ export function PlanTableEditor({
 
           <div>
             <div className="kicker-accent-2 mb-2">Leistungsdiagnostik</div>
-            <table className="table">
+            <div className="overflow-x-auto">
+            <table className="table" style={{ minWidth: 560 }}>
               <thead>
                 <tr>
                   <th>Test</th>
@@ -624,6 +629,7 @@ export function PlanTableEditor({
                 ))}
               </tbody>
             </table>
+            </div>
             <button type="button" className="btn btn-secondary mt-3" onClick={() => addRow("sprung")}>
               <PlusIcon /> weiterer Test
             </button>
@@ -642,10 +648,10 @@ export function PlanTableEditor({
               return (
                 <div key={index} style={{ border: "1px solid var(--dc-divider)" }}>
                   <div
-                    className="items-end gap-3"
-                    style={{ display: "grid", gridTemplateColumns: "1fr 130px 90px 90px 40px", padding: 16 }}
+                    className="grid grid-cols-2 items-end gap-3 lg:[grid-template-columns:1fr_130px_90px_90px_40px]"
+                    style={{ padding: 16 }}
                   >
-                    <div className="field" style={{ margin: 0 }}>
+                    <div className="field col-span-2 lg:col-span-1" style={{ margin: 0 }}>
                       <label>Übung</label>
                       <input
                         className="input"

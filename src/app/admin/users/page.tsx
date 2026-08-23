@@ -67,41 +67,43 @@ export default async function AdminUsersPage() {
         <CreateUserDialog />
       </div>
 
-      <table className="table mt-7">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Rolle</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {(profiles ?? []).map((p) => (
-            <tr key={p.id}>
-              <td className="text-[15px]">{p.full_name || "—"}</td>
-              <td className="text-sm">{ROLE_LABELS[p.role] ?? p.role}</td>
-              <td>
-                <span className={`tag ${p.must_change_password ? "tag-accent" : "tag-outline"}`}>
-                  {p.must_change_password ? "Passwort ausstehend" : "Aktiv"}
-                </span>
-              </td>
-              <td>
-                {p.id !== currentUser?.id && (
-                  <DeleteUserDialog userId={p.id} fullName={p.full_name || "—"} />
-                )}
-              </td>
-            </tr>
-          ))}
-          {(!profiles || profiles.length === 0) && (
+      <div className="mt-7 overflow-x-auto">
+        <table className="table" style={{ minWidth: 480 }}>
+          <thead>
             <tr>
-              <td colSpan={4} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
-                Noch keine Nutzer angelegt.
-              </td>
+              <th>Name</th>
+              <th>Rolle</th>
+              <th>Status</th>
+              <th></th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {(profiles ?? []).map((p) => (
+              <tr key={p.id}>
+                <td className="text-[15px]">{p.full_name || "—"}</td>
+                <td className="text-sm">{ROLE_LABELS[p.role] ?? p.role}</td>
+                <td>
+                  <span className={`tag ${p.must_change_password ? "tag-accent" : "tag-outline"}`}>
+                    {p.must_change_password ? "Passwort ausstehend" : "Aktiv"}
+                  </span>
+                </td>
+                <td>
+                  {p.id !== currentUser?.id && (
+                    <DeleteUserDialog userId={p.id} fullName={p.full_name || "—"} />
+                  )}
+                </td>
+              </tr>
+            ))}
+            {(!profiles || profiles.length === 0) && (
+              <tr>
+                <td colSpan={4} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                  Noch keine Nutzer angelegt.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <div className="mt-9 max-w-[720px]">
         <div className="kicker">Datenschutz</div>
@@ -113,39 +115,41 @@ export default async function AdminUsersPage() {
           <PrivacyPolicyDialog trigger="Datenschutzerklärung ansehen" />
         </div>
 
-        <table className="table mt-5">
-          <thead>
-            <tr>
-              <th>Person</th>
-              <th>Rolle</th>
-              <th>Einwilligung Gesundheit</th>
-              <th>Seit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {consentRows.map((row) => (
-              <tr key={row.id}>
-                <td className="text-[15px]">{row.name}</td>
-                <td className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
-                  {row.role}
-                </td>
-                <td>
-                  <span className={`tag ${row.state.tagClass}`}>{row.state.label}</span>
-                </td>
-                <td className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
-                  {row.date}
-                </td>
-              </tr>
-            ))}
-            {consentRows.length === 0 && (
+        <div className="mt-5 overflow-x-auto">
+          <table className="table" style={{ minWidth: 480 }}>
+            <thead>
               <tr>
-                <td colSpan={4} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
-                  Noch keine Trainer oder Athleten angelegt.
-                </td>
+                <th>Person</th>
+                <th>Rolle</th>
+                <th>Einwilligung Gesundheit</th>
+                <th>Seit</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {consentRows.map((row) => (
+                <tr key={row.id}>
+                  <td className="text-[15px]">{row.name}</td>
+                  <td className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
+                    {row.role}
+                  </td>
+                  <td>
+                    <span className={`tag ${row.state.tagClass}`}>{row.state.label}</span>
+                  </td>
+                  <td className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                    {row.date}
+                  </td>
+                </tr>
+              ))}
+              {consentRows.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                    Noch keine Trainer oder Athleten angelegt.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

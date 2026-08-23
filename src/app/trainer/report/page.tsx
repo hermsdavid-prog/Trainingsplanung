@@ -303,7 +303,7 @@ export default async function TrainerReportPage({
   return (
     <div>
       <div className="flex items-start justify-between gap-6 border-b-2 pb-4" style={{ borderColor: "var(--dc-text)" }}>
-        <div>
+        <div className="min-w-0">
           <div className="kicker">Wochenbericht · Woche {weekNumber}</div>
           <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">{group?.name}</h2>
         </div>
@@ -328,32 +328,34 @@ export default async function TrainerReportPage({
         ))}
       </div>
 
-      <table className="table mt-8">
-        <thead>
-          <tr>
-            <th>Athlet</th>
-            <th>Woche</th>
-            <th>Bereitschaft</th>
-            <th>Top-Satz</th>
-            <th>Auffällig</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trainerRows.map((r) => (
-            <tr key={r.name}>
-              <td className="text-[15px]">{r.name}</td>
-              <td>{r.progress}</td>
-              <td>
-                <span className={`tag ${r.readyClass}`}>{r.ready}</span>
-              </td>
-              <td style={{ color: "color-mix(in srgb, var(--dc-text) 75%, transparent)" }}>{r.top}</td>
-              <td className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
-                {r.note}
-              </td>
+      <div className="mt-8 overflow-x-auto">
+        <table className="table" style={{ minWidth: 560 }}>
+          <thead>
+            <tr>
+              <th>Athlet</th>
+              <th>Woche</th>
+              <th>Bereitschaft</th>
+              <th>Top-Satz</th>
+              <th>Auffällig</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {trainerRows.map((r) => (
+              <tr key={r.name}>
+                <td className="text-[15px]">{r.name}</td>
+                <td>{r.progress}</td>
+                <td>
+                  <span className={`tag ${r.readyClass}`}>{r.ready}</span>
+                </td>
+                <td style={{ color: "color-mix(in srgb, var(--dc-text) 75%, transparent)" }}>{r.top}</td>
+                <td className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                  {r.note}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="mt-7 max-w-[600px] text-sm leading-[1.6]">
         Der Bericht wird in der App gelesen oder als PDF gesichert — verschickt wird nichts.

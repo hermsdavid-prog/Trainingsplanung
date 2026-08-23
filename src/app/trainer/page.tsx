@@ -101,35 +101,37 @@ export default async function TrainerDashboardPage() {
       {athletes.length === 0 ? (
         <p className="mt-3 text-sm text-muted">Noch keine Athleten in deinen Gruppen.</p>
       ) : (
-        <table className="table mt-3">
-          <thead>
-            <tr>
-              <th>Athlet</th>
-              <th>Bereitschaft</th>
-              <th>Heute</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ athlete, level, todayLog }) => (
-              <tr key={athlete.id}>
-                <td className="text-[15px]">{athlete.full_name}</td>
-                <td>
-                  <span className={`tag ${LEVEL_TAG[level]}`}>{HEALTH_STATUS_LABEL[level]}</span>
-                </td>
-                <td
-                  className="text-[13px]"
-                  style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
-                >
-                  {todayLog
-                    ? `Wohlbefinden ${todayLog.wellbeing ?? "—"}${
-                        todayLog.hrv != null ? ` · HRV ${todayLog.hrv}` : ""
-                      }${todayLog.resting_hr != null ? ` · Ruhe-HF ${todayLog.resting_hr}` : ""}`
-                    : "Noch keine Eingabe für heute"}
-                </td>
+        <div className="mt-3 overflow-x-auto">
+          <table className="table" style={{ minWidth: 480 }}>
+            <thead>
+              <tr>
+                <th>Athlet</th>
+                <th>Bereitschaft</th>
+                <th>Heute</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map(({ athlete, level, todayLog }) => (
+                <tr key={athlete.id}>
+                  <td className="text-[15px]">{athlete.full_name}</td>
+                  <td>
+                    <span className={`tag ${LEVEL_TAG[level]}`}>{HEALTH_STATUS_LABEL[level]}</span>
+                  </td>
+                  <td
+                    className="text-[13px]"
+                    style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                  >
+                    {todayLog
+                      ? `Wohlbefinden ${todayLog.wellbeing ?? "—"}${
+                          todayLog.hrv != null ? ` · HRV ${todayLog.hrv}` : ""
+                        }${todayLog.resting_hr != null ? ` · Ruhe-HF ${todayLog.resting_hr}` : ""}`
+                      : "Noch keine Eingabe für heute"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

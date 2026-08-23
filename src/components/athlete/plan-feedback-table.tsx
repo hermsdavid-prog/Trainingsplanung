@@ -87,7 +87,8 @@ export function PlanFeedbackTable({
     <div className="flex flex-col gap-8">
       <div>
         {isAthletik && <div className="kicker-muted mb-2">Kraft</div>}
-        <table className="table">
+        <div className="overflow-x-auto">
+        <table className="table" style={{ minWidth: 640 }}>
           <thead>
             <tr>
               <th>Übung</th>
@@ -151,12 +152,14 @@ export function PlanFeedbackTable({
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {isAthletik && cardioItems.length > 0 && (
         <div>
           <div className="kicker-accent-2 mb-2">Cardio</div>
-          <table className="table">
+          <div className="overflow-x-auto">
+          <table className="table" style={{ minWidth: 760 }}>
             <thead>
               <tr>
                 <th>Übung</th>
@@ -211,6 +214,7 @@ export function PlanFeedbackTable({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

@@ -95,6 +95,10 @@ export default async function TrainerHealthPage({
                     style={{
                       background: active ? "var(--dc-neutral-700)" : "transparent",
                       color: active ? "var(--dc-bg)" : "var(--dc-text)",
+                      maxWidth: "min(100%, 220px)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      display: "inline-block",
                     }}
                   >
                     {a.full_name}

@@ -142,47 +142,49 @@ export default async function TrainerAthletikPage({
                   />
                 </div>
 
-                <table className="table mt-6">
-                  <thead>
-                    <tr>
-                      <th>Messung</th>
-                      <th>Wert</th>
-                      <th>Veränderung</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((r, i) => {
-                      const prev = i > 0 ? results[i - 1].value : null;
-                      const delta = prev !== null ? Math.round((r.value - prev) * 100) / 100 : null;
-                      return (
-                        <tr key={r.date}>
-                          <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
-                            {formatDateCompact(r.date)}
-                          </td>
-                          <td className="text-[15px]">
-                            {r.value}
-                            {r.unit ? ` ${r.unit}` : ""}
-                          </td>
-                          <td>
-                            <span
-                              className="text-sm"
-                              style={{
-                                color:
-                                  delta === null
-                                    ? "color-mix(in srgb, var(--dc-text) 55%, transparent)"
-                                    : delta >= 0
-                                      ? "var(--dc-accent-700)"
-                                      : "var(--dc-accent-2-700)",
-                              }}
-                            >
-                              {delta === null ? "—" : delta === 0 ? "±0" : `${delta > 0 ? "+" : ""}${delta}`}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="mt-6 overflow-x-auto">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Messung</th>
+                        <th>Wert</th>
+                        <th>Veränderung</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.map((r, i) => {
+                        const prev = i > 0 ? results[i - 1].value : null;
+                        const delta = prev !== null ? Math.round((r.value - prev) * 100) / 100 : null;
+                        return (
+                          <tr key={r.date}>
+                            <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
+                              {formatDateCompact(r.date)}
+                            </td>
+                            <td className="text-[15px]">
+                              {r.value}
+                              {r.unit ? ` ${r.unit}` : ""}
+                            </td>
+                            <td>
+                              <span
+                                className="text-sm"
+                                style={{
+                                  color:
+                                    delta === null
+                                      ? "color-mix(in srgb, var(--dc-text) 55%, transparent)"
+                                      : delta >= 0
+                                        ? "var(--dc-accent-700)"
+                                        : "var(--dc-accent-2-700)",
+                                }}
+                              >
+                                {delta === null ? "—" : delta === 0 ? "±0" : `${delta > 0 ? "+" : ""}${delta}`}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div>

@@ -97,7 +97,7 @@ export default async function TrainerAthletePlanPage({
         ← Zurück zur Übersicht
       </Link>
       <div className="mt-3.5 flex items-start justify-between gap-6">
-        <div>
+        <div className="min-w-0">
           <div className="kicker">{kicker}</div>
           <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">
             {athlete.full_name}

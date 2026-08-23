@@ -541,7 +541,7 @@ export function WorkoutSession({
               {karateRows.map((row) => (
                 <div key={row.itemId} className="p-4" style={{ background: "var(--dc-surface)" }}>
                   <div className="flex items-start justify-between gap-2.5">
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-[17px] leading-[1.25]">{row.name}</div>
                       <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
                         {row.valLabel}{row.restLabel ? ` · Pause ${row.restLabel}` : ""}
@@ -705,7 +705,7 @@ export function WorkoutSession({
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <div className="kicker">Anweisung vom Trainer</div>
                     <div className="mt-1.5 text-[21px] leading-[1.15]">{title}</div>
                   </div>

@@ -26,6 +26,9 @@ export function HealthGroupFilter({ groups }: { groups: { id: string; name: stri
             style={{
               background: active ? "var(--dc-accent)" : "transparent",
               color: active ? "var(--dc-bg)" : "var(--dc-text)",
+              maxWidth: "min(100%, 220px)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {g.name}

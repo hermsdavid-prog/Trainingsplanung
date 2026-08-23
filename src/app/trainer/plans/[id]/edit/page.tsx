@@ -185,7 +185,8 @@ export default async function EditPlanPage({
           {planGroupAthletes && planGroupAthletes.length > 0 && (
             <div>
               <div className="kicker-muted mb-2">Athleten in dieser Gruppe</div>
-              <table className="table">
+              <div className="overflow-x-auto">
+              <table className="table" style={{ minWidth: 360 }}>
                 <tbody>
                   {planGroupAthletes.map((row) => (
                     <tr key={row.athlete_id}>
@@ -199,6 +200,7 @@ export default async function EditPlanPage({
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>

@@ -165,6 +165,9 @@ export function GroupManager({
             style={{
               background: g.id === group.id ? "var(--dc-accent)" : "transparent",
               color: g.id === group.id ? "var(--dc-bg)" : "var(--dc-text)",
+              maxWidth: "min(100%, 320px)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {g.name} · {(athleteIdsByGroup[g.id] ?? []).length}

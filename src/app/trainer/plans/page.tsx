@@ -51,56 +51,58 @@ export default async function TrainerPlansPage({
         </Link>
       </div>
 
-      <table className="table mt-7">
-        <thead>
-          <tr>
-            <th>Datum</th>
-            <th>Zeit</th>
-            <th>Titel</th>
-            <th>Für</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {(plans ?? []).map((plan) => {
-            const canDelete =
-              profile?.role === "admin" ||
-              plan.created_by === currentUser?.id ||
-              plan.scope_type === "group";
-            return (
-              <tr key={plan.id}>
-                <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
-                  {formatDateShort(plan.date)}
-                </td>
-                <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
-                  {plan.time || "—"}
-                </td>
-                <td className="text-[15px]">{plan.title}</td>
-                <td className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
-                  {plan.scope_type === "group"
-                    ? (plan.groups?.name ?? "—")
-                    : (plan.profiles?.full_name ?? "—")}
-                </td>
-                <td>
-                  <div className="flex items-center justify-end gap-1">
-                    <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-ghost">
-                      bearbeiten
-                    </Link>
-                    {canDelete && <DeletePlanRowButton planId={plan.id} title={plan.title} />}
-                  </div>
+      <div className="mt-7 overflow-x-auto">
+        <table className="table" style={{ minWidth: 560 }}>
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Zeit</th>
+              <th>Titel</th>
+              <th>Für</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {(plans ?? []).map((plan) => {
+              const canDelete =
+                profile?.role === "admin" ||
+                plan.created_by === currentUser?.id ||
+                plan.scope_type === "group";
+              return (
+                <tr key={plan.id}>
+                  <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
+                    {formatDateShort(plan.date)}
+                  </td>
+                  <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
+                    {plan.time || "—"}
+                  </td>
+                  <td className="text-[15px]">{plan.title}</td>
+                  <td className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
+                    {plan.scope_type === "group"
+                      ? (plan.groups?.name ?? "—")
+                      : (plan.profiles?.full_name ?? "—")}
+                  </td>
+                  <td>
+                    <div className="flex items-center justify-end gap-1">
+                      <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-ghost">
+                        bearbeiten
+                      </Link>
+                      {canDelete && <DeletePlanRowButton planId={plan.id} title={plan.title} />}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {(!plans || plans.length === 0) && (
+              <tr>
+                <td colSpan={5} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                  Noch keine Trainingspläne angelegt.
                 </td>
               </tr>
-            );
-          })}
-          {(!plans || plans.length === 0) && (
-            <tr>
-              <td colSpan={5} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
-                Noch keine Trainingspläne angelegt.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

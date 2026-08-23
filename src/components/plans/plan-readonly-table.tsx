@@ -41,7 +41,8 @@ export function PlanReadOnlyTable({
     <div className="flex flex-col gap-8">
       <div>
         {isAthletik && <div className="kicker-muted mb-2">Kraft</div>}
-        <table className="table">
+        <div className="overflow-x-auto">
+        <table className="table" style={{ minWidth: 520 }}>
           <thead>
             <tr>
               <th>Übung</th>
@@ -77,12 +78,14 @@ export function PlanReadOnlyTable({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {isAthletik && cardioRows.length > 0 && (
         <div>
           <div className="kicker-accent-2 mb-2">Cardio</div>
-          <table className="table">
+          <div className="overflow-x-auto">
+          <table className="table" style={{ minWidth: 680 }}>
             <thead>
               <tr>
                 <th>Übung</th>
@@ -124,6 +127,7 @@ export function PlanReadOnlyTable({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
