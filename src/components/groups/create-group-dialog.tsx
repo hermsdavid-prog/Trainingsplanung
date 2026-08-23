@@ -16,6 +16,13 @@ const COLOR_OPTIONS = [
   { value: "#10b981", label: "Grün" },
   { value: "#f59e0b", label: "Orange" },
   { value: "#4b3793", label: "Violett" },
+  { value: "#dc2626", label: "Rot" },
+  { value: "#06b6d4", label: "Türkis" },
+  { value: "#eab308", label: "Gelb" },
+  { value: "#65a30d", label: "Olivgrün" },
+  { value: "#a855f7", label: "Lila" },
+  { value: "#92400e", label: "Braun" },
+  { value: "#64748b", label: "Grau" },
 ];
 
 export function CreateGroupDialog() {
@@ -72,7 +79,7 @@ export function CreateGroupDialog() {
               <label className="mb-1.5 block text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 70%, transparent)" }}>
                 Farbe
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {COLOR_OPTIONS.map((c, i) => (
                   <label key={c.value} className="flex items-center gap-1">
                     <input type="radio" name="color" value={c.value} defaultChecked={i === 0} className="sr-only peer" />
