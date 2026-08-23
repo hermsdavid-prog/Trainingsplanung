@@ -30,7 +30,7 @@ export default async function TrainerDashboardPage() {
       .eq("date", today),
     supabase
       .from("events")
-      .select("id, title, start_at, groups(name), profiles!events_athlete_id_fkey(full_name)")
+      .select("id, title, description, start_at, groups(name), profiles!events_athlete_id_fkey(full_name)")
       .eq("status", "proposed")
       .order("start_at"),
   ]);
@@ -38,6 +38,7 @@ export default async function TrainerDashboardPage() {
   const proposedEvents: ProposedEvent[] = (proposedRows ?? []).map((e) => ({
     id: e.id,
     title: e.title,
+    description: e.description,
     date: e.start_at.slice(0, 10),
     groupName: e.groups?.name ?? "—",
     proposedBy: e.profiles?.full_name ?? "—",

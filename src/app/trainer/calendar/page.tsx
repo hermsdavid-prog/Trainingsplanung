@@ -69,7 +69,7 @@ export default async function TrainerCalendarPage({
 
   let eventsQuery = supabase
     .from("events")
-    .select("id, title, start_at, event_type, color, status, group_id, athlete_id, all_day")
+    .select("id, title, description, start_at, event_type, color, status, group_id, athlete_id, all_day")
     .gte("start_at", `${rangeStart}T00:00:00Z`)
     .lte("start_at", `${rangeEnd}T23:59:59Z`);
   if (params.group) eventsQuery = eventsQuery.eq("group_id", params.group);
@@ -139,6 +139,7 @@ export default async function TrainerCalendarPage({
           href: `/trainer/calendar?month=${date.slice(0, 7)}`,
           status: event.status,
           subtitle: event.event_type,
+          description: event.description,
           kind: "event" as const,
         },
       ];
@@ -163,6 +164,7 @@ export default async function TrainerCalendarPage({
           tone: event.color,
           typeLabel: event.event_type,
           status: event.status,
+          description: event.description,
         },
       ];
     }

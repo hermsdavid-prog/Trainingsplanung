@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatDateLabel, formatDateShort } from "@/lib/date";
 import { reschedulePlanAction, duplicatePlanToDateAction } from "@/lib/actions/plans";
-import { rescheduleEventAction, duplicateEventToDateAction } from "@/lib/actions/events";
+import {
+  rescheduleEventAction,
+  duplicateEventToDateAction,
+  confirmEventAction,
+  deleteEventAction,
+} from "@/lib/actions/events";
 import { getBerlinCalendarMark } from "@/lib/berlin-holidays";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 
@@ -17,6 +22,7 @@ export type CalendarItem = {
   href: string;
   status?: string;
   subtitle?: string;
+  description?: string | null;
   kind: "plan" | "event";
 };
 
@@ -51,6 +57,7 @@ export function CalendarGrid({
   const [copyMode, setCopyMode] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showCreatePicker, setShowCreatePicker] = useState(false);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   // Native HTML5 drag-and-drop doesn't reliably support touch, so on touch
   // devices dropping onto month cells is disabled — dragging can only start
   // from the weekly board's cards, and only with a mouse.
@@ -71,7 +78,37 @@ export function CalendarGrid({
     if (!open) {
       setSelectedDate(null);
       setShowCreatePicker(false);
+      setExpandedEventId(null);
     }
+  }
+
+  function toggleExpandedEvent(id: string) {
+    setExpandedEventId((current) => (current === id ? null : id));
+  }
+
+  function confirmEvent(id: string) {
+    startTransition(async () => {
+      const result = await confirmEventAction(id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Termin bestätigt.");
+        router.refresh();
+      }
+    });
+  }
+
+  function removeEvent(id: string) {
+    startTransition(async () => {
+      const result = await deleteEventAction(id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Termin gelöscht.");
+        setExpandedEventId(null);
+        router.refresh();
+      }
+    });
   }
 
   function handleDrop(e: React.DragEvent, day: string) {
@@ -279,37 +316,102 @@ export function CalendarGrid({
 
                 {selectedItems.length > 0 && (
                   <div className="mt-3 flex flex-col gap-2">
-                    {selectedItems.map((item) => (
-                      <Link
-                        key={item.id}
-                        href={item.href}
-                        className="flex min-w-0 items-center gap-2.5 p-2.5"
-                        style={{ background: "var(--dc-bg)", borderLeft: `3px solid ${item.color}` }}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="truncate text-[14px]">{item.title}</span>
-                            {item.status === "proposed" && (
-                              <span className="tag tag-accent-2 shrink-0">Vorschlag</span>
+                    {selectedItems.map((item) =>
+                      item.kind === "plan" ? (
+                        <Link
+                          key={item.id}
+                          href={item.href}
+                          className="flex min-w-0 items-center gap-2.5 p-2.5"
+                          style={{ background: "var(--dc-bg)", borderLeft: `3px solid ${item.color}` }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="truncate text-[14px]">{item.title}</span>
+                            </div>
+                            {item.subtitle && (
+                              <div
+                                className="mt-0.5 truncate text-xs"
+                                style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                              >
+                                {item.subtitle}
+                              </div>
                             )}
                           </div>
-                          {item.subtitle && (
-                            <div
-                              className="mt-0.5 truncate text-xs"
-                              style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                          <span
+                            className="shrink-0 text-xs"
+                            style={{ color: "color-mix(in srgb, var(--dc-text) 45%, transparent)" }}
+                          >
+                            →
+                          </span>
+                        </Link>
+                      ) : (
+                        <div key={item.id} style={{ background: "var(--dc-bg)", borderLeft: `3px solid ${item.color}` }}>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpandedEvent(item.id)}
+                            className="flex w-full min-w-0 items-center gap-2.5 p-2.5 text-left"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="truncate text-[14px]">{item.title}</span>
+                                {item.status === "proposed" && (
+                                  <span className="tag tag-accent-2 shrink-0">Vorschlag</span>
+                                )}
+                              </div>
+                              {item.subtitle && (
+                                <div
+                                  className="mt-0.5 truncate text-xs"
+                                  style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                                >
+                                  {item.subtitle}
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              className="shrink-0 text-xs"
+                              style={{ color: "color-mix(in srgb, var(--dc-text) 45%, transparent)" }}
                             >
-                              {item.subtitle}
+                              {expandedEventId === item.id ? "▾" : "→"}
+                            </span>
+                          </button>
+                          {expandedEventId === item.id && (
+                            <div className="px-2.5 pb-2.5">
+                              {item.description ? (
+                                <p
+                                  className="text-[13px] leading-[1.5]"
+                                  style={{ overflowWrap: "anywhere", color: "color-mix(in srgb, var(--dc-text) 85%, transparent)" }}
+                                >
+                                  {item.description}
+                                </p>
+                              ) : (
+                                <p
+                                  className="text-[13px] leading-[1.5]"
+                                  style={{ color: "color-mix(in srgb, var(--dc-text) 50%, transparent)" }}
+                                >
+                                  Keine Beschreibung.
+                                </p>
+                              )}
+                              {enableDragDrop && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {item.status === "proposed" && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary"
+                                      onClick={() => confirmEvent(item.id)}
+                                    >
+                                      Bestätigen
+                                    </button>
+                                  )}
+                                  <button type="button" className="btn btn-ghost" onClick={() => removeEvent(item.id)}>
+                                    Löschen
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                        <span
-                          className="shrink-0 text-xs"
-                          style={{ color: "color-mix(in srgb, var(--dc-text) 45%, transparent)" }}
-                        >
-                          →
-                        </span>
-                      </Link>
-                    ))}
+                      )
+                    )}
                   </div>
                 )}
 

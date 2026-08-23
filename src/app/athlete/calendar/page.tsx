@@ -57,7 +57,7 @@ export default async function AthleteCalendarPage({
       .lte("date", rangeEnd),
     supabase
       .from("events")
-      .select("id, title, start_at, event_type, color, status, group_id, athlete_id, all_day")
+      .select("id, title, description, start_at, event_type, color, status, group_id, athlete_id, all_day")
       .gte("start_at", `${rangeStart}T00:00:00Z`)
       .lte("start_at", `${rangeEnd}T23:59:59Z`),
   ]);
@@ -111,6 +111,7 @@ export default async function AthleteCalendarPage({
           href: `/athlete/calendar?month=${date.slice(0, 7)}`,
           status: event.status,
           subtitle: event.event_type,
+          description: event.description,
           kind: "event" as const,
         },
       ];

@@ -9,6 +9,7 @@ import { formatDateShort } from "@/lib/date";
 export type ProposedEvent = {
   id: string;
   title: string;
+  description: string | null;
   date: string;
   groupName: string;
   proposedBy: string;
@@ -59,6 +60,14 @@ export function ProposedEventsWidget({ events }: { events: ProposedEvent[] }) {
               <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
                 {formatDateShort(e.date)} · {e.groupName} · vorgeschlagen von {e.proposedBy}
               </div>
+              {e.description && (
+                <div
+                  className="mt-1.5 text-[13px] leading-[1.4]"
+                  style={{ overflowWrap: "anywhere", color: "color-mix(in srgb, var(--dc-text) 80%, transparent)" }}
+                >
+                  {e.description}
+                </div>
+              )}
             </div>
             <div className="flex flex-none gap-2">
               <button type="button" className="btn btn-primary" disabled={isPending} onClick={() => confirm(e.id)}>

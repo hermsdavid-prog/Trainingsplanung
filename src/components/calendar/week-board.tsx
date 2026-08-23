@@ -28,6 +28,7 @@ export type WeekItem = {
   tone: string;
   typeLabel: string;
   status?: string;
+  description?: string | null;
 };
 
 const DEFAULT_DRAG_HINT =
@@ -281,6 +282,15 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                         {item.who}
                         {item.status === "proposed" && <span className="tag tag-outline ml-1.5">Vorschlag</span>}
                       </div>
+                      {item.description && (
+                        <div
+                          className="mt-1 text-[11px] leading-[1.3]"
+                          style={{ overflowWrap: "anywhere", color: "color-mix(in srgb, var(--dc-text) 75%, transparent)" }}
+                          title={item.description}
+                        >
+                          {item.description}
+                        </div>
+                      )}
                       <div className="mt-1 flex items-center justify-between gap-1.5">
                         <span
                           className="text-[10px] uppercase"
