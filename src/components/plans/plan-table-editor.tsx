@@ -16,7 +16,7 @@ import {
   type ExerciseSet,
 } from "@/components/athletik/exercise-set-entry-dialog";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
-import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, DumbbellIcon } from "lucide-react";
+import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, DumbbellIcon, CopyIcon } from "lucide-react";
 
 type Section = "kraft" | "cardio" | "sprung" | "runden";
 type DurationMode = "reps" | "duration";
@@ -185,6 +185,17 @@ export function PlanTableEditor({
 
   function addRow(section: Section) {
     setRows((prev) => [...prev, { ...EMPTY_ROW, section }]);
+  }
+
+  // Appended at the very end of `rows` (like addRow) rather than spliced in
+  // after the source row, so indices of any row that currently has a dialog
+  // open (notes/link/results/instructions, all tracked by index) never shift.
+  // It still lands at the bottom of its own section's table, since filtering
+  // by section preserves relative order among matching rows either way.
+  function duplicateLastRow(sectionRows: { row: Row; index: number }[]) {
+    const last = sectionRows.at(-1);
+    if (!last) return;
+    setRows((prev) => [...prev, { ...prev[last.index], result_sets: [] }]);
   }
 
   function removeRow(index: number) {
@@ -495,9 +506,19 @@ export function PlanTableEditor({
               </p>
             )}
 
-            <button type="button" className="btn btn-secondary mt-3" onClick={() => addRow("kraft")}>
-              <PlusIcon /> Übung hinzufügen
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="btn btn-secondary" onClick={() => addRow("kraft")}>
+                <PlusIcon /> Übung hinzufügen
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => duplicateLastRow(kraftRows)}
+                disabled={kraftRows.length === 0}
+              >
+                <CopyIcon /> Letzte Übung kopieren
+              </button>
+            </div>
           </div>
 
           <div>
@@ -613,9 +634,19 @@ export function PlanTableEditor({
             </table>
             </div>
 
-            <button type="button" className="btn btn-secondary mt-3" onClick={() => addRow("cardio")}>
-              <PlusIcon /> Übung hinzufügen
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="btn btn-secondary" onClick={() => addRow("cardio")}>
+                <PlusIcon /> Übung hinzufügen
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => duplicateLastRow(cardioRows)}
+                disabled={cardioRows.length === 0}
+              >
+                <CopyIcon /> Letzte Übung kopieren
+              </button>
+            </div>
           </div>
 
           <div>
@@ -690,9 +721,19 @@ export function PlanTableEditor({
               </tbody>
             </table>
             </div>
-            <button type="button" className="btn btn-secondary mt-3" onClick={() => addRow("sprung")}>
-              <PlusIcon /> weiterer Test
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="btn btn-secondary" onClick={() => addRow("sprung")}>
+                <PlusIcon /> weiterer Test
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => duplicateLastRow(sprungRows)}
+                disabled={sprungRows.length === 0}
+              >
+                <CopyIcon /> Letzten Test kopieren
+              </button>
+            </div>
             <p className="mt-2.5 max-w-[620px] text-xs leading-[1.6] text-muted">
               Übliche Tests: {SPRUNG_VORSCHLAEGE} — der beste Versuch geht in die Statistik.
             </p>
@@ -879,9 +920,19 @@ export function PlanTableEditor({
               );
             })}
           </div>
-          <button type="button" className="btn btn-secondary mt-4" onClick={() => addRow("runden")}>
-            <PlusIcon /> Übung hinzufügen
-          </button>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" className="btn btn-secondary" onClick={() => addRow("runden")}>
+              <PlusIcon /> Übung hinzufügen
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => duplicateLastRow(rundenRows)}
+              disabled={rundenRows.length === 0}
+            >
+              <CopyIcon /> Letzte Übung kopieren
+            </button>
+          </div>
         </div>
       )}
 
