@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AthletikFilters } from "@/components/athletik/athletik-filters";
 import { TrendChart } from "@/components/health/trend-chart";
 import { formatDateCompact, todayISO } from "@/lib/date";
+import { estimateOneRepMax } from "@/lib/one-rep-max";
 
 export default async function TrainerAthletikPage({
   searchParams,
@@ -60,20 +61,28 @@ export default async function TrainerAthletikPage({
   const { data: rawResults } = selectedAthlete && selectedExercise
     ? await supabase
         .from("exercise_results")
-        .select("date, value, unit, set_type")
+        .select("date, value, reps, unit, set_type")
         .eq("athlete_id", selectedAthlete)
         .eq("exercise_id", selectedExercise)
         .order("date")
     : { data: [] };
 
-  const resultsByDate = new Map<string, { date: string; value: number; unit: string | null }>();
+  const resultsByDate = new Map<
+    string,
+    { date: string; value: number; reps: number | null; unit: string | null }
+  >();
   for (const r of rawResults ?? []) {
     if (r.set_type === "aufwaermsatz") continue;
     const existing = resultsByDate.get(r.date);
     if (!existing || r.value > existing.value) resultsByDate.set(r.date, r);
   }
-  const results = Array.from(resultsByDate.values()).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const results = Array.from(resultsByDate.values())
+    .map((r) => ({ ...r, oneRm: r.reps != null ? estimateOneRepMax(r.value, r.reps) : null }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
   const best = results.length ? Math.max(...results.map((r) => r.value)) : null;
+  const bestOneRm = results.some((r) => r.oneRm != null)
+    ? Math.max(...results.map((r) => r.oneRm ?? -Infinity))
+    : null;
   const unit = results.find((r) => r.unit)?.unit ?? "";
   const gain =
     results.length >= 2 ? Math.round((results[results.length - 1].value - results[0].value) * 100) / 100 : null;
@@ -148,6 +157,8 @@ export default async function TrainerAthletikPage({
                       <tr>
                         <th>Messung</th>
                         <th>Wert</th>
+                        <th>Wdh.</th>
+                        <th>Geschätztes 1RM</th>
                         <th>Veränderung</th>
                       </tr>
                     </thead>
@@ -163,6 +174,12 @@ export default async function TrainerAthletikPage({
                             <td className="text-[15px]">
                               {r.value}
                               {r.unit ? ` ${r.unit}` : ""}
+                            </td>
+                            <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
+                              {r.reps ?? "—"}
+                            </td>
+                            <td className="text-[15px]">
+                              {r.oneRm != null ? `${r.oneRm} ${r.unit ?? ""}` : "—"}
                             </td>
                             <td>
                               <span
@@ -219,6 +236,14 @@ export default async function TrainerAthletikPage({
                       Start {results[0].value} {unit}
                     </div>
                   </div>
+                  <div className="py-2.5" style={{ borderBottom: "1px solid color-mix(in srgb, var(--dc-text) 10%, transparent)" }}>
+                    <div className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                      Bestes geschätztes 1RM
+                    </div>
+                    <div className="mt-1 text-[22px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
+                      {bestOneRm != null ? `${bestOneRm} ${unit}` : "—"}
+                    </div>
+                  </div>
                   <div className="py-2.5">
                     <div className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
                       Gruppenschnitt heute
@@ -227,7 +252,10 @@ export default async function TrainerAthletikPage({
                   </div>
                 </div>
                 <div className="mt-5 text-[13px] leading-[1.6]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
-                  Werte kommen aus dem schwersten Arbeitssatz des jeweiligen Tages. Neue Übungen erscheinen hier automatisch, sobald ein Ergebnis eingetragen wird.
+                  Werte kommen aus dem schwersten Arbeitssatz des jeweiligen Tages. Das geschätzte 1RM
+                  (One-Rep-Max) wird per Epley-Formel aus Gewicht und Wiederholungen berechnet und ist
+                  ab 1 Wdh. exakt, sonst eine Näherung — ab 12 Wdh. wird keine Schätzung mehr angezeigt.
+                  Neue Übungen erscheinen hier automatisch, sobald ein Ergebnis eingetragen wird.
                 </div>
               </div>
             </div>
