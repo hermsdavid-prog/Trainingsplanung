@@ -729,6 +729,28 @@ export async function saveAsTemplateAction(
   return {};
 }
 
+// plan_templates_delete (admin, or the trainer who created it) enforces who
+// may actually delete a row — this just surfaces a friendly error when that
+// check fails instead of silently reporting success on a 0-row delete.
+export async function deleteTemplateAction(templateId: string): Promise<ActionResult> {
+  const { supabase } = await requireTrainerOrAdmin();
+
+  const { data, error } = await supabase
+    .from("plan_templates")
+    .delete()
+    .eq("id", templateId)
+    .select("id");
+
+  if (error) return { error: "Vorlage konnte nicht gelöscht werden." };
+  if (!data || data.length === 0) {
+    return { error: "Keine Berechtigung, diese Vorlage zu löschen." };
+  }
+
+  revalidatePath("/trainer/plans/new");
+  revalidatePath("/athlete/plans/new");
+  return {};
+}
+
 // Resolves an exercise name to a library exercise_id on the spot, so the
 // "Anweisung und Link" panel (Sportartspezifisch/Karate rows) and the
 // "Ergebnis" set-entry dialog (Athletik Kraft rows) can be used for a

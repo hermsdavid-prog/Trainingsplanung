@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { CreatePlanForm } from "@/components/plans/create-plan-form";
+import { deleteTemplateAction } from "@/lib/actions/plans";
+import { Trash2Icon } from "lucide-react";
 
 export type PlanTemplateSummary = {
   id: string;
@@ -34,6 +38,8 @@ export function NewPlanFlow({
   const [step, setStep] = useState<"vorlage" | "rahmendaten">("vorlage");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [templateTitle, setTemplateTitle] = useState<string | undefined>(undefined);
+  const [isDeleting, startDeleteTransition] = useTransition();
+  const router = useRouter();
   const isSportartspezifisch = defaultCategory === "Sportartspezifisch";
   const kickerClass = isSportartspezifisch ? "kicker-accent-2" : "kicker";
 
@@ -41,6 +47,20 @@ export function NewPlanFlow({
     setTemplateId(id);
     setTemplateTitle(title);
     setStep("rahmendaten");
+  }
+
+  function handleDeleteTemplate(e: React.MouseEvent, id: string, title: string) {
+    e.stopPropagation();
+    if (!confirm(`Vorlage "${title}" wirklich löschen?`)) return;
+    startDeleteTransition(async () => {
+      const result = await deleteTemplateAction(id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Vorlage gelöscht.");
+        router.refresh();
+      }
+    });
   }
 
   if (step === "vorlage") {
@@ -61,19 +81,34 @@ export function NewPlanFlow({
             </div>
           </button>
           {templates.map((t) => (
-            <button key={t.id} type="button" className="exrow" onClick={() => pick(t.id, t.title)}>
-              <div className="flex items-baseline justify-between gap-5">
-                <span className="text-[19px]">{t.title}</span>
-                <span className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 50%, transparent)" }}>
-                  {t.itemCount} {t.itemCount === 1 ? "Übung" : "Übungen"}
-                </span>
-              </div>
-              {t.usage_note && (
-                <div className="mt-0.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
-                  {t.usage_note}
+            <div key={t.id} className="exrow" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => pick(t.id, t.title)}
+                style={{ flex: 1, minWidth: 0, textAlign: "left", background: "transparent", border: 0, padding: 0, cursor: "pointer", color: "inherit", font: "inherit" }}
+              >
+                <div className="flex items-baseline justify-between gap-5">
+                  <span className="text-[19px]">{t.title}</span>
+                  <span className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 50%, transparent)" }}>
+                    {t.itemCount} {t.itemCount === 1 ? "Übung" : "Übungen"}
+                  </span>
                 </div>
-              )}
-            </button>
+                {t.usage_note && (
+                  <div className="mt-0.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                    {t.usage_note}
+                  </div>
+                )}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={isDeleting}
+                onClick={(e) => handleDeleteTemplate(e, t.id, t.title)}
+                aria-label="Vorlage löschen"
+              >
+                <Trash2Icon />
+              </button>
+            </div>
           ))}
           {templates.length === 0 && (
             <p className="mt-2 text-sm text-muted">Noch keine Vorlage gespeichert.</p>
