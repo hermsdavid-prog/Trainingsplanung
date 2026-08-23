@@ -72,16 +72,26 @@ export default async function EditPlanPage({
         .eq("series_id", plan.series_id)
     : { count: null };
 
-  // Per-athlete drill-in (design's tAthlet) is only meaningful for a
-  // group-assigned Athletik plan, where each athlete logs their own sets.
+  // Athlete-by-athlete completion overview, shown for any group-assigned
+  // plan (Athletik or Sportartspezifisch) — the RPE ("Belastungsempfinden")
+  // an athlete logs when they tap "Training beenden" applies to both, so a
+  // trainer needs to see it regardless of category. The per-exercise
+  // "Sätze ansehen" drill-in is still most useful for Athletik, but stays
+  // harmless (and shows the same RPE) for Karate plans too.
   const { data: planGroupAthletes } =
-    isAthletik && plan.scope_type === "group" && plan.group_id
+    plan.scope_type === "group" && plan.group_id
       ? await supabase
           .from("group_athletes")
           .select("athlete_id, profiles(full_name)")
           .eq("group_id", plan.group_id)
           .order("athlete_id")
       : { data: null };
+
+  const { data: ratingRows } =
+    planGroupAthletes && planGroupAthletes.length > 0
+      ? await supabase.from("session_ratings").select("athlete_id, rpe").eq("training_plan_id", id)
+      : { data: null };
+  const rpeByAthlete = new Map((ratingRows ?? []).map((r) => [r.athlete_id, r.rpe]));
 
   const athleteMap = new Map<string, string>();
   for (const row of groupAthletes ?? []) {
@@ -187,18 +197,35 @@ export default async function EditPlanPage({
             <div>
               <div className="kicker-muted mb-2">Athleten in dieser Gruppe</div>
               <div className="overflow-x-auto">
-              <table className="table" style={{ minWidth: 360 }}>
+              <table className="table" style={{ minWidth: 420 }}>
+                <thead>
+                  <tr>
+                    <th>Athlet</th>
+                    <th>Belastungsempfinden</th>
+                    <th></th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {planGroupAthletes.map((row) => (
-                    <tr key={row.athlete_id}>
-                      <td className="text-[15px]">{row.profiles?.full_name ?? "—"}</td>
-                      <td className="text-right">
-                        <Link href={`/trainer/plans/${plan.id}/athlete/${row.athlete_id}`} className="btn btn-ghost">
-                          Sätze ansehen
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {planGroupAthletes.map((row) => {
+                    const rpe = rpeByAthlete.get(row.athlete_id);
+                    return (
+                      <tr key={row.athlete_id}>
+                        <td className="text-[15px]">{row.profiles?.full_name ?? "—"}</td>
+                        <td>
+                          {rpe != null ? (
+                            <span className="tag tag-neutral">{rpe} / 10</span>
+                          ) : (
+                            <span className="text-xs text-muted">Noch keine Angabe</span>
+                          )}
+                        </td>
+                        <td className="text-right">
+                          <Link href={`/trainer/plans/${plan.id}/athlete/${row.athlete_id}`} className="btn btn-ghost">
+                            Sätze ansehen
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               </div>
