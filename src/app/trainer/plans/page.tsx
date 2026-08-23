@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DeletePlanRowButton } from "@/components/plans/delete-plan-row-button";
+import { PlanOccurrenceDropdown } from "@/components/plans/plan-occurrence-dropdown";
 import { formatDateShort } from "@/lib/date";
 import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
 
@@ -142,19 +143,15 @@ export default async function TrainerPlansPage({
               return (
                 <tr key={group.key}>
                   <td colSpan={2}>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.occurrences.map((o) => (
-                        <Link key={o.id} href={`/trainer/plans/${o.id}/edit`} className="chip">
-                          {formatDateShort(o.date)}
-                        </Link>
-                      ))}
-                    </div>
+                    <PlanOccurrenceDropdown occurrences={group.occurrences} />
                   </td>
                   <td className="text-[15px]">
                     {group.title}
-                    <div className="mt-0.5 text-xs" style={MUTED}>
-                      {group.occurrences.length} Termine{group.time ? ` · ${group.time}` : ""}
-                    </div>
+                    {group.time && (
+                      <div className="mt-0.5 text-xs" style={MUTED}>
+                        {group.time}
+                      </div>
+                    )}
                   </td>
                   <td className="text-sm" style={MUTED}>
                     {group.forLabel}
