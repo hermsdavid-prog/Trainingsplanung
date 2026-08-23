@@ -152,11 +152,6 @@ export function WorkoutSession({
   });
 
   const [activeItemId, setActiveItemId] = useState<string>(exercises[0]?.itemId ?? "");
-  const [roundState, setRoundState] = useState<Record<string, boolean[]>>(() => {
-    const map: Record<string, boolean[]> = {};
-    for (const row of karateRows) map[row.itemId] = Array.from({ length: row.rounds }, () => false);
-    return map;
-  });
 
   const [restRemaining, setRestRemaining] = useState<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -544,7 +539,9 @@ export function WorkoutSession({
                     <div className="min-w-0">
                       <div className="text-[17px] leading-[1.25]">{row.name}</div>
                       <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
-                        {row.valLabel}{row.restLabel ? ` · Pause ${row.restLabel}` : ""}
+                        {row.valLabel}
+                        {row.rounds ? ` · ${row.rounds} ${row.rounds === 1 ? "Runde" : "Runden"}` : ""}
+                        {row.restLabel ? ` · Pause ${row.restLabel}` : ""}
                       </div>
                     </div>
                     <button
@@ -558,34 +555,9 @@ export function WorkoutSession({
                     </button>
                   </div>
                   {row.desc && <div className="mt-2 text-[13px] leading-[1.5]">{row.desc}</div>}
-                  <div className="mt-3 flex gap-2">
-                    {(roundState[row.itemId] ?? []).map((done, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() =>
-                          setRoundState((prev) => ({
-                            ...prev,
-                            [row.itemId]: prev[row.itemId].map((v, idx) => (idx === i ? !v : v)),
-                          }))
-                        }
-                        className="flex h-[38px] w-[38px] items-center justify-center rounded-sm text-sm"
-                        style={{
-                          border: `1px solid ${done ? "var(--dc-accent)" : "var(--dc-divider)"}`,
-                          background: done ? "var(--dc-accent)" : "transparent",
-                          color: done ? "var(--dc-bg)" : "var(--dc-text)",
-                        }}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
-              Der Rundenstatus wird nur in dieser Sitzung angezeigt und noch nicht gespeichert.
-            </p>
           </div>
         )}
 
