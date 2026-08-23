@@ -4,6 +4,17 @@ import { DeletePlanRowButton } from "@/components/plans/delete-plan-row-button";
 import { formatDateShort } from "@/lib/date";
 import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
 
+const MUTED = { color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" };
+
+type PlanGroup = {
+  key: string;
+  title: string;
+  time: string | null;
+  scopeType: string;
+  forLabel: string;
+  occurrences: { id: string; date: string; created_by: string | null }[];
+};
+
 export default async function TrainerPlansPage({
   searchParams,
 }: {
@@ -23,7 +34,7 @@ export default async function TrainerPlansPage({
     supabase
       .from("training_plans")
       .select(
-        "id, title, category_label, date, time, scope_type, created_by, groups(name), profiles!training_plans_athlete_id_fkey(full_name)"
+        "id, title, category_label, date, time, scope_type, created_by, group_id, athlete_id, series_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)"
       )
       .eq("category_label", category)
       .order("date", { ascending: false })
@@ -34,6 +45,45 @@ export default async function TrainerPlansPage({
   ]);
 
   const isKarate = category === "Sportartspezifisch";
+
+  // A weekly-repeat series (shared series_id) and ad-hoc copies ("Plan
+  // kopieren", or the calendar's drag-to-copy) both produce one
+  // training_plans row per date with otherwise-identical content. Listing
+  // every occurrence separately buries the list in repeats of the same
+  // training, so occurrences that are clearly "the same training" collapse
+  // into a single row with all of its dates shown together.
+  const groupsByKey = new Map<string, PlanGroup>();
+  for (const plan of plans ?? []) {
+    const key =
+      plan.series_id ??
+      `adhoc:${plan.title}::${plan.scope_type}::${plan.group_id ?? plan.athlete_id ?? ""}`;
+    const forLabel =
+      plan.scope_type === "group" ? (plan.groups?.name ?? "—") : (plan.profiles?.full_name ?? "—");
+    const occurrence = { id: plan.id, date: plan.date, created_by: plan.created_by };
+    const existing = groupsByKey.get(key);
+    if (existing) {
+      existing.occurrences.push(occurrence);
+    } else {
+      groupsByKey.set(key, {
+        key,
+        title: plan.title,
+        time: plan.time,
+        scopeType: plan.scope_type,
+        forLabel,
+        occurrences: [occurrence],
+      });
+    }
+  }
+
+  const groups = Array.from(groupsByKey.values());
+  for (const group of groups) {
+    group.occurrences.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  }
+  groups.sort((a, b) => {
+    const aLatest = a.occurrences[a.occurrences.length - 1].date;
+    const bLatest = b.occurrences[b.occurrences.length - 1].date;
+    return aLatest < bLatest ? 1 : aLatest > bLatest ? -1 : 0;
+  });
 
   return (
     <div>
@@ -63,37 +113,57 @@ export default async function TrainerPlansPage({
             </tr>
           </thead>
           <tbody>
-            {(plans ?? []).map((plan) => {
-              const canDelete =
-                profile?.role === "admin" ||
-                plan.created_by === currentUser?.id ||
-                plan.scope_type === "group";
+            {groups.map((group) => {
+              if (group.occurrences.length === 1) {
+                const plan = group.occurrences[0];
+                const canDelete =
+                  profile?.role === "admin" ||
+                  plan.created_by === currentUser?.id ||
+                  group.scopeType === "group";
+                return (
+                  <tr key={group.key}>
+                    <td style={MUTED}>{formatDateShort(plan.date)}</td>
+                    <td style={MUTED}>{group.time || "—"}</td>
+                    <td className="text-[15px]">{group.title}</td>
+                    <td className="text-sm" style={MUTED}>
+                      {group.forLabel}
+                    </td>
+                    <td>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-ghost">
+                          bearbeiten
+                        </Link>
+                        {canDelete && <DeletePlanRowButton planId={plan.id} title={group.title} />}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
               return (
-                <tr key={plan.id}>
-                  <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
-                    {formatDateShort(plan.date)}
-                  </td>
-                  <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
-                    {plan.time || "—"}
-                  </td>
-                  <td className="text-[15px]">{plan.title}</td>
-                  <td className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>
-                    {plan.scope_type === "group"
-                      ? (plan.groups?.name ?? "—")
-                      : (plan.profiles?.full_name ?? "—")}
-                  </td>
-                  <td>
-                    <div className="flex items-center justify-end gap-1">
-                      <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-ghost">
-                        bearbeiten
-                      </Link>
-                      {canDelete && <DeletePlanRowButton planId={plan.id} title={plan.title} />}
+                <tr key={group.key}>
+                  <td colSpan={2}>
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.occurrences.map((o) => (
+                        <Link key={o.id} href={`/trainer/plans/${o.id}/edit`} className="chip">
+                          {formatDateShort(o.date)}
+                        </Link>
+                      ))}
                     </div>
                   </td>
+                  <td className="text-[15px]">
+                    {group.title}
+                    <div className="mt-0.5 text-xs" style={MUTED}>
+                      {group.occurrences.length} Termine{group.time ? ` · ${group.time}` : ""}
+                    </div>
+                  </td>
+                  <td className="text-sm" style={MUTED}>
+                    {group.forLabel}
+                  </td>
+                  <td></td>
                 </tr>
               );
             })}
-            {(!plans || plans.length === 0) && (
+            {groups.length === 0 && (
               <tr>
                 <td colSpan={5} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
                   Noch keine Trainingspläne angelegt.
