@@ -22,7 +22,7 @@ export default async function EditPlanPage({
     await Promise.all([
       supabase
         .from("training_plans")
-        .select("id, title, category_label, date, time, scope_type, group_id, created_by, series_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
+        .select("id, title, category_label, date, time, scope_type, group_id, athlete_id, created_by, series_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
         .eq("id", id)
         .single(),
       supabase
@@ -64,6 +64,20 @@ export default async function EditPlanPage({
     profile?.role === "admin" ||
     plan.created_by === currentUser?.id ||
     plan.scope_type === "group";
+
+  // A trainer can already read this plan and its exercise_results (RLS
+  // grants that for any athlete in one of their groups, regardless of who
+  // created it) but couldn't get to the page that actually shows the
+  // logged sets/reps/weights/RPE for a self-created (non-group) plan —
+  // only the planned structure via PlanReadOnlyTable below.
+  const { data: rpeRow } = !canEdit
+    ? await supabase
+        .from("session_ratings")
+        .select("rpe")
+        .eq("training_plan_id", id)
+        .eq("athlete_id", plan.athlete_id ?? "")
+        .maybeSingle()
+    : { data: null };
 
   const { count: seriesCount } = plan.series_id
     ? await supabase
@@ -132,7 +146,18 @@ export default async function EditPlanPage({
               Dieses Training wurde vom Athleten selbst erstellt. Du kannst es einsehen, aber
               nicht bearbeiten.
             </p>
+            <p className="mt-1.5 text-sm">
+              Belastungsempfinden: <strong>{rpeRow?.rpe ?? "—"}</strong>
+            </p>
           </div>
+          {isAthletik && plan.athlete_id && (
+            <Link
+              href={`/trainer/plans/${plan.id}/athlete/${plan.athlete_id}`}
+              className="btn btn-secondary flex-none"
+            >
+              Sätze, Wdh. und Gewichte ansehen
+            </Link>
+          )}
         </div>
       )}
 
