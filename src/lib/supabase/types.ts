@@ -829,7 +829,34 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      replace_training_plan_items: {
+        Args: { p_items: Json; p_plan_id: string }
+        Returns: {
+          created_at: string
+          description: string | null
+          duration_mode: string | null
+          exercise_id: string | null
+          exercise_name: string
+          heart_rate_off: string | null
+          heart_rate_on: string | null
+          id: string
+          link_url: string | null
+          notes: string | null
+          position: number
+          reps_or_duration: string | null
+          rest_time: string | null
+          round_rest: string | null
+          section: string
+          sets: string | null
+          training_plan_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "training_plan_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       event_status: "proposed" | "confirmed"

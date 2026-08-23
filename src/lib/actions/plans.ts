@@ -314,6 +314,50 @@ function normalizeUrl(value: string): string | null {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+// Resolves a (trimmed) exercise name to a library exercise_id, auto-creating
+// it if it doesn't exist yet. Case-insensitive lookup via ilike, with a
+// retry-after-insert-conflict to handle two requests racing to create the
+// same not-yet-existing name at once — including two different-case
+// spellings of the same name, since the underlying unique index is
+// case-sensitive while this lookup isn't.
+async function resolveOrCreateExerciseId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  name: string
+): Promise<{ exerciseId?: string; error?: string }> {
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Kein Übungsname angegeben." };
+
+  const escapedName = trimmed.replace(/[%_\\]/g, (char) => `\\${char}`);
+  const { data: existing } = await supabase
+    .from("exercises")
+    .select("id")
+    .ilike("name", escapedName)
+    .maybeSingle();
+  if (existing) return { exerciseId: existing.id };
+
+  const { data: created, error } = await supabase
+    .from("exercises")
+    .insert({ name: trimmed, created_by: userId })
+    .select("id")
+    .single();
+  if (created) return { exerciseId: created.id };
+
+  // Unique-constraint race: another request created the same (or, since the
+  // constraint is case-sensitive but this lookup isn't, a same-but-differently-
+  // cased) name first.
+  if (error) {
+    const { data: retry } = await supabase
+      .from("exercises")
+      .select("id")
+      .ilike("name", escapedName)
+      .maybeSingle();
+    if (retry) return { exerciseId: retry.id };
+  }
+
+  return { error: "Übung konnte nicht angelegt werden." };
+}
+
 export type SavedPlanItem = { position: number; exercise_id: string | null };
 
 export async function savePlanItemsAction(
@@ -339,40 +383,33 @@ export async function savePlanItemsAction(
   // exercise_instructions (steps/video) off of. Cardio and Leistungsdiagnostik
   // (sprung) rows never resolve to a library exercise — weight/rep-based
   // result tracking and per-exercise instructions don't apply to them.
-  const resolvedExerciseIds: (string | null)[] = [];
-  for (const item of filteredItems) {
+  //
+  // Resolved in parallel rather than one at a time, and a failure here is
+  // reported back instead of silently saving the row without an exercise_id
+  // (which used to leave results/instructions silently unusable for it).
+  const resolvedExerciseIds: (string | null)[] = new Array(filteredItems.length).fill(null);
+  const toResolve: { index: number; name: string }[] = [];
+  filteredItems.forEach((item, index) => {
     if (item.section === "cardio" || item.section === "sprung") {
-      resolvedExerciseIds.push(item.exercise_id ?? null);
-      continue;
+      resolvedExerciseIds[index] = item.exercise_id ?? null;
+    } else if (item.exercise_id) {
+      resolvedExerciseIds[index] = item.exercise_id;
+    } else {
+      toResolve.push({ index, name: item.exercise_name });
     }
-    if (item.exercise_id) {
-      resolvedExerciseIds.push(item.exercise_id);
-      continue;
+  });
+  if (toResolve.length > 0) {
+    const results = await Promise.all(
+      toResolve.map(({ name }) => resolveOrCreateExerciseId(supabase, userId, name))
+    );
+    for (let i = 0; i < toResolve.length; i++) {
+      const result = results[i];
+      if (result.error || !result.exerciseId) {
+        return { error: `Übung „${toResolve[i].name.trim()}" konnte nicht angelegt werden.` };
+      }
+      resolvedExerciseIds[toResolve[i].index] = result.exerciseId;
     }
-    const name = item.exercise_name.trim();
-    const escapedName = name.replace(/[%_\\]/g, (char) => `\\${char}`);
-    const { data: existing } = await supabase
-      .from("exercises")
-      .select("id")
-      .ilike("name", escapedName)
-      .maybeSingle();
-    if (existing) {
-      resolvedExerciseIds.push(existing.id);
-      continue;
-    }
-    const { data: created } = await supabase
-      .from("exercises")
-      .insert({ name, created_by: userId })
-      .select("id")
-      .single();
-    resolvedExerciseIds.push(created?.id ?? null);
   }
-
-  const { error: deleteError } = await supabase
-    .from("training_plan_items")
-    .delete()
-    .eq("training_plan_id", planId);
-  if (deleteError) return { error: "Speichern fehlgeschlagen." };
 
   const rows = filteredItems.map((item, index) => ({
     training_plan_id: planId,
@@ -392,15 +429,19 @@ export async function savePlanItemsAction(
     duration_mode: item.duration_mode ?? null,
   }));
 
-  let savedItems: SavedPlanItem[] = [];
-  if (rows.length > 0) {
-    const { data: inserted, error: insertError } = await supabase
-      .from("training_plan_items")
-      .insert(rows)
-      .select("position, exercise_id");
-    if (insertError) return { error: "Speichern fehlgeschlagen." };
-    savedItems = inserted ?? [];
-  }
+  // Replaces the plan's items in a single database transaction (delete old +
+  // insert new) via an RPC, so a failure partway through can't leave the
+  // plan's exercise table wiped out with nothing restored — the old
+  // delete-then-insert-as-two-calls version could do exactly that.
+  const { data: savedRows, error: saveError } = await supabase.rpc(
+    "replace_training_plan_items",
+    { p_plan_id: planId, p_items: rows }
+  );
+  if (saveError) return { error: "Speichern fehlgeschlagen." };
+  const savedItems: SavedPlanItem[] = (savedRows ?? []).map((r) => ({
+    position: r.position,
+    exercise_id: r.exercise_id,
+  }));
 
   // For recurring plans, propagate these exercises to sibling occurrences
   // that haven't been individually customized yet (still have zero items).
@@ -705,33 +746,5 @@ export async function ensureExerciseAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
-  const trimmed = name.trim();
-  if (!trimmed) return { error: "Kein Übungsname angegeben." };
-
-  const escapedName = trimmed.replace(/[%_\\]/g, (char) => `\\${char}`);
-  const { data: existing } = await supabase
-    .from("exercises")
-    .select("id")
-    .ilike("name", escapedName)
-    .maybeSingle();
-  if (existing) return { exerciseId: existing.id };
-
-  const { data: created, error } = await supabase
-    .from("exercises")
-    .insert({ name: trimmed, created_by: user.id })
-    .select("id")
-    .single();
-  if (created) return { exerciseId: created.id };
-
-  // Unique-constraint race: another request created the same name first.
-  if (error) {
-    const { data: retry } = await supabase
-      .from("exercises")
-      .select("id")
-      .ilike("name", escapedName)
-      .maybeSingle();
-    if (retry) return { exerciseId: retry.id };
-  }
-
-  return { error: "Übung konnte nicht angelegt werden." };
+  return resolveOrCreateExerciseId(supabase, user.id, name);
 }
