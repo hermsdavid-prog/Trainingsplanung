@@ -8,6 +8,10 @@ export type PlanTemplateSummary = {
   title: string;
   usage_note: string | null;
   itemCount: number;
+  // Only populated (and shown as a badge) by the athlete's OwnPlanFlow,
+  // which lists templates across both categories; NewPlanFlow's trainer
+  // picker already pre-filters by category server-side so it's unused there.
+  category_label?: string;
 };
 
 // Mirrors the design's two-step "Vorlage wählen" → Rahmendaten flow

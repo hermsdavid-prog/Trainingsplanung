@@ -1,17 +1,30 @@
-import { CreateOwnPlanForm } from "@/components/plans/create-own-plan-form";
+import { createClient } from "@/lib/supabase/server";
+import { OwnPlanFlow } from "@/components/plans/own-plan-flow";
+import type { PlanTemplateSummary } from "@/components/plans/new-plan-flow";
 
-export default function NewOwnPlanPage() {
+export default async function NewOwnPlanPage() {
+  const supabase = await createClient();
+
+  // No category filter (unlike the trainer's NewPlanPage) — the athlete
+  // hasn't chosen Athletik vs. Sportartspezifisch yet at this point, that
+  // happens in step 2. RLS (plan_templates_select) already restricts this
+  // plain select to templates scoped to groups the athlete belongs to.
+  const { data: templateRows } = await supabase
+    .from("plan_templates")
+    .select("id, title, usage_note, items, category_label")
+    .order("created_at");
+
+  const templates: PlanTemplateSummary[] = (templateRows ?? []).map((t) => ({
+    id: t.id,
+    title: t.title,
+    usage_note: t.usage_note,
+    itemCount: Array.isArray(t.items) ? t.items.length : 0,
+    category_label: t.category_label,
+  }));
+
   return (
     <div className="max-w-[520px]">
-      <div className="kicker">Eigenes Workout</div>
-      <h2 className="mt-2.5 text-[27px] leading-[1.08]">Training erstellen</h2>
-      <p className="mt-2.5 text-sm leading-[1.55]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
-        Lege die Rahmendaten fest — die Übungstabelle folgt im nächsten Schritt. Dein Trainer
-        kann dieses Training einsehen.
-      </p>
-      <div className="mt-6">
-        <CreateOwnPlanForm />
-      </div>
+      <OwnPlanFlow templates={templates} />
     </div>
   );
 }

@@ -197,6 +197,7 @@ export async function confirmEventAction(eventId: string): Promise<ActionResult>
     return { error: "Keine Berechtigung, diesen Termin zu bestätigen." };
   }
 
+  revalidatePath("/trainer");
   revalidatePath("/trainer/calendar");
   revalidatePath("/athlete/calendar");
   return {};
@@ -216,6 +217,7 @@ export async function deleteEventAction(eventId: string): Promise<ActionResult> 
     return { error: "Keine Berechtigung, diesen Termin zu löschen." };
   }
 
+  revalidatePath("/trainer");
   revalidatePath("/trainer/calendar");
   revalidatePath("/athlete/calendar");
   return {};

@@ -111,7 +111,7 @@ export function ExerciseSetEntryDialog({
 
           {!exerciseId ? (
             <p className="mt-2 text-sm text-muted">
-              Bitte zuerst den Plan zuweisen — danach kann hier ein Ergebnis erfasst
+              Bitte zuerst den Plan speichern — danach kann hier ein Ergebnis erfasst
               werden.
             </p>
           ) : (

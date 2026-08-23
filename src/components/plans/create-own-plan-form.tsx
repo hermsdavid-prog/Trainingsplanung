@@ -6,19 +6,42 @@ import { PLAN_TYPES } from "@/lib/plan-type";
 
 const initialState: ActionResult = {};
 
-export function CreateOwnPlanForm() {
+export function CreateOwnPlanForm({
+  templateId,
+  defaultTitle,
+  defaultCategory,
+}: {
+  templateId?: string | null;
+  defaultTitle?: string;
+  defaultCategory?: string;
+} = {}) {
   const [state, formAction, isPending] = useActionState(createOwnPlanAction, initialState);
 
   return (
     <form action={formAction} className="flex flex-col">
+      {templateId && <input type="hidden" name="template_id" value={templateId} />}
+
       <div className="field">
         <label htmlFor="title">Titel</label>
-        <input id="title" name="title" required className="input" placeholder="z. B. Eigenes Workout" />
+        <input
+          id="title"
+          name="title"
+          required
+          className="input"
+          defaultValue={defaultTitle}
+          placeholder="z. B. Eigenes Workout"
+        />
       </div>
 
       <div className="field mt-3.5">
         <label htmlFor="category_label">Typ</label>
-        <select id="category_label" name="category_label" defaultValue={PLAN_TYPES[0]} required className="input">
+        <select
+          id="category_label"
+          name="category_label"
+          defaultValue={defaultCategory ?? PLAN_TYPES[0]}
+          required
+          className="input"
+        >
           {PLAN_TYPES.map((t) => (
             <option key={t} value={t}>
               {t}

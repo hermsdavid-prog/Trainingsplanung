@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { loginAction, type ActionResult } from "@/lib/actions/auth";
 import { PrivacyPolicyDialog } from "@/components/shell/privacy-policy-dialog";
+import { ImprintDialog } from "@/components/shell/imprint-dialog";
 
 const initialState: ActionResult = {};
 
@@ -45,6 +46,7 @@ export function LoginForm() {
       </button>
       <div className="mt-[18px] flex gap-4 text-[13px]">
         <PrivacyPolicyDialog trigger="Datenschutzerklärung" />
+        <ImprintDialog trigger="Impressum" />
       </div>
     </form>
   );

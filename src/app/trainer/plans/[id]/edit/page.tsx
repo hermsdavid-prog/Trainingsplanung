@@ -137,6 +137,7 @@ export default async function EditPlanPage({
             initialTime={plan.time}
             kicker={kicker}
             backHref={backHref}
+            allowSaveAsTemplate
             subtitle={`Für: ${targetLabel ?? "—"} (${plan.scope_type === "group" ? "Gruppe" : "Einzelplan"})${
               plan.series_id && seriesCount && seriesCount > 1
                 ? " · Übungen werden beim Speichern automatisch auf noch leere Termine dieser Serie übertragen."

@@ -157,31 +157,7 @@ export async function createPlanAction(
   // chosen plan_templates row so the trainer lands in a pre-populated editor
   // instead of a blank one.
   if (templateId) {
-    const { data: template } = await supabase
-      .from("plan_templates")
-      .select("items")
-      .eq("id", templateId)
-      .maybeSingle();
-    const rawItems: unknown[] = Array.isArray(template?.items) ? (template.items as unknown[]) : [];
-    const templateItems: PlanItemInput[] = rawItems
-      .filter((it): it is Record<string, unknown> => typeof it === "object" && it !== null && !Array.isArray(it))
-      .map((it) => ({
-        exercise_name: String(it.exercise_name ?? ""),
-        reps_or_duration: String(it.reps_or_duration ?? ""),
-        sets: String(it.sets ?? ""),
-        rest_time: String(it.rest_time ?? ""),
-        notes: String(it.notes ?? ""),
-        link_url: String(it.link_url ?? ""),
-        section: (it.section as PlanItemInput["section"]) ?? "kraft",
-        round_rest: String(it.round_rest ?? ""),
-        heart_rate_on: String(it.heart_rate_on ?? ""),
-        heart_rate_off: String(it.heart_rate_off ?? ""),
-        description: String(it.description ?? ""),
-        duration_mode: (it.duration_mode as PlanItemInput["duration_mode"]) ?? null,
-      }));
-    if (templateItems.length > 0) {
-      await savePlanItemsAction(plans[0].id, templateItems);
-    }
+    await applyTemplateToNewPlan(supabase, plans[0].id, templateId);
   }
 
   redirect(`/trainer/plans/${plans[0].id}/edit`);
@@ -198,6 +174,7 @@ export async function createOwnPlanAction(
   const title = String(formData.get("title") ?? "").trim();
   const date = String(formData.get("date") ?? "");
   const time = String(formData.get("time") ?? "").trim() || null;
+  const templateId = String(formData.get("template_id") ?? "") || null;
 
   if (!title) {
     return { error: "Bitte einen Titel angeben." };
@@ -224,11 +201,18 @@ export async function createOwnPlanAction(
     return { error: "Plan konnte nicht angelegt werden." };
   }
 
+  // "Vorlage wählen" step 1 (athlete equivalent of the trainer flow) —
+  // prefill the new plan's exercise table from the chosen plan_templates
+  // row, same as createPlanAction does for trainers.
+  if (templateId) {
+    await applyTemplateToNewPlan(supabase, plan.id, templateId);
+  }
+
   revalidatePath("/athlete");
   redirect(`/athlete/plans/${plan.id}`);
 }
 
-// Called directly (not via useActionState) from the combined "Plan zuweisen"
+// Called directly (not via useActionState) from the combined "Plan speichern"
 // button in PlanTableEditor, alongside savePlanItemsAction, so the whole
 // editor (rahmendaten + rows) saves in one action. category_label is fixed
 // at creation time (implied by the Athletik/Karate nav entry point that was
@@ -281,6 +265,46 @@ type PlanItemInput = {
   description?: string;
   duration_mode?: "reps" | "duration" | null;
 };
+
+// Shared by createPlanAction (trainer) and createOwnPlanAction (athlete) —
+// both let the user pick a plan_templates row in step 1 of their creation
+// flow and carry its id through as template_id. This turns the template's
+// stored jsonb items back into PlanItemInput rows for savePlanItemsAction.
+function parseTemplateItems(rawItemsValue: unknown): PlanItemInput[] {
+  const rawItems: unknown[] = Array.isArray(rawItemsValue) ? rawItemsValue : [];
+  return rawItems
+    .filter((it): it is Record<string, unknown> => typeof it === "object" && it !== null && !Array.isArray(it))
+    .map((it) => ({
+      exercise_name: String(it.exercise_name ?? ""),
+      reps_or_duration: String(it.reps_or_duration ?? ""),
+      sets: String(it.sets ?? ""),
+      rest_time: String(it.rest_time ?? ""),
+      notes: String(it.notes ?? ""),
+      link_url: String(it.link_url ?? ""),
+      section: (it.section as PlanItemInput["section"]) ?? "kraft",
+      round_rest: String(it.round_rest ?? ""),
+      heart_rate_on: String(it.heart_rate_on ?? ""),
+      heart_rate_off: String(it.heart_rate_off ?? ""),
+      description: String(it.description ?? ""),
+      duration_mode: (it.duration_mode as PlanItemInput["duration_mode"]) ?? null,
+    }));
+}
+
+async function applyTemplateToNewPlan(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  planId: string,
+  templateId: string
+) {
+  const { data: template } = await supabase
+    .from("plan_templates")
+    .select("items")
+    .eq("id", templateId)
+    .maybeSingle();
+  const templateItems = parseTemplateItems(template?.items);
+  if (templateItems.length > 0) {
+    await savePlanItemsAction(planId, templateItems);
+  }
+}
 
 // Prefix bare domains/paths with https:// so links always navigate instead
 // of being interpreted as a relative path on this site.
@@ -589,4 +613,125 @@ export async function copyPlanAction(
 
   revalidatePath("/trainer/plans");
   redirect(`/trainer/plans/${newPlan.id}/edit`);
+}
+
+// "Auch als Vorlage speichern" in PlanTableEditor's header — snapshots the
+// currently-edited plan's rows into a new plan_templates row so it can be
+// reused as a starting point for future plans (via the "Vorlage wählen"
+// step in NewPlanFlow / OwnPlanFlow). Mirrors the plan_templates_insert RLS
+// policy (admin or trainer only — athletes can look at templates but not
+// create them) and, like requirePlanEditAccess, also confirms the caller
+// may actually edit this specific plan.
+//
+// group_id is copied from the plan being saved: a group-scoped plan produces
+// a template visible to every trainer plus athletes in that group (per the
+// plan_templates_select policy); an individual/athlete-scoped plan has no
+// group, so the template is saved with group_id = null, which under that
+// same policy only the creating trainer can see again in their own "Vorlage
+// wählen" picker (trainers see all templates regardless of group_id;
+// athletes only see group-scoped ones) — still useful as a personal
+// template, just not shared with a group of athletes.
+export async function saveAsTemplateAction(
+  planId: string,
+  items: PlanItemInput[],
+  title: string
+): Promise<ActionResult> {
+  const { supabase, userId, role } = await requirePlanEditAccess(planId);
+  if (role !== "admin" && role !== "trainer") {
+    return { error: "Keine Berechtigung, eine Vorlage zu speichern." };
+  }
+
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) {
+    return { error: "Bitte einen Titel angeben, bevor die Vorlage gespeichert wird." };
+  }
+
+  const filteredItems = items.filter((item) => item.exercise_name.trim());
+  if (filteredItems.length === 0) {
+    return { error: "Die Übungstabelle ist leer — es gibt nichts zu speichern." };
+  }
+
+  const { data: plan } = await supabase
+    .from("training_plans")
+    .select("category_label, group_id")
+    .eq("id", planId)
+    .single();
+  if (!plan) return { error: "Plan nicht gefunden." };
+
+  const templateItems = filteredItems.map((item) => ({
+    exercise_name: item.exercise_name.trim(),
+    reps_or_duration: item.reps_or_duration.trim(),
+    sets: item.sets.trim(),
+    rest_time: item.rest_time.trim(),
+    notes: item.notes.trim(),
+    link_url: item.link_url.trim(),
+    section: item.section ?? "kraft",
+    round_rest: item.round_rest?.trim() ?? "",
+    heart_rate_on: item.heart_rate_on?.trim() ?? "",
+    heart_rate_off: item.heart_rate_off?.trim() ?? "",
+    description: item.description?.trim() ?? "",
+    duration_mode: item.duration_mode ?? null,
+  }));
+
+  const { error } = await supabase.from("plan_templates").insert({
+    category_label: plan.category_label,
+    title: trimmedTitle,
+    items: templateItems,
+    created_by: userId,
+    group_id: plan.group_id ?? null,
+  });
+
+  if (error) return { error: "Vorlage konnte nicht gespeichert werden." };
+
+  revalidatePath("/trainer/plans/new");
+  revalidatePath("/athlete/plans/new");
+  return {};
+}
+
+// Resolves an exercise name to a library exercise_id on the spot, so the
+// "Anweisung und Link" panel (Sportartspezifisch/Karate rows) and the
+// "Ergebnis" set-entry dialog (Athletik Kraft rows) can be used for a
+// brand-new exercise immediately, without first saving the whole plan via
+// savePlanItemsAction (which is where this resolution previously only
+// happened). Mirrors that same ilike-then-insert lookup, and the
+// exercises_insert RLS policy allows any authenticated role (admin,
+// trainer, athlete) — matching who can already reach this UI.
+export async function ensureExerciseAction(
+  name: string
+): Promise<{ exerciseId?: string; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Kein Übungsname angegeben." };
+
+  const escapedName = trimmed.replace(/[%_\\]/g, (char) => `\\${char}`);
+  const { data: existing } = await supabase
+    .from("exercises")
+    .select("id")
+    .ilike("name", escapedName)
+    .maybeSingle();
+  if (existing) return { exerciseId: existing.id };
+
+  const { data: created, error } = await supabase
+    .from("exercises")
+    .insert({ name: trimmed, created_by: user.id })
+    .select("id")
+    .single();
+  if (created) return { exerciseId: created.id };
+
+  // Unique-constraint race: another request created the same name first.
+  if (error) {
+    const { data: retry } = await supabase
+      .from("exercises")
+      .select("id")
+      .ilike("name", escapedName)
+      .maybeSingle();
+    if (retry) return { exerciseId: retry.id };
+  }
+
+  return { error: "Übung konnte nicht angelegt werden." };
 }

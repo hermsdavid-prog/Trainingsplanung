@@ -3,6 +3,7 @@ import { CreateUserDialog } from "@/components/admin/create-user-dialog";
 import { DeleteUserDialog } from "@/components/admin/delete-user-dialog";
 import { RetentionField } from "@/components/admin/retention-field";
 import { PrivacyPolicyDialog } from "@/components/shell/privacy-policy-dialog";
+import { ImprintDialog } from "@/components/shell/imprint-dialog";
 import { formatDateShort, utcISOToAppDateString } from "@/lib/date";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -113,6 +114,7 @@ export default async function AdminUsersPage() {
         <div className="mt-4 flex flex-wrap items-end gap-5">
           <RetentionField initialValue={retentionSetting?.value ?? DEFAULT_RETENTION} />
           <PrivacyPolicyDialog trigger="Datenschutzerklärung ansehen" />
+          <ImprintDialog trigger="Impressum" />
         </div>
 
         <div className="mt-5 overflow-x-auto">

@@ -4,10 +4,11 @@ import { useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { formatDateShort } from "@/lib/date";
+import { formatDateLabel, formatDateShort } from "@/lib/date";
 import { reschedulePlanAction, duplicatePlanToDateAction } from "@/lib/actions/plans";
 import { rescheduleEventAction, duplicateEventToDateAction } from "@/lib/actions/events";
 import { getBerlinCalendarMark } from "@/lib/berlin-holidays";
+import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 
 export type CalendarItem = {
   id: string;
@@ -48,7 +49,8 @@ export function CalendarGrid({
   const [, startTransition] = useTransition();
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [copyMode, setCopyMode] = useState(false);
-  const [dayPickDate, setDayPickDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showCreatePicker, setShowCreatePicker] = useState(false);
   // Native HTML5 drag-and-drop doesn't reliably support touch, so on touch
   // devices dropping onto month cells is disabled — dragging can only start
   // from the weekly board's cards, and only with a mouse.
@@ -58,6 +60,19 @@ export function CalendarGrid({
     getCoarsePointerServerSnapshot
   );
   const dragDropActive = enableDragDrop && !isCoarsePointer;
+  const selectedItems = selectedDate ? (itemsByDate[selectedDate] ?? []) : [];
+
+  function openDay(day: string) {
+    setSelectedDate(day);
+    setShowCreatePicker(false);
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) {
+      setSelectedDate(null);
+      setShowCreatePicker(false);
+    }
+  }
 
   function handleDrop(e: React.DragEvent, day: string) {
     e.preventDefault();
@@ -128,7 +143,7 @@ export function CalendarGrid({
             <button
               key={day}
               type="button"
-              onClick={enableDragDrop ? () => setDayPickDate(day) : undefined}
+              onClick={() => openDay(day)}
               onDragOver={
                 dragDropActive
                   ? (e) => {
@@ -148,7 +163,7 @@ export function CalendarGrid({
                 minHeight: 92,
                 padding: 5,
                 fontFamily: "var(--dc-font-body)",
-                cursor: enableDragDrop ? "pointer" : "default",
+                cursor: "pointer",
                 background: bg,
                 border: `1px solid ${border}`,
                 color: fg,
@@ -245,29 +260,97 @@ export function CalendarGrid({
         </span>
       </div>
 
-      {dayPickDate && (
-        <div className="mt-3.5 max-w-[520px] p-4" style={{ background: "var(--dc-surface)" }}>
-          <div className="kicker">Neues Training am {formatDateShort(dayPickDate)}</div>
-          <div className="mt-2 text-[13px] leading-[1.5]">Welche Art von Training soll es werden?</div>
-          <div className="mt-3.5 flex flex-wrap gap-2">
-            <Link
-              href={`/trainer/plans/new?type=Athletik&date=${dayPickDate}`}
-              className="btn btn-primary"
-            >
-              Athletiktraining
-            </Link>
-            <Link
-              href={`/trainer/plans/new?type=Sportartspezifisch&date=${dayPickDate}`}
-              className="btn btn-secondary"
-            >
-              Sportartspezifisch
-            </Link>
-            <button type="button" className="btn btn-ghost" onClick={() => setDayPickDate(null)}>
-              Abbrechen
-            </button>
-          </div>
-        </div>
-      )}
+      <Dialog open={selectedDate !== null} onOpenChange={handleDialogOpenChange}>
+        <DialogPortal>
+          <DialogOverlay />
+          <DialogContent className="dc-dialog max-w-[480px]">
+            {selectedDate && (
+              <div className="min-w-0">
+                <div className="kicker-muted capitalize">{formatDateLabel(selectedDate)}</div>
+
+                {selectedItems.length === 0 && (
+                  <p
+                    className="mt-3 text-[13px] leading-[1.5]"
+                    style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                  >
+                    Für diesen Tag ist nichts geplant.
+                  </p>
+                )}
+
+                {selectedItems.length > 0 && (
+                  <div className="mt-3 flex flex-col gap-2">
+                    {selectedItems.map((item) => (
+                      <Link
+                        key={item.id}
+                        href={item.href}
+                        className="flex min-w-0 items-center gap-2.5 p-2.5"
+                        style={{ background: "var(--dc-bg)", borderLeft: `3px solid ${item.color}` }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="truncate text-[14px]">{item.title}</span>
+                            {item.status === "proposed" && (
+                              <span className="tag tag-accent-2 shrink-0">Vorschlag</span>
+                            )}
+                          </div>
+                          {item.subtitle && (
+                            <div
+                              className="mt-0.5 truncate text-xs"
+                              style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                            >
+                              {item.subtitle}
+                            </div>
+                          )}
+                        </div>
+                        <span
+                          className="shrink-0 text-xs"
+                          style={{ color: "color-mix(in srgb, var(--dc-text) 45%, transparent)" }}
+                        >
+                          →
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                {enableDragDrop && (
+                  <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--dc-divider)" }}>
+                    {!showCreatePicker ? (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setShowCreatePicker(true)}
+                      >
+                        + Neues Training
+                      </button>
+                    ) : (
+                      <div>
+                        <div className="kicker-muted">
+                          Neues Training am {formatDateShort(selectedDate)}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Link
+                            href={`/trainer/plans/new?type=Athletik&date=${selectedDate}`}
+                            className="btn btn-primary"
+                          >
+                            Athletiktraining
+                          </Link>
+                          <Link
+                            href={`/trainer/plans/new?type=Sportartspezifisch&date=${selectedDate}`}
+                            className="btn btn-secondary"
+                          >
+                            Sportartspezifisch
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </DialogPortal>
+      </Dialog>
     </div>
   );
 }

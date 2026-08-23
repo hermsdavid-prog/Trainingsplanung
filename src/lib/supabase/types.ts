@@ -576,6 +576,7 @@ export type Database = {
           category_label: string
           created_at: string
           created_by: string | null
+          group_id: string | null
           id: string
           items: Json
           title: string
@@ -585,6 +586,7 @@ export type Database = {
           category_label: string
           created_at?: string
           created_by?: string | null
+          group_id?: string | null
           id?: string
           items?: Json
           title: string
@@ -594,6 +596,7 @@ export type Database = {
           category_label?: string
           created_at?: string
           created_by?: string | null
+          group_id?: string | null
           id?: string
           items?: Json
           title?: string
@@ -605,6 +608,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_templates_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
             referencedColumns: ["id"]
           },
         ]

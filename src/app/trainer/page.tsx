@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO, formatDateLabel } from "@/lib/date";
+import { ProposedEventsWidget, type ProposedEvent } from "@/components/calendar/proposed-events-widget";
 import {
   computeHealthStatus,
   HEALTH_STATUS_LABEL,
@@ -21,13 +22,26 @@ export default async function TrainerDashboardPage() {
 
   const supabase = await createClient();
 
-  const [{ data: groupAthleteRows }, { data: todaysPlans }] = await Promise.all([
+  const [{ data: groupAthleteRows }, { data: todaysPlans }, { data: proposedRows }] = await Promise.all([
     supabase.from("group_athletes").select("athlete_id, profiles(full_name)"),
     supabase
       .from("training_plans")
       .select("id, title, category_label, scope_type, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
       .eq("date", today),
+    supabase
+      .from("events")
+      .select("id, title, start_at, groups(name), profiles!events_athlete_id_fkey(full_name)")
+      .eq("status", "proposed")
+      .order("start_at"),
   ]);
+
+  const proposedEvents: ProposedEvent[] = (proposedRows ?? []).map((e) => ({
+    id: e.id,
+    title: e.title,
+    date: e.start_at.slice(0, 10),
+    groupName: e.groups?.name ?? "—",
+    proposedBy: e.profiles?.full_name ?? "—",
+  }));
 
   const athleteMap = new Map<string, string>();
   for (const row of groupAthleteRows ?? []) {
@@ -74,6 +88,8 @@ export default async function TrainerDashboardPage() {
         {(todaysPlans ?? []).length} Einheiten heute geplant · {checkedInCount} von {athletes.length}{" "}
         Athleten eingecheckt{redCount > 0 ? ` · ${redCount} rote Bereitschaft${redCount > 1 ? "en" : ""}` : ""}
       </p>
+
+      <ProposedEventsWidget events={proposedEvents} />
 
       {(todaysPlans ?? []).length > 0 && (
         <div className="mt-6 flex flex-col gap-2.5">

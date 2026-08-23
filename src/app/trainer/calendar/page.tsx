@@ -208,9 +208,9 @@ export default async function TrainerCalendarPage({
           </Link>
         </div>
         <p className="mt-1.5 text-[13px] leading-[1.5]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
-          Auf einen Tag klicken: neues Athletik- oder Sportartspezifisches Training anlegen. Einen
-          Termin aus der Woche darauf ziehen oder mit „kopieren“ auswählen und den Tag anklicken:
-          der Termin wird kopiert.
+          Auf einen Tag klicken: alle Trainings und Termine dieses Tages ansehen und bei Bedarf ein
+          neues Training anlegen. Einen Termin aus der Woche darauf ziehen oder mit „kopieren“
+          auswählen und den Tag anklicken: der Termin wird kopiert.
         </p>
 
         <div className="mt-3">

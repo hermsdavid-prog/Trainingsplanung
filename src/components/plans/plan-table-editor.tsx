@@ -3,7 +3,12 @@
 import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { savePlanItemsAction, updatePlanMetaAction } from "@/lib/actions/plans";
+import {
+  savePlanItemsAction,
+  updatePlanMetaAction,
+  saveAsTemplateAction,
+  ensureExerciseAction,
+} from "@/lib/actions/plans";
 import { upsertExerciseInstructionsAction } from "@/lib/actions/exercise-instructions";
 import { formatDateShort } from "@/lib/date";
 import {
@@ -73,6 +78,7 @@ export function PlanTableEditor({
   badges,
   backHref,
   headerActions,
+  allowSaveAsTemplate = false,
 }: {
   planId: string;
   initialItems: Row[];
@@ -87,6 +93,10 @@ export function PlanTableEditor({
   badges?: ReactNode;
   backHref?: string;
   headerActions?: ReactNode;
+  // Trainer-only ("Auch als Vorlage speichern"): saves the current rows as a
+  // reusable plan_templates row. Not shown on the athlete's own-plan editor
+  // — plan_templates_insert RLS only allows admin/trainer to create one.
+  allowSaveAsTemplate?: boolean;
 }) {
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
 
@@ -105,9 +115,45 @@ export function PlanTableEditor({
   const [stepDraftByIndex, setStepDraftByIndex] = useState<Record<number, string>>({});
   const [instrSaving, setInstrSaving] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isSavingTemplate, startTemplateTransition] = useTransition();
+  const [resolvingIndex, setResolvingIndex] = useState<number | null>(null);
   const planDate = date;
 
   const nameByLowercase = new Map(exerciseLibrary.map((e) => [e.name.toLowerCase(), e]));
+
+  // Lets the "Anweisung und Link" panel (Sportartspezifisch/Karate rows) and
+  // the "Ergebnis" dialog (Athletik Kraft rows) be used on a brand-new
+  // exercise name immediately, instead of requiring "Plan speichern" first.
+  // Looks up/auto-creates the library exercise on demand and stores the
+  // resolved id on the row so exercise-scoped saves (instructions, results)
+  // work right away.
+  async function resolveExerciseId(index: number): Promise<string | null> {
+    const row = rows[index];
+    if (row.exercise_id) return row.exercise_id;
+    const name = row.exercise_name.trim();
+    if (!name) return null;
+    setResolvingIndex(index);
+    const result = await ensureExerciseAction(name);
+    setResolvingIndex(null);
+    if (result.error || !result.exerciseId) {
+      if (result.error) toast.error(result.error);
+      return null;
+    }
+    const exerciseId = result.exerciseId;
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, exercise_id: exerciseId } : r)));
+    return exerciseId;
+  }
+
+  function handleSaveAsTemplate() {
+    startTemplateTransition(async () => {
+      const result = await saveAsTemplateAction(planId, rows, title);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Als Vorlage gespeichert.");
+    });
+  }
 
   function updateRow(index: number, field: keyof Row, value: string) {
     setRows((prev) =>
@@ -145,7 +191,7 @@ export function PlanTableEditor({
     setRows((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // Single "Plan zuweisen" action for the whole editor — saves the
+  // Single "Plan speichern" action for the whole editor — saves the
   // rahmendaten (title/date/time) and the exercise rows together instead of
   // the old two separate "Rahmendaten speichern" / "Übungstabelle speichern"
   // buttons.
@@ -183,14 +229,14 @@ export function PlanTableEditor({
         });
       }
 
-      toast.success("Plan zugewiesen.");
+      toast.success("Plan gespeichert.");
     });
   }
 
   // exercise_instructions is keyed by exercise_id and shared across every
   // plan that references the exercise, so edits here save immediately
   // (matching the design's onChange-only instructions panel) instead of
-  // waiting for the "Plan zuweisen" button.
+  // waiting for the "Plan speichern" button.
   async function saveInstructions(
     index: number,
     patch: { steps?: string[]; video_url?: string }
@@ -292,8 +338,18 @@ export function PlanTableEditor({
           </div>
           <div className="flex flex-none items-center gap-2">
             {headerActions}
+            {allowSaveAsTemplate && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleSaveAsTemplate}
+                disabled={isSavingTemplate}
+              >
+                {isSavingTemplate ? "Wird gespeichert…" : "Als Vorlage speichern"}
+              </button>
+            )}
             <button type="button" className="btn btn-primary" onClick={handleAssign} disabled={isPending}>
-              {isPending ? "Wird zugewiesen…" : "Plan zuweisen"}
+              {isPending ? "Wird gespeichert…" : "Plan speichern"}
             </button>
           </div>
         </div>
@@ -356,13 +412,18 @@ export function PlanTableEditor({
                         <button
                           type="button"
                           className="btn btn-secondary"
-                          onClick={() => setResultsOpenIndex(index)}
-                          disabled={!row.exercise_name.trim()}
+                          onClick={async () => {
+                            const id = await resolveExerciseId(index);
+                            if (id) setResultsOpenIndex(index);
+                          }}
+                          disabled={!row.exercise_name.trim() || resolvingIndex === index}
                         >
                           <DumbbellIcon />
-                          {row.result_sets && row.result_sets.length > 0
-                            ? `${row.result_sets.length} ${row.result_sets.length > 1 ? "Sätze" : "Satz"}`
-                            : "Ergebnis"}
+                          {resolvingIndex === index
+                            ? "Wird angelegt…"
+                            : row.result_sets && row.result_sets.length > 0
+                              ? `${row.result_sets.length} ${row.result_sets.length > 1 ? "Sätze" : "Satz"}`
+                              : "Ergebnis"}
                         </button>
                       </td>
                     )}
@@ -430,8 +491,7 @@ export function PlanTableEditor({
             {trackResults && (
               <p className="mt-2 text-xs text-muted">
                 Trage bei Übungen aus der Athletik-Bibliothek Wiederholungen und Gewicht je Satz ein —
-                das wird für die Fortschrittskurve gespeichert. Bei einer neuen Übung zuerst den
-                Plan zuweisen, danach lässt sich das Ergebnis erfassen.
+                das wird für die Fortschrittskurve gespeichert.
               </p>
             )}
 
@@ -724,16 +784,24 @@ export function PlanTableEditor({
                     <button
                       type="button"
                       className="btn btn-ghost"
-                      onClick={() => setInstrOpenIndex(instrOpenIndex === index ? null : index)}
+                      disabled={!row.exercise_name.trim() || resolvingIndex === index}
+                      onClick={async () => {
+                        if (instrOpenIndex === index) {
+                          setInstrOpenIndex(null);
+                          return;
+                        }
+                        const id = await resolveExerciseId(index);
+                        if (id) setInstrOpenIndex(index);
+                      }}
                     >
-                      Anweisung und Link
+                      {resolvingIndex === index ? "Wird angelegt…" : "Anweisung und Link"}
                     </button>
                   </div>
                   {instrOpenIndex === index && (
                     <div style={{ padding: "18px 16px 20px", borderTop: "1px solid var(--dc-divider)" }}>
                       {!row.exercise_id ? (
                         <p className="text-xs text-muted">
-                          Zuerst den Plan zuweisen, danach lässt sich die Anweisung hinterlegen.
+                          Übung konnte nicht angelegt werden — bitte erneut versuchen.
                         </p>
                       ) : (
                         <>
