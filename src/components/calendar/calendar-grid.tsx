@@ -14,6 +14,7 @@ import {
 } from "@/lib/actions/events";
 import { getBerlinCalendarMark } from "@/lib/berlin-holidays";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
+import { CopyIcon } from "lucide-react";
 
 export type CalendarItem = {
   id: string;
@@ -58,16 +59,47 @@ export function CalendarGrid({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showCreatePicker, setShowCreatePicker] = useState(false);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
-  // Native HTML5 drag-and-drop doesn't reliably support touch, so on touch
-  // devices dropping onto month cells is disabled — dragging can only start
-  // from the weekly board's cards, and only with a mouse.
+  // Native HTML5 drag-and-drop doesn't reliably support touch (this is a
+  // long-standing WebKit/iPadOS limitation, not specific to this app —
+  // dragstart/dragover/drop don't fire reliably even on an iPad Pro with a
+  // trackpad), so on touch devices dropping onto month cells is disabled.
+  // armedItem below is the tap-to-copy replacement: pick an item via the
+  // "kopieren" button in the day-detail dialog, then tap the target day.
   const isCoarsePointer = useSyncExternalStore(
     subscribeNoop,
     getCoarsePointerSnapshot,
     getCoarsePointerServerSnapshot
   );
   const dragDropActive = enableDragDrop && !isCoarsePointer;
+  const [armedItem, setArmedItem] = useState<{ id: string; kind: "plan" | "event"; title: string } | null>(null);
   const selectedItems = selectedDate ? (itemsByDate[selectedDate] ?? []) : [];
+
+  function armItem(item: CalendarItem) {
+    setArmedItem({ id: item.id, kind: item.kind, title: item.title });
+    setSelectedDate(null);
+    setShowCreatePicker(false);
+    setExpandedEventId(null);
+  }
+
+  function handleDayTap(day: string) {
+    if (armedItem) {
+      startTransition(async () => {
+        const result =
+          armedItem.kind === "plan"
+            ? await duplicatePlanToDateAction(armedItem.id, day)
+            : await duplicateEventToDateAction(armedItem.id, day);
+        if (result.error) {
+          toast.error(result.error);
+        } else {
+          toast.success("Termin kopiert.");
+          router.refresh();
+        }
+        setArmedItem(null);
+      });
+      return;
+    }
+    openDay(day);
+  }
 
   function openDay(day: string) {
     setSelectedDate(day);
@@ -138,6 +170,19 @@ export function CalendarGrid({
 
   return (
     <div>
+      {armedItem && (
+        <div
+          className="mb-2.5 flex flex-wrap items-center justify-between gap-3"
+          style={{ padding: "9px 12px", background: "var(--dc-accent-100)" }}
+        >
+          <span className="text-[13px] leading-[1.4]">
+            „{armedItem.title}“ ausgewählt — auf einen Tag tippen, um dorthin zu kopieren.
+          </span>
+          <button type="button" className="btn btn-ghost shrink-0" onClick={() => setArmedItem(null)}>
+            Abbrechen
+          </button>
+        </div>
+      )}
       <div
         className="grid gap-1.5 text-[10px] uppercase"
         style={{
@@ -180,7 +225,7 @@ export function CalendarGrid({
             <button
               key={day}
               type="button"
-              onClick={() => openDay(day)}
+              onClick={() => handleDayTap(day)}
               onDragOver={
                 dragDropActive
                   ? (e) => {
@@ -318,32 +363,43 @@ export function CalendarGrid({
                   <div className="mt-3 flex flex-col gap-2">
                     {selectedItems.map((item) =>
                       item.kind === "plan" ? (
-                        <Link
+                        <div
                           key={item.id}
-                          href={item.href}
-                          className="flex min-w-0 items-center gap-2.5 p-2.5"
+                          className="flex min-w-0 items-center gap-1"
                           style={{ background: "var(--dc-bg)", borderLeft: `3px solid ${item.color}` }}
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="truncate text-[14px]">{item.title}</span>
-                            </div>
-                            {item.subtitle && (
-                              <div
-                                className="mt-0.5 truncate text-xs"
-                                style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
-                              >
-                                {item.subtitle}
+                          <Link href={item.href} className="flex min-w-0 flex-1 items-center gap-2.5 p-2.5">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="truncate text-[14px]">{item.title}</span>
                               </div>
-                            )}
-                          </div>
-                          <span
-                            className="shrink-0 text-xs"
-                            style={{ color: "color-mix(in srgb, var(--dc-text) 45%, transparent)" }}
-                          >
-                            →
-                          </span>
-                        </Link>
+                              {item.subtitle && (
+                                <div
+                                  className="mt-0.5 truncate text-xs"
+                                  style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                                >
+                                  {item.subtitle}
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              className="shrink-0 text-xs"
+                              style={{ color: "color-mix(in srgb, var(--dc-text) 45%, transparent)" }}
+                            >
+                              →
+                            </span>
+                          </Link>
+                          {enableDragDrop && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost mr-1.5 shrink-0"
+                              onClick={() => armItem(item)}
+                              aria-label="Zum Kopieren auswählen"
+                            >
+                              <CopyIcon />
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <div key={item.id} style={{ background: "var(--dc-bg)", borderLeft: `3px solid ${item.color}` }}>
                           <button
@@ -402,6 +458,9 @@ export function CalendarGrid({
                                       Bestätigen
                                     </button>
                                   )}
+                                  <button type="button" className="btn btn-ghost" onClick={() => armItem(item)}>
+                                    <CopyIcon /> Kopieren
+                                  </button>
                                   <button type="button" className="btn btn-ghost" onClick={() => removeEvent(item.id)}>
                                     Löschen
                                   </button>
