@@ -47,6 +47,9 @@ export async function createUserAction(
   if (!email || !fullName) {
     return { error: "Bitte Name und E-Mail-Adresse ausfüllen." };
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Bitte eine gültige E-Mail-Adresse angeben." };
+  }
   if (!["admin", "trainer", "athlete"].includes(role)) {
     return { error: "Bitte eine gültige Rolle wählen." };
   }
@@ -62,12 +65,11 @@ export async function createUserAction(
   });
 
   if (error) {
-    return {
-      error:
-        error.message.includes("already been registered")
-          ? "Diese E-Mail-Adresse ist bereits vergeben."
-          : "Account konnte nicht angelegt werden: " + error.message,
-    };
+    if (error.message.includes("already been registered")) {
+      return { error: "Diese E-Mail-Adresse ist bereits vergeben." };
+    }
+    console.error("createUserAction failed:", error);
+    return { error: "Account konnte nicht angelegt werden. Bitte erneut versuchen." };
   }
 
   revalidatePath("/admin/users");
@@ -87,7 +89,8 @@ export async function deleteUserAction(userId: string): Promise<DeleteUserResult
   const { error } = await adminClient.auth.admin.deleteUser(userId);
 
   if (error) {
-    return { error: "Account konnte nicht gelöscht werden: " + error.message };
+    console.error("deleteUserAction failed:", error);
+    return { error: "Account konnte nicht gelöscht werden. Bitte erneut versuchen." };
   }
 
   revalidatePath("/admin/users");

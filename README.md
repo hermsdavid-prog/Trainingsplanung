@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Trainingsplanung
 
-## Getting Started
+Trainingsplanungs- und Dokumentations-App für einen Sportverein. Trainer legen Trainingspläne (Athletik/Kraft-Cardio oder Sportartspezifisch/Karate) für Gruppen oder einzelne Athleten an; Athleten führen ihr Training live durch, tragen Ergebnisse ein und dokumentieren tägliche Gesundheitswerte.
 
-First, run the development server:
+## Tech-Stack
+
+- **Next.js 16** (App Router, Server Actions) + **React 19** + **TypeScript**
+- **Supabase** (Postgres + Auth) als Backend — Zugriffskontrolle läuft über Row Level Security (RLS), nicht über eine eigene Autorisierungsschicht im Code
+- **Tailwind CSS 4** mit Design-Tokens als CSS Custom Properties in `src/app/globals.css`
+
+## Setup
 
 ```bash
+npm install
+cp .env.local.example .env.local   # Werte aus dem Supabase-Dashboard eintragen
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Umgebungsvariablen (`.env.local`)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Zweck |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase-Projekt-URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public/Anon-Key — läuft im Browser, wird durch RLS eingeschränkt |
+| `SUPABASE_SERVICE_ROLE_KEY` | Umgeht RLS vollständig. **Nur** in `src/lib/supabase/admin.ts` verwenden (Nutzer anlegen/löschen als Admin) — niemals in Client-Code oder eine andere Datei importieren |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Alle drei stehen im Supabase-Dashboard unter *Project Settings → API*. Das Projekt läuft in der Region Frankfurt (eu-central-1).
 
-## Learn More
+## Rollen & Zugriffskontrolle
 
-To learn more about Next.js, take a look at the following resources:
+Es gibt drei Rollen (`profiles.role`): `admin`, `trainer`, `athlete`. Accounts werden ausschließlich vom Admin angelegt (`src/app/admin/users`) — es gibt keine Selbstregistrierung.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Autorisierung ist doppelt abgesichert:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Server Actions** (`src/lib/actions/*.ts`) prüfen Rolle/Eigentümerschaft explizit, bevor sie etwas tun (z. B. `requireTrainerOrAdmin`, `requirePlanEditAccess`).
+2. **Row Level Security** in Postgres ist die eigentliche Durchsetzungsebene — jede Tabelle hat RLS-Policies, die unabhängig davon gelten, über welchen Weg eine Anfrage kommt. Migrationen liegen im Supabase-Projekt selbst (nicht als lokale `.sql`-Dateien im Repo); Schema-Änderungen laufen über den Supabase MCP/Dashboard.
 
-## Deploy on Vercel
+Layout-Dateien (`src/app/{admin,trainer,athlete}/layout.tsx`) leiten serverseitig um, falls die Rolle nicht passt — das ist UX, nicht die Sicherheitsgrenze.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Projektstruktur
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+  app/            Next.js-Routen, nach Rolle gruppiert (admin/, trainer/, athlete/)
+  components/     UI-Komponenten, gespiegelt zur Domäne (plans/, calendar/, health/, athletik/ …)
+  lib/actions/    Server Actions — der einzige Ort, an dem geschrieben wird
+  lib/supabase/   Supabase-Client-Setup (server.ts = anon+RLS, admin.ts = service role)
+  lib/auth/       Aktuellen Nutzer/Profil serverseitig ermitteln
+```
+
+## Bekannte Lücken
+
+Es gibt aktuell **keine automatisierten Tests** — jede Änderung wird manuell verifiziert (Testkonten anlegen, durchklicken, wieder löschen). Vor einer größeren Refaktorierung von `plans.ts` oder `plan-table-editor.tsx` lohnt es sich, das im Hinterkopf zu behalten.
