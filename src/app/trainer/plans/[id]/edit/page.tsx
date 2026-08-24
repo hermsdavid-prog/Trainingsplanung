@@ -150,14 +150,16 @@ export default async function EditPlanPage({
               Belastungsempfinden: <strong>{rpeRow?.rpe ?? "—"}</strong>
             </p>
           </div>
-          {isAthletik && plan.athlete_id && (
-            <Link
-              href={`/trainer/plans/${plan.id}/athlete/${plan.athlete_id}`}
-              className="btn btn-secondary flex-none"
-            >
-              Sätze, Wdh. und Gewichte ansehen
+          <div className="flex flex-none flex-wrap gap-2">
+            <Link href={`/trainer/plans/${plan.id}/workout`} className="btn btn-secondary">
+              Workout-Ansicht
             </Link>
-          )}
+            {isAthletik && plan.athlete_id && (
+              <Link href={`/trainer/plans/${plan.id}/athlete/${plan.athlete_id}`} className="btn btn-secondary">
+                Sätze, Wdh. und Gewichte ansehen
+              </Link>
+            )}
+          </div>
         </div>
       )}
 
@@ -185,6 +187,9 @@ export default async function EditPlanPage({
             }
             headerActions={
               <>
+                <Link href={`/trainer/plans/${plan.id}/workout`} className="btn btn-secondary">
+                  Workout-Ansicht
+                </Link>
                 <PlanActions planId={plan.id} />
                 <CopyPlanDialog planId={plan.id} groups={groups ?? []} athletes={athletes} />
               </>
