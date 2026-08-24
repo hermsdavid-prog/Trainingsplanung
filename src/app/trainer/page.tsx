@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO, formatDateLabel } from "@/lib/date";
 import { ProposedEventsWidget, type ProposedEvent } from "@/components/calendar/proposed-events-widget";
+import { ReadinessPanel, type ReadinessRow } from "@/components/trainer/readiness-panel";
 import {
   computeHealthStatus,
   HEALTH_STATUS_LABEL,
@@ -79,6 +80,19 @@ export default async function TrainerDashboardPage() {
   const redCount = rows.filter((r) => r.level === "red").length;
   const checkedInCount = rows.filter((r) => r.todayLog).length;
 
+  const readinessRows: ReadinessRow[] = rows.map(({ athlete, level, todayLog }) => ({
+    athleteId: athlete.id,
+    fullName: athlete.full_name,
+    level,
+    levelLabel: HEALTH_STATUS_LABEL[level],
+    levelTagClass: LEVEL_TAG[level],
+    todayLabel: todayLog
+      ? `Wohlbefinden ${todayLog.wellbeing ?? "—"}${
+          todayLog.hrv != null ? ` · HRV ${todayLog.hrv}` : ""
+        }${todayLog.resting_hr != null ? ` · Ruhe-HF ${todayLog.resting_hr}` : ""}`
+      : "Noch keine Eingabe für heute",
+  }));
+
   return (
     <div>
       <div className="kicker">{formatDateLabel(today)}</div>
@@ -114,42 +128,7 @@ export default async function TrainerDashboardPage() {
         </div>
       )}
 
-      <div className="kicker-muted mt-8">Trainingsbereitschaft</div>
-      {athletes.length === 0 ? (
-        <p className="mt-3 text-sm text-muted">Noch keine Athleten in deinen Gruppen.</p>
-      ) : (
-        <div className="mt-3 overflow-x-auto">
-          <table className="table" style={{ minWidth: 480 }}>
-            <thead>
-              <tr>
-                <th>Athlet</th>
-                <th>Bereitschaft</th>
-                <th>Heute</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ athlete, level, todayLog }) => (
-                <tr key={athlete.id}>
-                  <td className="text-[15px]">{athlete.full_name}</td>
-                  <td>
-                    <span className={`tag ${LEVEL_TAG[level]}`}>{HEALTH_STATUS_LABEL[level]}</span>
-                  </td>
-                  <td
-                    className="text-[13px]"
-                    style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
-                  >
-                    {todayLog
-                      ? `Wohlbefinden ${todayLog.wellbeing ?? "—"}${
-                          todayLog.hrv != null ? ` · HRV ${todayLog.hrv}` : ""
-                        }${todayLog.resting_hr != null ? ` · Ruhe-HF ${todayLog.resting_hr}` : ""}`
-                      : "Noch keine Eingabe für heute"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <ReadinessPanel rows={readinessRows} />
     </div>
   );
 }

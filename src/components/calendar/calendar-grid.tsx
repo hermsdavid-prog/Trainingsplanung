@@ -15,6 +15,7 @@ import {
 import { getBerlinCalendarMark } from "@/lib/berlin-holidays";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { CopyIcon } from "lucide-react";
+import { useArmedItem } from "@/components/calendar/armed-item-context";
 
 export type CalendarItem = {
   id: string;
@@ -71,11 +72,11 @@ export function CalendarGrid({
     getCoarsePointerServerSnapshot
   );
   const dragDropActive = enableDragDrop && !isCoarsePointer;
-  const [armedItem, setArmedItem] = useState<{ id: string; kind: "plan" | "event"; title: string } | null>(null);
+  const { armedItem, arm, clear: clearArmed } = useArmedItem();
   const selectedItems = selectedDate ? (itemsByDate[selectedDate] ?? []) : [];
 
   function armItem(item: CalendarItem) {
-    setArmedItem({ id: item.id, kind: item.kind, title: item.title });
+    arm({ id: item.id, kind: item.kind, title: item.title });
     setSelectedDate(null);
     setShowCreatePicker(false);
     setExpandedEventId(null);
@@ -94,7 +95,7 @@ export function CalendarGrid({
           toast.success("Termin kopiert.");
           router.refresh();
         }
-        setArmedItem(null);
+        clearArmed();
       });
       return;
     }
@@ -178,7 +179,7 @@ export function CalendarGrid({
           <span className="text-[13px] leading-[1.4]">
             „{armedItem.title}“ ausgewählt — auf einen Tag tippen, um dorthin zu kopieren.
           </span>
-          <button type="button" className="btn btn-ghost shrink-0" onClick={() => setArmedItem(null)}>
+          <button type="button" className="btn btn-ghost shrink-0" onClick={clearArmed}>
             Abbrechen
           </button>
         </div>
@@ -489,18 +490,15 @@ export function CalendarGrid({
                         <div className="kicker-muted">
                           Neues Training am {formatDateShort(selectedDate)}
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Link
-                            href={`/trainer/plans/new?type=Athletik&date=${selectedDate}`}
-                            className="btn btn-primary"
-                          >
-                            Athletiktraining
+                        <div className="mt-2">
+                          <Link href={`/trainer/plans/new?type=Athletik&date=${selectedDate}`} className="exrow">
+                            <span className="text-[16px]">Athletiktraining</span>
                           </Link>
                           <Link
                             href={`/trainer/plans/new?type=Sportartspezifisch&date=${selectedDate}`}
-                            className="btn btn-secondary"
+                            className="exrow"
                           >
-                            Sportartspezifisch
+                            <span className="text-[16px]">Sportartspezifisch</span>
                           </Link>
                         </div>
                       </div>

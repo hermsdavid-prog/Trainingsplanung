@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PlanFeedbackTable } from "@/components/athlete/plan-feedback-table";
 import { PlanTableEditor } from "@/components/plans/plan-table-editor";
 import { PlanActions } from "@/components/plans/plan-actions";
+import { CopyOwnPlanDialog } from "@/components/plans/copy-own-plan-dialog";
 import type { ExerciseSet } from "@/components/athletik/exercise-set-entry-dialog";
 import { formatDateShort } from "@/lib/date";
 
@@ -90,7 +91,12 @@ export default async function AthletePlanPage({
             kicker="Eigenes Training"
             backHref="/athlete"
             subtitle="Nur du und dein Trainer können dieses Training sehen."
-            headerActions={<PlanActions planId={plan.id} />}
+            headerActions={
+              <>
+                <CopyOwnPlanDialog planId={plan.id} />
+                <PlanActions planId={plan.id} />
+              </>
+            }
             initialItems={(items ?? []).map((item) => {
               const instruction = item.exercise_id ? instructionsByExerciseId.get(item.exercise_id) : undefined;
               const section = !isAthletik
@@ -158,11 +164,14 @@ export default async function AthletePlanPage({
               : "Einzeltraining für dich"}
           </p>
         </div>
-        {(items ?? []).length > 0 && (
-          <Link href={`/athlete/plans/${plan.id}/session`} className="btn btn-primary">
-            Training starten
-          </Link>
-        )}
+        <div className="flex flex-none flex-wrap gap-2">
+          {(items ?? []).length > 0 && (
+            <Link href={`/athlete/plans/${plan.id}/session`} className="btn btn-primary">
+              Training starten
+            </Link>
+          )}
+          <CopyOwnPlanDialog planId={plan.id} />
+        </div>
       </div>
 
       <div className="mt-5">

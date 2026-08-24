@@ -149,6 +149,11 @@ export function getWeekDays(dateStr: string): string[] {
   return days;
 }
 
+// Shifts a week-start (Monday) YYYY-MM-DD date by N weeks.
+export function shiftWeekStr(weekStartStr: string, delta: number): string {
+  return shiftDateISO(weekStartStr, delta * 7);
+}
+
 // ISO-8601 week number for dateStr.
 export function getISOWeekNumber(dateStr: string): number {
   const [y, m, d] = dateStr.split("-").map(Number);

@@ -17,6 +17,7 @@ import {
   deleteEventAction,
   confirmEventAction,
 } from "@/lib/actions/events";
+import { useArmedItem } from "@/components/calendar/armed-item-context";
 
 export type WeekItem = {
   id: string;
@@ -49,7 +50,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
   const [, startTransition] = useTransition();
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [copyMode, setCopyMode] = useState(false);
-  const [armedItem, setArmedItem] = useState<WeekItem | null>(null);
+  const { armedItem, arm, clear: clearArmed } = useArmedItem();
   const [draggingItem, setDraggingItem] = useState<WeekItem | null>(null);
 
   const isCoarsePointer = useSyncExternalStore(
@@ -60,18 +61,22 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
 
   const dragActive = armedItem !== null || draggingItem !== null;
   const dragHint = armedItem
-    ? `„${armedItem.title}“ ausgewählt — bei einem Tag auf „Hierhin kopieren“ tippen.`
+    ? `„${armedItem.title}“ ausgewählt — bei einem Tag auf „Hierhin kopieren“ tippen, oder unten im Monatskalender auf einen Tag tippen.`
     : draggingItem
       ? `„${draggingItem.title}“ wird verschoben — auf einen Tag ziehen (mit Strg/Cmd: kopieren).`
       : DEFAULT_DRAG_HINT;
 
   function cancelDrag() {
-    setArmedItem(null);
+    clearArmed();
     setDraggingItem(null);
   }
 
   function toggleArmed(item: WeekItem) {
-    setArmedItem((current) => (current?.id === item.id ? null : item));
+    if (armedItem?.id === item.id) {
+      clearArmed();
+    } else {
+      arm({ id: item.id, kind: item.kind, title: item.title });
+    }
   }
 
   function handleDragStart(e: React.DragEvent, item: WeekItem) {
@@ -117,7 +122,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
   function handleTapCopy(day: string) {
     if (!armedItem) return;
     runMove(armedItem.id, armedItem.kind, day, true);
-    setArmedItem(null);
+    clearArmed();
   }
 
   function handleRemove(item: WeekItem) {

@@ -6,7 +6,9 @@ import {
   formatWeekLabel,
   getMonthGridDays,
   getWeekDays,
+  getWeekStart,
   shiftMonthStr,
+  shiftWeekStr,
   todayISO,
   utcISOToAppDateString,
 } from "@/lib/date";
@@ -14,6 +16,7 @@ import { CalendarGrid, type CalendarItem } from "@/components/calendar/calendar-
 import { CalendarFilters } from "@/components/calendar/calendar-filters";
 import { CreateEventDialog } from "@/components/calendar/create-event-dialog";
 import { WeekBoard, type WeekItem } from "@/components/calendar/week-board";
+import { CalendarArmedProvider } from "@/components/calendar/armed-item-context";
 
 const INDIVIDUAL_PLAN_COLOR = "#4b3793";
 
@@ -22,6 +25,7 @@ export default async function TrainerCalendarPage({
 }: {
   searchParams: Promise<{
     month?: string;
+    week?: string;
     group?: string;
     athlete?: string;
     type?: string;
@@ -31,7 +35,8 @@ export default async function TrainerCalendarPage({
   const month = params.month || currentMonthStr();
   const today = todayISO();
   const days = getMonthGridDays(month);
-  const weekDays = getWeekDays(today);
+  const weekStart = params.week ? getWeekStart(params.week) : getWeekStart(today);
+  const weekDays = getWeekDays(weekStart);
 
   const rangeStart = days[0] < weekDays[0] ? days[0] : weekDays[0];
   const rangeEnd = days[days.length - 1] > weekDays[6] ? days[days.length - 1] : weekDays[6];
@@ -177,7 +182,18 @@ export default async function TrainerCalendarPage({
     for (const [key, value] of Object.entries(activeParams)) {
       if (value) query.set(key, value);
     }
+    if (params.week) query.set("week", params.week);
     query.set("month", targetMonth);
+    return `/trainer/calendar?${query.toString()}`;
+  }
+
+  function weekHref(targetWeek: string) {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(activeParams)) {
+      if (value) query.set(key, value);
+    }
+    if (params.month) query.set("month", params.month);
+    query.set("week", targetWeek);
     return `/trainer/calendar?${query.toString()}`;
   }
 
@@ -195,30 +211,44 @@ export default async function TrainerCalendarPage({
         <CalendarFilters groups={groups ?? []} athletes={athletes} eventTypes={eventTypes} />
       </div>
 
-      <WeekBoard days={weekDays} itemsByDate={weekItemsByDate} />
-
-      <div className="mt-9 max-w-[900px]">
-        <div className="flex items-baseline justify-between gap-3">
-          <Link href={monthHref(shiftMonthStr(month, -1))} className="btn btn-ghost" aria-label="Vorheriger Monat">
-            ← Monat
+      <CalendarArmedProvider>
+        <div className="mt-5 flex items-baseline justify-between gap-3">
+          <Link href={weekHref(shiftWeekStr(weekStart, -1))} className="btn btn-ghost" aria-label="Vorherige Woche">
+            ← Woche
           </Link>
-          <span className="text-[24px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
-            {formatMonthLabel(month)}
+          <span className="text-[15px]" style={{ color: "color-mix(in srgb, var(--dc-text) 70%, transparent)" }}>
+            {formatWeekLabel(weekStart)}
           </span>
-          <Link href={monthHref(shiftMonthStr(month, 1))} className="btn btn-ghost" aria-label="Nächster Monat">
-            Monat →
+          <Link href={weekHref(shiftWeekStr(weekStart, 1))} className="btn btn-ghost" aria-label="Nächste Woche">
+            Woche →
           </Link>
         </div>
-        <p className="mt-1.5 text-[13px] leading-[1.5]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
-          Auf einen Tag klicken: alle Trainings und Termine dieses Tages ansehen und bei Bedarf ein
-          neues Training anlegen. Einen Termin aus der Woche darauf ziehen oder mit „kopieren“
-          auswählen und den Tag anklicken: der Termin wird kopiert.
-        </p>
+        <WeekBoard days={weekDays} itemsByDate={weekItemsByDate} />
 
-        <div className="mt-3">
-          <CalendarGrid monthStr={month} days={days} itemsByDate={itemsByDate} todayStr={today} enableDragDrop />
+        <div className="mt-9 max-w-[900px]">
+          <div className="flex items-baseline justify-between gap-3">
+            <Link href={monthHref(shiftMonthStr(month, -1))} className="btn btn-ghost" aria-label="Vorheriger Monat">
+              ← Monat
+            </Link>
+            <span className="text-[24px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
+              {formatMonthLabel(month)}
+            </span>
+            <Link href={monthHref(shiftMonthStr(month, 1))} className="btn btn-ghost" aria-label="Nächster Monat">
+              Monat →
+            </Link>
+          </div>
+          <p className="mt-1.5 text-[13px] leading-[1.5]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+            Auf einen Tag klicken: alle Trainings und Termine dieses Tages ansehen und bei Bedarf ein
+            neues Training anlegen. Einen Termin aus der Woche oder dem Monat darauf ziehen oder mit
+            „kopieren“ auswählen und den Zieltag anklicken: der Termin wird kopiert — auch zwischen
+            Wochen- und Monatskalender.
+          </p>
+
+          <div className="mt-3">
+            <CalendarGrid monthStr={month} days={days} itemsByDate={itemsByDate} todayStr={today} enableDragDrop />
+          </div>
         </div>
-      </div>
+      </CalendarArmedProvider>
     </div>
   );
 }

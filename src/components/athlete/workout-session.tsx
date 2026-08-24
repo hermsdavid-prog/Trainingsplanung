@@ -107,6 +107,7 @@ export function WorkoutSession({
   karateRows,
   instructionsByExercise,
   initialRpe,
+  lastKnownByExercise = {},
 }: {
   planId: string;
   planDate: string;
@@ -119,6 +120,7 @@ export function WorkoutSession({
   karateRows: SessionKarateRow[];
   instructionsByExercise: Record<string, ExerciseInstructions>;
   initialRpe: number | null;
+  lastKnownByExercise?: Record<string, { weight: string; reps: string }>;
 }) {
   const isAthletik = categoryLabel.trim().toLowerCase() === "athletik";
 
@@ -180,6 +182,7 @@ export function WorkoutSession({
     buffer: string;
     unit: string;
     step: number;
+    suggestion?: string;
   } | null>(null);
 
   const [instrItemId, setInstrItemId] = useState<string | null>(null);
@@ -294,7 +297,11 @@ export function WorkoutSession({
   }
 
   function openPad(itemId: string, setKey: string, field: "reps" | "weight", current: string, unit: string) {
-    setPad({ itemId, setKey, field, buffer: current, unit, step: field === "weight" ? 2.5 : 1 });
+    const ex = exercises.find((e) => e.itemId === itemId);
+    const suggestion = ex?.exerciseId ? lastKnownByExercise[ex.exerciseId] : undefined;
+    const suggestedValue = suggestion ? (field === "weight" ? suggestion.weight : suggestion.reps) : undefined;
+    const buffer = current.trim() || suggestedValue || current;
+    setPad({ itemId, setKey, field, buffer, unit, step: field === "weight" ? 2.5 : 1, suggestion: suggestedValue });
   }
 
   function padPress(key: string) {
@@ -315,10 +322,22 @@ export function WorkoutSession({
     setPad({ ...pad, buffer: String(next).replace(".", ",") });
   }
 
+  // Auto-save: once both weight and reps for a set are filled in (whichever
+  // field got typed second), persist immediately instead of requiring a
+  // separate tap on ✓ — the manual ✓ button still works for weight-only
+  // saves (reps stay optional) and for re-saving a correction afterwards.
   function padSave() {
     if (!pad) return;
-    updateSet(pad.itemId, pad.setKey, pad.field, pad.buffer);
+    const { itemId, setKey, field, buffer } = pad;
     setPad(null);
+    updateSet(itemId, setKey, field, buffer);
+    const current = (setsByItem[itemId] ?? []).find((s) => s.key === setKey);
+    if (!current) return;
+    const updated = { ...current, [field]: buffer };
+    if (!updated.confirmed && updated.weight.trim() && updated.reps.trim()) {
+      const ex = exercises.find((e) => e.itemId === itemId);
+      if (ex) confirmSet(ex, updated);
+    }
   }
 
   async function handleRpeSave() {
@@ -592,6 +611,11 @@ export function WorkoutSession({
                 {pad.unit}
               </span>
             </div>
+            {pad.suggestion && (
+              <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                Letztes Training: {pad.suggestion} {pad.unit}
+              </div>
+            )}
             <div className="mt-3 flex gap-2">
               <button type="button" className="btn btn-secondary" onClick={() => padStepBy(-pad.step)}>
                 − {String(pad.step).replace(".", ",")}

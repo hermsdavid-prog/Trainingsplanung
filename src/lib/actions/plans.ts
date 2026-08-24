@@ -656,6 +656,85 @@ export async function copyPlanAction(
   redirect(`/trainer/plans/${newPlan.id}/edit`);
 }
 
+// Lets an athlete copy any plan they can currently read (their own
+// self-created plan, or a plan assigned to them/their group — RLS on the
+// select below is what actually enforces this) onto a new date as a fresh
+// personal plan. Unlike duplicatePlanToDateAction (trainer/admin-gated via
+// requirePlanEditAccess, and preserves the original's group/athlete scope),
+// this always lands the copy under the athlete's own scope so it doesn't
+// require edit rights on the source and never creates a group-wide plan.
+export async function copyPlanForAthleteAction(
+  _prevState: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const { supabase, userId } = await requireAthlete();
+
+  const sourcePlanId = String(formData.get("source_plan_id") ?? "");
+  const newDate = String(formData.get("date") ?? "");
+  if (!sourcePlanId || !newDate) {
+    return { error: "Bitte ein Zieldatum angeben." };
+  }
+
+  const { data: sourcePlan } = await supabase
+    .from("training_plans")
+    .select("title, category_label, time")
+    .eq("id", sourcePlanId)
+    .maybeSingle();
+  if (!sourcePlan) return { error: "Ursprungsplan nicht gefunden oder keine Berechtigung." };
+
+  const { data: sourceItems } = await supabase
+    .from("training_plan_items")
+    .select(
+      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes, description, duration_mode"
+    )
+    .eq("training_plan_id", sourcePlanId)
+    .order("position");
+
+  const { data: newPlan, error } = await supabase
+    .from("training_plans")
+    .insert({
+      title: sourcePlan.title,
+      category_label: sourcePlan.category_label,
+      date: newDate,
+      time: sourcePlan.time,
+      scope_type: "athlete",
+      athlete_id: userId,
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (error || !newPlan) return { error: "Training konnte nicht kopiert werden." };
+
+  if (sourceItems && sourceItems.length > 0) {
+    const { error: itemsError } = await supabase.from("training_plan_items").insert(
+      sourceItems.map((item) => ({
+        training_plan_id: newPlan.id,
+        position: item.position,
+        exercise_name: item.exercise_name,
+        exercise_id: item.exercise_id,
+        section: item.section,
+        reps_or_duration: item.reps_or_duration,
+        sets: item.sets,
+        rest_time: item.rest_time,
+        round_rest: item.round_rest,
+        heart_rate_on: item.heart_rate_on,
+        heart_rate_off: item.heart_rate_off,
+        link_url: item.link_url,
+        notes: item.notes,
+        description: item.description,
+        duration_mode: item.duration_mode,
+      }))
+    );
+    if (itemsError) {
+      return { error: "Training wurde angelegt, Übungen konnten aber nicht kopiert werden." };
+    }
+  }
+
+  revalidatePath("/athlete");
+  redirect(`/athlete/plans/${newPlan.id}`);
+}
+
 // "Auch als Vorlage speichern" in PlanTableEditor's header — snapshots the
 // currently-edited plan's rows into a new plan_templates row so it can be
 // reused as a starting point for future plans (via the "Vorlage wählen"

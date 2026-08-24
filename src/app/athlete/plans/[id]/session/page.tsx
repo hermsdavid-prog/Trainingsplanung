@@ -51,29 +51,58 @@ export default async function AthleteWorkoutSessionPage({
     new Set((items ?? []).map((i) => i.exercise_id).filter((x): x is string => !!x))
   );
 
-  const [{ data: existingResults }, { data: instructions }, { data: rating }] = await Promise.all([
-    exerciseIds.length
-      ? supabase
-          .from("exercise_results")
-          .select("exercise_id, set_number, value, reps, unit, set_type")
-          .eq("athlete_id", user.id)
-          .eq("date", plan.date)
-          .in("exercise_id", exerciseIds)
-          .order("set_number")
-      : Promise.resolve({ data: [] }),
-    exerciseIds.length
-      ? supabase
-          .from("exercise_instructions")
-          .select("exercise_id, short_summary, watch_note, steps, video_url, video_label")
-          .in("exercise_id", exerciseIds)
-      : Promise.resolve({ data: [] }),
-    supabase
-      .from("session_ratings")
-      .select("rpe")
-      .eq("training_plan_id", id)
-      .eq("athlete_id", user.id)
-      .maybeSingle(),
-  ]);
+  const [{ data: existingResults }, { data: instructions }, { data: rating }, { data: historyRows }] =
+    await Promise.all([
+      exerciseIds.length
+        ? supabase
+            .from("exercise_results")
+            .select("exercise_id, set_number, value, reps, unit, set_type")
+            .eq("athlete_id", user.id)
+            .eq("date", plan.date)
+            .in("exercise_id", exerciseIds)
+            .order("set_number")
+        : Promise.resolve({ data: [] }),
+      exerciseIds.length
+        ? supabase
+            .from("exercise_instructions")
+            .select("exercise_id, short_summary, watch_note, steps, video_url, video_label")
+            .in("exercise_id", exerciseIds)
+        : Promise.resolve({ data: [] }),
+      supabase
+        .from("session_ratings")
+        .select("rpe")
+        .eq("training_plan_id", id)
+        .eq("athlete_id", user.id)
+        .maybeSingle(),
+      // Weight suggestions: the athlete's most recent arbeitssatz per exercise
+      // from an earlier session, used to prefill the numeric pad so they don't
+      // have to remember/re-type what they lifted last time.
+      exerciseIds.length
+        ? supabase
+            .from("exercise_results")
+            .select("exercise_id, date, value, reps, set_type")
+            .eq("athlete_id", user.id)
+            .in("exercise_id", exerciseIds)
+            .lt("date", plan.date)
+            .order("date", { ascending: false })
+        : Promise.resolve({ data: [] }),
+    ]);
+
+  const latestDateByExercise = new Map<string, string>();
+  for (const r of historyRows ?? []) {
+    if (!latestDateByExercise.has(r.exercise_id)) latestDateByExercise.set(r.exercise_id, r.date);
+  }
+  const lastKnownByExercise: Record<string, { weight: string; reps: string }> = {};
+  for (const r of historyRows ?? []) {
+    if (r.set_type !== "arbeitssatz" || r.date !== latestDateByExercise.get(r.exercise_id)) continue;
+    const existing = lastKnownByExercise[r.exercise_id];
+    if (!existing || Number(r.value) > Number(existing.weight)) {
+      lastKnownByExercise[r.exercise_id] = {
+        weight: String(r.value),
+        reps: r.reps != null ? String(r.reps) : "",
+      };
+    }
+  }
 
   const kraftItems = (items ?? []).filter((i) => i.section === "kraft" || i.section === "sprung");
   const cardioItems = (items ?? []).filter((i) => i.section === "cardio");
@@ -159,6 +188,7 @@ export default async function AthleteWorkoutSessionPage({
       karateRows={karateRows}
       instructionsByExercise={instructionsByExercise}
       initialRpe={rating?.rpe ?? null}
+      lastKnownByExercise={lastKnownByExercise}
     />
   );
 }
