@@ -10,6 +10,7 @@ import {
   setGroupTrainerAction,
   updateGroupAction,
 } from "@/lib/actions/groups";
+import { GROUP_COLOR_OPTIONS } from "@/lib/group-colors";
 
 type Person = { id: string; full_name: string };
 type Group = {
@@ -49,6 +50,7 @@ export function GroupManager({
   const group = groups.find((g) => g.id === selectedId) ?? groups[0];
   const [name, setName] = useState(group?.name ?? "");
   const [description, setDescription] = useState(group?.description ?? "");
+  const [color, setColor] = useState(group?.color ?? GROUP_COLOR_OPTIONS[0].value);
 
   const groupTrainerIds = trainerIdsByGroup[group?.id ?? ""] ?? [];
   const groupAthleteIds = athleteIdsByGroup[group?.id ?? ""] ?? [];
@@ -77,18 +79,22 @@ export function GroupManager({
     setSelectedId(g.id);
     setName(g.name);
     setDescription(g.description ?? "");
+    setColor(g.color);
     setCoachQuery("");
     setAthleteQuery("");
     setError(undefined);
   }
 
-  function saveMeta() {
+  // Takes an explicit color override so the color swatch buttons can save
+  // immediately on click without waiting a render for setColor to land —
+  // the other fields save via onBlur, where state has already settled.
+  function saveMeta(colorOverride?: string) {
     if (!group) return;
     const formData = new FormData();
     formData.set("group_id", group.id);
     formData.set("name", name);
     formData.set("description", description);
-    formData.set("color", group.color);
+    formData.set("color", colorOverride ?? color);
     formData.set("short_name", group.short_name ?? "");
     startTransition(async () => {
       const result = await updateGroupAction({}, formData);
@@ -98,6 +104,11 @@ export function GroupManager({
         router.refresh();
       }
     });
+  }
+
+  function handleColorChange(newColor: string) {
+    setColor(newColor);
+    saveMeta(newColor);
   }
 
   function toggleTrainer(trainerId: string, assign: boolean) {
@@ -163,6 +174,9 @@ export function GroupManager({
             className="chip"
             onClick={() => selectGroup(g)}
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
               background: g.id === group.id ? "var(--dc-accent)" : "transparent",
               color: g.id === group.id ? "var(--dc-bg)" : "var(--dc-text)",
               maxWidth: "min(100%, 320px)",
@@ -170,6 +184,10 @@ export function GroupManager({
               textOverflow: "ellipsis",
             }}
           >
+            <span
+              className="inline-block flex-none rounded-full"
+              style={{ width: 9, height: 9, background: g.color }}
+            />
             {g.name} · {(athleteIdsByGroup[g.id] ?? []).length}
           </button>
         ))}
@@ -184,7 +202,7 @@ export function GroupManager({
               className="input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              onBlur={canManageTeam ? saveMeta : undefined}
+              onBlur={canManageTeam ? () => saveMeta() : undefined}
               readOnly={!canManageTeam}
             />
           </div>
@@ -195,10 +213,34 @@ export function GroupManager({
               className="input"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              onBlur={canManageTeam ? saveMeta : undefined}
+              onBlur={canManageTeam ? () => saveMeta() : undefined}
               readOnly={!canManageTeam}
               placeholder="z. B. 3 Einheiten pro Woche"
             />
+          </div>
+          <div className="mt-3.5">
+            <label className="mb-1.5 block text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 70%, transparent)" }}>
+              Farbe
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {GROUP_COLOR_OPTIONS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  disabled={!canManageTeam || isPending}
+                  onClick={() => handleColorChange(c.value)}
+                  aria-label={c.label}
+                  title={c.label}
+                  className="size-6 cursor-pointer rounded-full"
+                  style={{
+                    backgroundColor: c.value,
+                    outline: c.value === color ? "2px solid var(--dc-text)" : "none",
+                    outlineOffset: 2,
+                    opacity: canManageTeam ? 1 : 0.6,
+                  }}
+                />
+              ))}
+            </div>
           </div>
           {error && (
             <div className="mt-2 text-[13px]" style={{ color: "var(--dc-accent-2-700)" }}>
