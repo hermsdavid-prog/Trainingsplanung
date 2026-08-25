@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO, formatDateLabel } from "@/lib/date";
 import { ProposedEventsWidget, type ProposedEvent } from "@/components/calendar/proposed-events-widget";
@@ -109,10 +110,11 @@ export default async function TrainerDashboardPage() {
       {(todaysPlans ?? []).length > 0 && (
         <div className="mt-6 flex flex-col gap-2.5">
           {(todaysPlans ?? []).map((plan) => (
-            <div
+            <Link
               key={plan.id}
-              className="p-3.5"
-              style={{ background: "var(--dc-surface)", borderLeft: "2px solid var(--dc-accent)" }}
+              href={`/trainer/plans/${plan.id}/edit`}
+              className="block p-3.5 no-underline"
+              style={{ background: "var(--dc-surface)", borderLeft: "2px solid var(--dc-accent)", color: "inherit" }}
             >
               <div className="flex items-baseline justify-between gap-2.5">
                 <span className="text-[16px]">{plan.title}</span>
@@ -123,7 +125,7 @@ export default async function TrainerDashboardPage() {
                   ? (plan.groups?.name ?? "Gruppe")
                   : (plan.profiles?.full_name ?? "Einzeltraining")}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

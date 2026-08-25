@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO } from "@/lib/date";
 import { computeHealthStatus, HEALTH_STATUS_LABEL, type HealthLog, type HealthStatusLevel } from "@/lib/health-status";
 import { TrendChart } from "@/components/health/trend-chart";
-import { HealthGroupFilter } from "@/components/health/health-group-filter";
+import { HealthFilters } from "@/components/health/health-filters";
 
 const METRICS: { key: "hrv" | "resting_hr" | "wellbeing"; label: string; unit: string; domain?: [number, number] }[] = [
   { key: "hrv", label: "HRV", unit: "ms" },
@@ -80,33 +80,8 @@ export default async function TrainerHealthPage({
       ) : (
         <>
           <div className="mt-[22px]">
-            <HealthGroupFilter key={selectedGroup} groups={groups} />
+            <HealthFilters key={`${selectedGroup}-${selectedAthlete}`} groups={groups} athletes={athletes} />
           </div>
-
-          {athletes.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {athletes.map((a) => {
-                const active = a.id === selectedAthlete;
-                return (
-                  <a
-                    key={a.id}
-                    href={`/trainer/health?group=${selectedGroup}&athlete=${a.id}`}
-                    className="chip"
-                    style={{
-                      background: active ? "var(--dc-neutral-700)" : "transparent",
-                      color: active ? "var(--dc-bg)" : "var(--dc-text)",
-                      maxWidth: "min(100%, 220px)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      display: "inline-block",
-                    }}
-                  >
-                    {a.full_name}
-                  </a>
-                );
-              })}
-            </div>
-          )}
 
           {selectedGroup && athletes.length === 0 && (
             <p className="mt-4 text-sm text-muted">Noch keine Athleten in dieser Gruppe.</p>

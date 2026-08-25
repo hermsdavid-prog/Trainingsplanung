@@ -74,6 +74,7 @@ export default async function TrainerPlanWorkoutPage({
       restLabel: i.rest_time ?? "",
       on: i.heart_rate_on ?? "",
       off: i.heart_rate_off ?? "",
+      exerciseId: i.exercise_id,
     }));
   const karateRows: OverviewKarateRow[] = (items ?? [])
     .filter((i) => i.section === "runden")

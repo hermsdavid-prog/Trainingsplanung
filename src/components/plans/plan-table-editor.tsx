@@ -347,7 +347,7 @@ export function PlanTableEditor({
             {!isAthletik && <p className="mt-1 text-[13px] text-muted">{rundenSummary}</p>}
             {badges && <div className="mt-2 flex items-center gap-2">{badges}</div>}
           </div>
-          <div className="flex flex-none items-center gap-2">
+          <div className="flex w-full flex-none flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             {headerActions}
             {allowSaveAsTemplate && (
               <button

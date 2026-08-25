@@ -18,6 +18,7 @@ export type OverviewCardio = {
   restLabel: string;
   on: string;
   off: string;
+  exerciseId: string | null;
 };
 
 export type OverviewKarateRow = {
@@ -52,12 +53,11 @@ export function WorkoutOverview({
   const [instrId, setInstrId] = useState<string | null>(null);
 
   const instrExercise = isAthletik
-    ? kraft.find((e) => e.id === instrId)
+    ? (kraft.find((e) => e.id === instrId) ?? cardio.find((c) => c.id === instrId))
     : karateRows.find((r) => r.id === instrId);
-  const instrExerciseId =
-    isAthletik
-      ? kraft.find((e) => e.id === instrId)?.exerciseId
-      : karateRows.find((r) => r.id === instrId)?.exerciseId;
+  const instrExerciseId = isAthletik
+    ? (kraft.find((e) => e.id === instrId)?.exerciseId ?? cardio.find((c) => c.id === instrId)?.exerciseId)
+    : karateRows.find((r) => r.id === instrId)?.exerciseId;
   const instr = instrExerciseId ? instructionsByExercise[instrExerciseId] : undefined;
 
   return (
@@ -103,11 +103,26 @@ export function WorkoutOverview({
               <div className="mt-3 flex flex-col gap-2.5">
                 {cardio.map((c) => (
                   <div key={c.id} className="p-3.5" style={{ background: "var(--dc-surface)" }}>
-                    <div className="text-[16px] leading-[1.25]">{c.name}{c.spec ? ` — ${c.spec}` : ""}</div>
-                    <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
-                      {c.on && `On ${c.on} Belastung`}
-                      {c.off && ` · Off ${c.off} Pause`}
-                      {c.restLabel && ` · Pause ${c.restLabel}`}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="min-w-0">
+                        <div className="text-[16px] leading-[1.25]">{c.name}{c.spec ? ` — ${c.spec}` : ""}</div>
+                        <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                          {c.on && `On ${c.on} Belastung`}
+                          {c.off && ` · Off ${c.off} Pause`}
+                          {c.restLabel && ` · Pause ${c.restLabel}`}
+                        </div>
+                      </div>
+                      {c.exerciseId && instructionsByExercise[c.exerciseId]?.steps.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setInstrId(c.id)}
+                          aria-label="Anweisung anzeigen"
+                          className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[15px]"
+                          style={{ border: "1px solid var(--dc-accent)", color: "var(--dc-accent-700)" }}
+                        >
+                          i
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
