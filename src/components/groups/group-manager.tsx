@@ -49,6 +49,7 @@ export function GroupManager({
 
   const group = groups.find((g) => g.id === selectedId) ?? groups[0];
   const [name, setName] = useState(group?.name ?? "");
+  const [shortName, setShortName] = useState(group?.short_name ?? "");
   const [description, setDescription] = useState(group?.description ?? "");
   const [color, setColor] = useState(group?.color ?? GROUP_COLOR_OPTIONS[0].value);
 
@@ -78,6 +79,7 @@ export function GroupManager({
   function selectGroup(g: Group) {
     setSelectedId(g.id);
     setName(g.name);
+    setShortName(g.short_name ?? "");
     setDescription(g.description ?? "");
     setColor(g.color);
     setCoachQuery("");
@@ -95,7 +97,7 @@ export function GroupManager({
     formData.set("name", name);
     formData.set("description", description);
     formData.set("color", colorOverride ?? color);
-    formData.set("short_name", group.short_name ?? "");
+    formData.set("short_name", shortName);
     startTransition(async () => {
       const result = await updateGroupAction({}, formData);
       if (result.error) {
@@ -205,6 +207,20 @@ export function GroupManager({
               onBlur={canManageTeam ? () => saveMeta() : undefined}
               readOnly={!canManageTeam}
             />
+          </div>
+          <div className="field mt-3.5">
+            <label htmlFor="group-short-name">Kürzel</label>
+            <input
+              id="group-short-name"
+              className="input w-24"
+              maxLength={8}
+              value={shortName}
+              onChange={(e) => setShortName(e.target.value)}
+              onBlur={canManageTeam ? () => saveMeta() : undefined}
+              readOnly={!canManageTeam}
+              placeholder="z. B. KU"
+            />
+            <p className="mt-1.5 text-xs text-muted">Erscheint im Kalender statt des vollen Gruppennamens.</p>
           </div>
           <div className="field mt-3.5">
             <label htmlFor="group-desc">Rhythmus</label>
