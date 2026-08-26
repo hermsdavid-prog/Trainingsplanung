@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   upsertExerciseResultAction,
@@ -123,6 +124,12 @@ export function WorkoutSession({
   lastKnownByExercise?: Record<string, { weight: string; reps: string }>;
 }) {
   const isAthletik = categoryLabel.trim().toLowerCase() === "athletik";
+  const router = useRouter();
+
+  // A saved RPE means this training was already ended in an earlier visit —
+  // land back on a compact "abgeschlossen" summary instead of jumping
+  // straight into live entry, with an explicit opt-in to keep editing.
+  const [editMode, setEditMode] = useState(initialRpe === null);
 
   const [setsByItem, setSetsByItem] = useState<Record<string, SessionSet[]>>(() => {
     const map: Record<string, SessionSet[]> = {};
@@ -188,7 +195,6 @@ export function WorkoutSession({
   const [instrItemId, setInstrItemId] = useState<string | null>(null);
   const [rpeOpen, setRpeOpen] = useState(false);
   const [rpeValue, setRpeValue] = useState<number | null>(initialRpe);
-  const [rpeSaved, setRpeSaved] = useState(false);
   const [isSavingRpe, setIsSavingRpe] = useState(false);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
 
@@ -296,12 +302,15 @@ export function WorkoutSession({
     }
   }
 
+  // The field to fill in always starts empty (or with whatever the athlete
+  // already entered) — the last-known value is shown only as a reference
+  // hint below it, never pre-filled, so nothing gets saved without the
+  // athlete actually typing it.
   function openPad(itemId: string, setKey: string, field: "reps" | "weight", current: string, unit: string) {
     const ex = exercises.find((e) => e.itemId === itemId);
     const suggestion = ex?.exerciseId ? lastKnownByExercise[ex.exerciseId] : undefined;
     const suggestedValue = suggestion ? (field === "weight" ? suggestion.weight : suggestion.reps) : undefined;
-    const buffer = current.trim() || suggestedValue || current;
-    setPad({ itemId, setKey, field, buffer, unit, step: field === "weight" ? 2.5 : 1, suggestion: suggestedValue });
+    setPad({ itemId, setKey, field, buffer: current, unit, step: field === "weight" ? 2.5 : 1, suggestion: suggestedValue });
   }
 
   function padPress(key: string) {
@@ -352,8 +361,8 @@ export function WorkoutSession({
       toast.error(result.error);
       return;
     }
-    setRpeSaved(true);
-    setRpeOpen(false);
+    toast.success("Training gespeichert.");
+    router.push("/athlete");
   }
 
   const padKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "⌫"];
@@ -368,7 +377,32 @@ export function WorkoutSession({
         <div className="kicker">{planKicker}</div>
         <h2 className="mt-1.5 text-[27px] leading-[1.08]">{planTitle}</h2>
 
-        {isAthletik ? (
+        {!editMode && (
+          <div className="mt-5">
+            <div className="flex items-center gap-2.5 p-4" style={{ background: "var(--dc-surface)" }}>
+              <span
+                className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[15px]"
+                style={{ background: "#10b981", color: "var(--dc-bg)" }}
+              >
+                ✓
+              </span>
+              <div>
+                <div className="text-[16px]">Training abgeschlossen</div>
+                <div className="mt-0.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                  Belastungsempfinden: {rpeValue ?? "—"} / 10
+                  {isAthletik && totals.done > 0
+                    ? ` · ${totals.done} ${totals.done === 1 ? "Satz" : "Sätze"} dokumentiert`
+                    : ""}
+                </div>
+              </div>
+            </div>
+            <button type="button" className="btn btn-secondary btn-block mt-3.5" onClick={() => setEditMode(true)}>
+              Nachträglich bearbeiten
+            </button>
+          </div>
+        )}
+
+        {editMode && (isAthletik ? (
           <>
             <div className="mt-3.5 flex items-baseline justify-between text-[13px]">
               <span>
@@ -473,8 +507,8 @@ export function WorkoutSession({
                           aria-label="Satz übernehmen"
                           className="flex h-[38px] w-[38px] items-center justify-center rounded-sm text-[17px]"
                           style={{
-                            border: `1px solid ${s.confirmed ? "var(--dc-accent)" : "var(--dc-divider)"}`,
-                            background: s.confirmed ? "var(--dc-accent)" : "transparent",
+                            border: `1px solid ${s.confirmed ? "#10b981" : "var(--dc-divider)"}`,
+                            background: s.confirmed ? "#10b981" : "transparent",
                             color: s.confirmed ? "var(--dc-bg)" : "var(--dc-text)",
                           }}
                         >
@@ -578,15 +612,12 @@ export function WorkoutSession({
               ))}
             </div>
           </div>
-        )}
+        ))}
 
-        <button type="button" className="btn btn-primary btn-block mt-5" onClick={() => setRpeOpen(true)}>
-          Training beenden
-        </button>
-        {rpeSaved && (
-          <div className="mt-3 p-3 text-[13px] leading-[1.5]" style={{ background: "var(--dc-accent-100)", color: "var(--dc-accent-800)" }}>
-            Danke — dein Belastungsempfinden wurde gespeichert.
-          </div>
+        {editMode && (
+          <button type="button" className="btn btn-primary btn-block mt-5" onClick={() => setRpeOpen(true)}>
+            Training beenden
+          </button>
         )}
       </div>
 

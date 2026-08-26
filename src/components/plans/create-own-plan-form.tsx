@@ -4,6 +4,11 @@ import { useActionState } from "react";
 import { createOwnPlanAction, type ActionResult } from "@/lib/actions/plans";
 import { PLAN_TYPES } from "@/lib/plan-type";
 
+// PLAN_TYPES[0] is "Sportartspezifisch" (its historical/display order), but
+// athletes creating their own training overwhelmingly mean an Athletik
+// session — default the picker to that instead.
+const DEFAULT_OWN_PLAN_CATEGORY = "Athletik";
+
 const initialState: ActionResult = {};
 
 export function CreateOwnPlanForm({
@@ -38,7 +43,7 @@ export function CreateOwnPlanForm({
         <select
           id="category_label"
           name="category_label"
-          defaultValue={defaultCategory ?? PLAN_TYPES[0]}
+          defaultValue={defaultCategory ?? DEFAULT_OWN_PLAN_CATEGORY}
           required
           className="input"
         >
