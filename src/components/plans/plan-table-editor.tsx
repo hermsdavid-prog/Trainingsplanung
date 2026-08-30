@@ -161,8 +161,15 @@ export function PlanTableEditor({
         if (i !== index) return row;
         const next = { ...row, [field]: value };
         if (field === "exercise_name" && (row.section === "kraft" || row.section === "runden")) {
+          // Only keep exercise_id when the new text still matches a known
+          // library exercise — falling back to the row's previous id here
+          // used to let a renamed row silently keep pointing at the OLD
+          // exercise (its results/instructions would then attach to the
+          // wrong exercise). Leaving it null instead defers to save-time
+          // (or the next "Anweisung"/"Ergebnis" open) resolution, which
+          // creates-or-finds the exercise matching the CURRENT text.
           const match = nameByLowercase.get(value.trim().toLowerCase());
-          next.exercise_id = match?.id ?? row.exercise_id ?? null;
+          next.exercise_id = match?.id ?? null;
         }
         return next;
       })
@@ -195,7 +202,13 @@ export function PlanTableEditor({
   function duplicateLastRow(sectionRows: { row: Row; index: number }[]) {
     const last = sectionRows.at(-1);
     if (!last) return;
-    setRows((prev) => [...prev, { ...prev[last.index], result_sets: [] }]);
+    // Not exercise_id: true copies get renamed into a different exercise
+    // far more often than not, and starting from the source row's id (as
+    // this used to) let the copy silently keep pointing at that OLD
+    // exercise once renamed — the trigger behind several real mislinked
+    // rows in production. Leaving it null defers to the same
+    // create-or-find resolution a brand-new row gets.
+    setRows((prev) => [...prev, { ...prev[last.index], exercise_id: null, result_sets: [] }]);
   }
 
   function removeRow(index: number) {

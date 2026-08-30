@@ -387,12 +387,30 @@ export async function savePlanItemsAction(
   // Resolved in parallel rather than one at a time, and a failure here is
   // reported back instead of silently saving the row without an exercise_id
   // (which used to leave results/instructions silently unusable for it).
+  // Defense in depth against a client that sends a stale exercise_id (an id
+  // left over from before the row's exercise_name was edited — the bug that
+  // let a renamed row keep pointing at its old exercise, so newly-entered
+  // results and instructions silently attached to the wrong one): re-verify
+  // that the id's catalogued name still matches this save's exercise_name
+  // before trusting it, and re-resolve otherwise.
+  const idsToVerify = Array.from(
+    new Set(
+      filteredItems
+        .filter((item) => item.section !== "cardio" && item.section !== "sprung" && item.exercise_id)
+        .map((item) => item.exercise_id as string)
+    )
+  );
+  const { data: existingExercises } = idsToVerify.length
+    ? await supabase.from("exercises").select("id, name").in("id", idsToVerify)
+    : { data: [] };
+  const nameById = new Map((existingExercises ?? []).map((e) => [e.id, e.name.trim().toLowerCase()]));
+
   const resolvedExerciseIds: (string | null)[] = new Array(filteredItems.length).fill(null);
   const toResolve: { index: number; name: string }[] = [];
   filteredItems.forEach((item, index) => {
     if (item.section === "cardio" || item.section === "sprung") {
       resolvedExerciseIds[index] = item.exercise_id ?? null;
-    } else if (item.exercise_id) {
+    } else if (item.exercise_id && nameById.get(item.exercise_id) === item.exercise_name.trim().toLowerCase()) {
       resolvedExerciseIds[index] = item.exercise_id;
     } else {
       toResolve.push({ index, name: item.exercise_name });
