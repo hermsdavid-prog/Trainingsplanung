@@ -54,10 +54,72 @@ async function requireAthlete() {
 
 // Mirrors the training_plans_update / training_plan_items_* RLS policies so the
 // app can show a clean error instead of a silent no-op update. Admin, the
-// plan's creator, or the trainer of its group may edit; an athlete's own
-// self-created plan is only editable by that athlete (created_by = auth.uid()),
-// not by trainers viewing it.
+// plan's creator, or the trainer of its group may edit. An athlete's own
+// self-created plan is editable by that athlete, or by a trainer who shares
+// a group with them (e.g. to fix a typo'd exercise name) — matching the
+// "every trainer of a group manages all its athletes' data" model already
+// used for reading this data.
 async function requirePlanEditAccess(planId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht angemeldet.");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile) throw new Error("Kein Profil gefunden.");
+
+  const { data: plan } = await supabase
+    .from("training_plans")
+    .select("id, created_by, group_id, athlete_id")
+    .eq("id", planId)
+    .single();
+  if (!plan) throw new Error("Plan nicht gefunden.");
+
+  let canEdit = profile.role === "admin" || plan.created_by === user.id;
+
+  if (!canEdit && profile.role === "trainer" && plan.group_id) {
+    const { data: trainerGroup } = await supabase
+      .from("group_trainers")
+      .select("group_id")
+      .eq("trainer_id", user.id)
+      .eq("group_id", plan.group_id)
+      .maybeSingle();
+    canEdit = !!trainerGroup;
+  }
+
+  if (!canEdit && profile.role === "trainer" && plan.athlete_id) {
+    const { data: athleteGroups } = await supabase
+      .from("group_athletes")
+      .select("group_id")
+      .eq("athlete_id", plan.athlete_id);
+    const groupIds = (athleteGroups ?? []).map((g) => g.group_id);
+    if (groupIds.length > 0) {
+      const { data: trainerGroup } = await supabase
+        .from("group_trainers")
+        .select("group_id")
+        .eq("trainer_id", user.id)
+        .in("group_id", groupIds)
+        .maybeSingle();
+      canEdit = !!trainerGroup;
+    }
+  }
+
+  if (!canEdit) throw new Error("Keine Berechtigung, diesen Plan zu bearbeiten.");
+
+  return { supabase, userId: user.id, role: profile.role };
+}
+
+// Deliberately narrower than requirePlanEditAccess — deleting an athlete's
+// self-created plan outright stays athlete/admin-only (a trainer fixing a
+// typo shouldn't be able to delete their whole personal training), unlike
+// editing it, so this intentionally does NOT get the athlete-in-my-group
+// branch above.
+async function requirePlanDeleteAccess(planId: string) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -78,21 +140,21 @@ async function requirePlanEditAccess(planId: string) {
     .single();
   if (!plan) throw new Error("Plan nicht gefunden.");
 
-  let canEdit = profile.role === "admin" || plan.created_by === user.id;
+  let canDelete = profile.role === "admin" || plan.created_by === user.id;
 
-  if (!canEdit && profile.role === "trainer" && plan.group_id) {
+  if (!canDelete && profile.role === "trainer" && plan.group_id) {
     const { data: trainerGroup } = await supabase
       .from("group_trainers")
       .select("group_id")
       .eq("trainer_id", user.id)
       .eq("group_id", plan.group_id)
       .maybeSingle();
-    canEdit = !!trainerGroup;
+    canDelete = !!trainerGroup;
   }
 
-  if (!canEdit) throw new Error("Keine Berechtigung, diesen Plan zu bearbeiten.");
+  if (!canDelete) throw new Error("Keine Berechtigung, diesen Plan zu löschen.");
 
-  return { supabase, userId: user.id, role: profile.role };
+  return { supabase };
 }
 
 export async function createPlanAction(
@@ -578,7 +640,7 @@ export async function duplicatePlanToDateAction(
 }
 
 export async function deletePlanAction(planId: string): Promise<ActionResult> {
-  const { supabase } = await requirePlanEditAccess(planId);
+  const { supabase } = await requirePlanDeleteAccess(planId);
 
   const { error } = await supabase.from("training_plans").delete().eq("id", planId);
   if (error) return { error: "Plan konnte nicht gelöscht werden." };

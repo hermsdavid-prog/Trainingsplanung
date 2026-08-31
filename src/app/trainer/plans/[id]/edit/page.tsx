@@ -60,24 +60,43 @@ export default async function EditPlanPage({
     (instructionRows ?? []).map((r) => [r.exercise_id, r])
   );
 
+  // A trainer can edit an athlete's own self-created plan too (e.g. to fix
+  // a typo'd exercise name), as long as that athlete is in one of the
+  // trainer's groups — mirrors requirePlanEditAccess's RLS-backed check.
+  // groupAthletes is already scoped by RLS to "athletes in my groups" for a
+  // trainer caller, so membership in it is exactly that check.
+  const canEditAthletePlan =
+    profile?.role === "trainer" &&
+    plan.scope_type === "athlete" &&
+    !!plan.athlete_id &&
+    (groupAthletes ?? []).some((ga) => ga.athlete_id === plan.athlete_id);
+
   const canEdit =
     profile?.role === "admin" ||
     plan.created_by === currentUser?.id ||
-    plan.scope_type === "group";
+    plan.scope_type === "group" ||
+    canEditAthletePlan;
+
+  // Deleting stays narrower than editing (see requirePlanDeleteAccess) — a
+  // trainer fixing a typo in an athlete's own plan shouldn't be able to
+  // delete it outright, so the delete button only shows where the delete
+  // action would actually succeed.
+  const canDelete =
+    profile?.role === "admin" || plan.created_by === currentUser?.id || plan.scope_type === "group";
 
   // A trainer can already read this plan and its exercise_results (RLS
   // grants that for any athlete in one of their groups, regardless of who
-  // created it) but couldn't get to the page that actually shows the
-  // logged sets/reps/weights/RPE for a self-created (non-group) plan —
-  // only the planned structure via PlanReadOnlyTable below.
-  const { data: rpeRow } = !canEdit
-    ? await supabase
-        .from("session_ratings")
-        .select("rpe")
-        .eq("training_plan_id", id)
-        .eq("athlete_id", plan.athlete_id ?? "")
-        .maybeSingle()
-    : { data: null };
+  // created it) — fetch the RPE whenever it's an athlete-scope plan so it
+  // can be shown whether the trainer is viewing read-only or now editing.
+  const { data: rpeRow } =
+    plan.scope_type === "athlete"
+      ? await supabase
+          .from("session_ratings")
+          .select("rpe")
+          .eq("training_plan_id", id)
+          .eq("athlete_id", plan.athlete_id ?? "")
+          .maybeSingle()
+      : { data: null };
 
   const { count: seriesCount } = plan.series_id
     ? await supabase
@@ -121,7 +140,9 @@ export default async function EditPlanPage({
 
   const isKarate = plan.category_label?.trim() === "Sportartspezifisch";
   const kicker = isAthletik
-    ? "Gruppenplan · ohne Gewichte, die sind individuell"
+    ? plan.scope_type === "group"
+      ? "Gruppenplan · ohne Gewichte, die sind individuell"
+      : "Einzelplan"
     : isKarate
       ? "Sportartspezifisch · Karate"
       : "Sportartspezifisch";
@@ -176,13 +197,22 @@ export default async function EditPlanPage({
             backHref={backHref}
             allowSaveAsTemplate
             subtitle={`Für: ${targetLabel ?? "—"} (${plan.scope_type === "group" ? "Gruppe" : "Einzelplan"})${
+              plan.scope_type === "athlete" ? " · Vom Athleten selbst erstellt" : ""
+            }${
               plan.series_id && seriesCount && seriesCount > 1
                 ? " · Übungen werden beim Speichern automatisch auf noch leere Termine dieser Serie übertragen."
                 : ""
             }`}
             badges={
-              plan.series_id && seriesCount && seriesCount > 1 ? (
-                <span className="tag tag-neutral">Serie · {seriesCount} Termine</span>
+              (plan.series_id && seriesCount && seriesCount > 1) || plan.scope_type === "athlete" ? (
+                <>
+                  {plan.series_id && seriesCount && seriesCount > 1 && (
+                    <span className="tag tag-neutral">Serie · {seriesCount} Termine</span>
+                  )}
+                  {plan.scope_type === "athlete" && (
+                    <span className="tag tag-neutral">Belastungsempfinden: {rpeRow?.rpe ?? "—"}</span>
+                  )}
+                </>
               ) : undefined
             }
             headerActions={
@@ -190,7 +220,12 @@ export default async function EditPlanPage({
                 <Link href={`/trainer/plans/${plan.id}/workout`} className="btn btn-secondary">
                   Workout-Ansicht
                 </Link>
-                <PlanActions planId={plan.id} />
+                {isAthletik && plan.scope_type === "athlete" && plan.athlete_id && (
+                  <Link href={`/trainer/plans/${plan.id}/athlete/${plan.athlete_id}`} className="btn btn-secondary">
+                    Sätze, Wdh. und Gewichte ansehen
+                  </Link>
+                )}
+                {canDelete && <PlanActions planId={plan.id} />}
                 <CopyPlanDialog planId={plan.id} groups={groups ?? []} athletes={athletes} />
               </>
             }
