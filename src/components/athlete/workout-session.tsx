@@ -18,6 +18,7 @@ type SessionSet = {
   type: SetType;
   reps: string;
   weight: string;
+  rir: string;
   confirmed: boolean;
 };
 
@@ -39,7 +40,7 @@ export type SessionExercise = {
   restSeconds: number;
   note: string;
   unit: string;
-  initialSets: { setNumber: number; type: SetType; reps: string; weight: string }[];
+  initialSets: { setNumber: number; type: SetType; reps: string; weight: string; rir: string }[];
 };
 
 export type SessionCardio = {
@@ -140,18 +141,24 @@ export function WorkoutSession({
         type: s.type,
         reps: s.reps,
         weight: s.weight,
+        rir: s.rir,
         confirmed: true,
       }));
       const suggested = Number(ex.sets) || 1;
       const rows = [...confirmedSets];
       let nextSetNumber = rows.reduce((m, r) => Math.max(m, r.setNumber), 0) + 1;
+      // The first set prepared for a fresh exercise is always a warm-up, not
+      // a work set — matches how a lift is actually approached (ramp up,
+      // then work sets), and the athlete can still add/remove either kind
+      // freely from there via the existing +Aufwärmsatz/+Arbeitssatz buttons.
       for (let i = rows.length; i < suggested; i++) {
         rows.push({
           key: nextKey(),
           setNumber: nextSetNumber++,
-          type: "arbeitssatz",
+          type: rows.length === 0 ? "aufwaermsatz" : "arbeitssatz",
           reps: parseLeadingNumber(ex.spec),
           weight: "",
+          rir: "",
           confirmed: false,
         });
       }
@@ -192,6 +199,12 @@ export function WorkoutSession({
     suggestion?: string;
   } | null>(null);
 
+  // RIR ("Reps in Reserve") is asked per work set right after it's logged —
+  // MacroFactor-style per-set feedback, separate from the end-of-session
+  // RPE below. A small fixed picker (not the numeric pad) since it's always
+  // one of a handful of values.
+  const [rirPad, setRirPad] = useState<{ itemId: string; setKey: string } | null>(null);
+
   const [instrItemId, setInstrItemId] = useState<string | null>(null);
   const [rpeOpen, setRpeOpen] = useState(false);
   const [rpeValue, setRpeValue] = useState<number | null>(initialRpe);
@@ -228,7 +241,7 @@ export function WorkoutSession({
 
   const progressWidth = totals.total > 0 ? `${Math.min(100, (totals.done / totals.total) * 100)}%` : "0%";
 
-  function updateSet(itemId: string, key: string, field: "reps" | "weight", value: string) {
+  function updateSet(itemId: string, key: string, field: "reps" | "weight" | "rir", value: string) {
     setSetsByItem((prev) => ({
       ...prev,
       [itemId]: prev[itemId].map((s) => (s.key === key ? { ...s, [field]: value } : s)),
@@ -243,7 +256,7 @@ export function WorkoutSession({
         ...prev,
         [itemId]: [
           ...rows,
-          { key: nextKey(), setNumber: maxSetNumber + 1, type, reps: "", weight: "", confirmed: false },
+          { key: nextKey(), setNumber: maxSetNumber + 1, type, reps: "", weight: "", rir: "", confirmed: false },
         ],
       };
     });
@@ -277,6 +290,7 @@ export function WorkoutSession({
       return;
     }
     const reps = set.reps.trim() ? Number(set.reps.replace(",", ".")) : null;
+    const rir = set.type === "arbeitssatz" && set.rir.trim() ? Number(set.rir) : null;
     setPendingKey(set.key);
     const result = await upsertExerciseResultAction(
       ex.exerciseId,
@@ -286,7 +300,8 @@ export function WorkoutSession({
       reps,
       ex.unit || "kg",
       planId,
-      set.type
+      set.type,
+      rir
     );
     setPendingKey(null);
     if (result.error) {
@@ -347,6 +362,17 @@ export function WorkoutSession({
       const ex = exercises.find((e) => e.itemId === itemId);
       if (ex) confirmSet(ex, updated);
     }
+  }
+
+  // RIR is picked after the set is already logged, so this always re-saves
+  // an already-confirmed set (same weight/reps, now with RIR attached).
+  async function saveRir(itemId: string, setKey: string, rirValue: string) {
+    setRirPad(null);
+    updateSet(itemId, setKey, "rir", rirValue);
+    const ex = exercises.find((e) => e.itemId === itemId);
+    const current = (setsByItem[itemId] ?? []).find((s) => s.key === setKey);
+    if (!ex || !current) return;
+    await confirmSet(ex, { ...current, rir: rirValue });
   }
 
   async function handleRpeSave() {
@@ -453,7 +479,7 @@ export function WorkoutSession({
                 <div
                   className="mt-4 grid gap-2 pb-1.5 text-[10px] uppercase"
                   style={{
-                    gridTemplateColumns: "64px 1fr 1fr 38px 30px",
+                    gridTemplateColumns: "64px 1fr 1fr 52px 38px 30px",
                     letterSpacing: ".09em",
                     color: "color-mix(in srgb, var(--dc-text) 55%, transparent)",
                     borderBottom: "1px solid var(--dc-divider)",
@@ -462,6 +488,7 @@ export function WorkoutSession({
                   <span>Satz</span>
                   <span>Wdh.</span>
                   <span>Gewicht</span>
+                  <span>RIR</span>
                   <span />
                   <span />
                 </div>
@@ -476,7 +503,7 @@ export function WorkoutSession({
                         key={s.key}
                         className="grid items-center gap-2 py-2.5"
                         style={{
-                          gridTemplateColumns: "64px 1fr 1fr 38px 30px",
+                          gridTemplateColumns: "64px 1fr 1fr 52px 38px 30px",
                           borderBottom: "1px solid color-mix(in srgb, var(--dc-text) 8%, transparent)",
                         }}
                       >
@@ -500,6 +527,19 @@ export function WorkoutSession({
                         >
                           {s.weight ? `${s.weight} ${activeExercise.unit || "kg"}` : "—"}
                         </button>
+                        {s.type === "arbeitssatz" && s.confirmed ? (
+                          <button
+                            type="button"
+                            className="tapv text-left text-[15px]"
+                            onClick={() => setRirPad({ itemId: activeExercise.itemId, setKey: s.key })}
+                          >
+                            {s.rir || "—"}
+                          </button>
+                        ) : (
+                          <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 30%, transparent)" }}>
+                            —
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={() => confirmSet(activeExercise, s)}
@@ -665,6 +705,37 @@ export function WorkoutSession({
             <button type="button" className="btn btn-primary btn-block mt-3" onClick={padSave}>
               Übernehmen
             </button>
+          </div>
+        </div>
+      )}
+
+      {rirPad && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "color-mix(in srgb, #201e1d 45%, transparent)" }} onClick={() => setRirPad(null)}>
+          <div
+            className="mx-auto w-full max-w-[420px] p-4.5 pb-6.5"
+            style={{ background: "var(--dc-surface)", borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-baseline justify-between">
+              <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                RIR — Wiederholungen bis zum Muskelversagen übrig
+              </span>
+              <button type="button" className="btn btn-ghost" onClick={() => setRirPad(null)}>
+                Abbrechen
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {["0", "1", "2", "3", "4", "5+"].map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="padkey"
+                  onClick={() => saveRir(rirPad.itemId, rirPad.setKey, label === "5+" ? "5" : label)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

@@ -117,10 +117,11 @@ export default async function TrainerPlansPage({
             {groups.map((group) => {
               if (group.occurrences.length === 1) {
                 const plan = group.occurrences[0];
-                const canDelete =
-                  profile?.role === "admin" ||
-                  plan.created_by === currentUser?.id ||
-                  group.scopeType === "group";
+                // The list query is already RLS-scoped to plans this trainer
+                // can see (their own groups, plus those groups' athletes'
+                // own trainings) — any trainer/admin viewing a row here may
+                // also delete it, matching requirePlanEditAccess.
+                const canDelete = profile?.role === "admin" || profile?.role === "trainer";
                 return (
                   <tr key={group.key}>
                     <td style={MUTED}>{formatDateShort(plan.date)}</td>

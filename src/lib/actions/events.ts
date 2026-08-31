@@ -24,7 +24,9 @@ export type CreateEventInput = {
   date: string;
   time: string;
   allDay: boolean;
-  groupId: string | null;
+  // Empty array = "Alle" (not scoped to any specific group, the previous
+  // groupId: null behavior). One or more ids = one event per selected group.
+  groupIds: string[];
   athleteId: string | null;
   repeatUntil: string | null;
 };
@@ -42,21 +44,24 @@ export async function createEventAction(input: CreateEventInput): Promise<Action
   const dates = input.repeatUntil
     ? weeklyOccurrences(input.date, input.repeatUntil)
     : [input.date];
-  const seriesId = dates.length > 1 ? randomUUID() : null;
+  const targetGroupIds: (string | null)[] = input.groupIds.length > 0 ? input.groupIds : [null];
+  const seriesId = dates.length * targetGroupIds.length > 1 ? randomUUID() : null;
 
-  const rows = dates.map((date) => ({
-    title: input.title.trim(),
-    description: input.description.trim() || null,
-    event_type: input.eventType.trim() || "Termin",
-    color: input.color,
-    start_at: input.allDay ? `${date}T00:00:00Z` : appWallTimeToUTCISOString(date, input.time || "00:00"),
-    all_day: input.allDay,
-    group_id: input.groupId,
-    athlete_id: input.athleteId,
-    series_id: seriesId,
-    status: "confirmed" as const,
-    created_by: userId,
-  }));
+  const rows = targetGroupIds.flatMap((groupId) =>
+    dates.map((date) => ({
+      title: input.title.trim(),
+      description: input.description.trim() || null,
+      event_type: input.eventType.trim() || "Termin",
+      color: input.color,
+      start_at: input.allDay ? `${date}T00:00:00Z` : appWallTimeToUTCISOString(date, input.time || "00:00"),
+      all_day: input.allDay,
+      group_id: groupId,
+      athlete_id: input.athleteId,
+      series_id: seriesId,
+      status: "confirmed" as const,
+      created_by: userId,
+    }))
+  );
 
   const { error } = await supabase.from("events").insert(rows);
   if (error) return { error: "Termin konnte nicht angelegt werden." };

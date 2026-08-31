@@ -56,7 +56,7 @@ export default async function AthleteWorkoutSessionPage({
       exerciseIds.length
         ? supabase
             .from("exercise_results")
-            .select("exercise_id, set_number, value, reps, unit, set_type")
+            .select("exercise_id, set_number, value, reps, unit, set_type, rir")
             .eq("athlete_id", user.id)
             .eq("date", plan.date)
             .in("exercise_id", exerciseIds)
@@ -108,7 +108,7 @@ export default async function AthleteWorkoutSessionPage({
   const cardioItems = (items ?? []).filter((i) => i.section === "cardio");
   const roundItems = (items ?? []).filter((i) => i.section === "runden");
 
-  const resultsByExercise = new Map<string, { setNumber: number; type: "aufwaermsatz" | "arbeitssatz"; reps: string; weight: string }[]>();
+  const resultsByExercise = new Map<string, { setNumber: number; type: "aufwaermsatz" | "arbeitssatz"; reps: string; weight: string; rir: string }[]>();
   for (const r of existingResults ?? []) {
     const list = resultsByExercise.get(r.exercise_id) ?? [];
     list.push({
@@ -116,6 +116,7 @@ export default async function AthleteWorkoutSessionPage({
       type: r.set_type === "aufwaermsatz" ? "aufwaermsatz" : "arbeitssatz",
       reps: r.reps != null ? String(r.reps) : "",
       weight: String(r.value),
+      rir: r.rir != null ? String(r.rir) : "",
     });
     resultsByExercise.set(r.exercise_id, list);
   }
@@ -177,6 +178,12 @@ export default async function AthleteWorkoutSessionPage({
 
   return (
     <WorkoutSession
+      // Forces a fresh mount per plan — without this, navigating from one
+      // plan's session view to another's (e.g. a freshly copied training)
+      // can reuse the same component instance across the route change,
+      // leaving stale client state like editMode ("Training abgeschlossen")
+      // from the PREVIOUS plan visible on a training that was never done.
+      key={plan.id}
       planId={plan.id}
       planDate={plan.date}
       planTitle={plan.title}

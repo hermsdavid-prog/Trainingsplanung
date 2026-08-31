@@ -77,12 +77,9 @@ export default async function EditPlanPage({
     plan.scope_type === "group" ||
     canEditAthletePlan;
 
-  // Deleting stays narrower than editing (see requirePlanDeleteAccess) — a
-  // trainer fixing a typo in an athlete's own plan shouldn't be able to
-  // delete it outright, so the delete button only shows where the delete
-  // action would actually succeed.
-  const canDelete =
-    profile?.role === "admin" || plan.created_by === currentUser?.id || plan.scope_type === "group";
+  // Deleting now matches editing exactly (a trainer may delete any plan
+  // they can edit, including an athlete's own self-created training).
+  const canDelete = canEdit;
 
   // A trainer can already read this plan and its exercise_results (RLS
   // grants that for any athlete in one of their groups, regardless of who

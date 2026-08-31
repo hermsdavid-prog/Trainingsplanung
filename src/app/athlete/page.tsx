@@ -11,6 +11,7 @@ import {
 import { computeExerciseTrends } from "@/lib/exercise-trend";
 import { ExerciseTrendList } from "@/components/athletik/exercise-trend-list";
 import { HealthChart } from "@/components/health/health-chart";
+import { CoachNotesBanner } from "@/components/athletes/coach-notes-banner";
 
 const LEVEL_TAG: Record<HealthStatusLevel, string> = {
   red: "tag-accent-2",
@@ -34,7 +35,7 @@ export default async function AthleteTodayPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: plans }, { data: healthLog }, { data: recentLogs }, { data: exerciseResultRows }] =
+  const [{ data: plans }, { data: healthLog }, { data: recentLogs }, { data: exerciseResultRows }, { data: unreadNoteRows }] =
     await Promise.all([
       supabase
         .from("training_plans")
@@ -64,7 +65,22 @@ export default async function AthleteTodayPage({
             .eq("athlete_id", user.id)
             .order("date")
         : Promise.resolve({ data: [] }),
+      user
+        ? supabase
+            .from("athlete_notes")
+            .select("id, message, created_at, profiles!athlete_notes_trainer_id_fkey(full_name)")
+            .eq("athlete_id", user.id)
+            .is("read_at", null)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
     ]);
+
+  const unreadNotes = (unreadNoteRows ?? []).map((n) => ({
+    id: n.id,
+    message: n.message,
+    createdAt: n.created_at,
+    trainerName: n.profiles?.full_name ?? "Trainer",
+  }));
 
   const readiness = computeHealthStatus(recentLogs ?? [], today);
   const trends = computeExerciseTrends(
@@ -85,6 +101,8 @@ export default async function AthleteTodayPage({
   return (
     <div>
       <div className="kicker">{formatDateLabel(date)}</div>
+
+      <CoachNotesBanner notes={unreadNotes} />
 
       <CheckinGate
         showCheckin={showCheckin}

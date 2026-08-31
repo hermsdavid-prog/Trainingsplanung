@@ -12,7 +12,8 @@ export async function upsertExerciseResultAction(
   reps: number | null,
   unit: string,
   planId: string,
-  setType: "aufwaermsatz" | "arbeitssatz" = "arbeitssatz"
+  setType: "aufwaermsatz" | "arbeitssatz" = "arbeitssatz",
+  rir: number | null = null
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const {
@@ -31,13 +32,14 @@ export async function upsertExerciseResultAction(
       unit: unit.trim() || null,
       training_plan_id: planId,
       set_type: setType,
+      rir,
     },
     { onConflict: "athlete_id,exercise_id,date,set_number" }
   );
 
   if (error) return { error: "Ergebnis konnte nicht gespeichert werden." };
 
-  revalidatePath("/trainer/athletik");
+  revalidatePath("/trainer/athletes");
   revalidatePath("/athlete/athletik");
   return {};
 }
@@ -63,7 +65,7 @@ export async function deleteExerciseResultSetAction(
 
   if (error) return { error: "Satz konnte nicht gelöscht werden." };
 
-  revalidatePath("/trainer/athletik");
+  revalidatePath("/trainer/athletes");
   revalidatePath("/athlete/athletik");
   return {};
 }

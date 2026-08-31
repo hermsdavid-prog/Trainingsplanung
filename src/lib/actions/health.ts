@@ -45,6 +45,6 @@ export async function upsertHealthLogAction(input: {
   if (error) return { error: "Speichern fehlgeschlagen." };
 
   revalidatePath("/athlete");
-  revalidatePath("/trainer/health");
+  revalidatePath("/trainer/athletes");
   return {};
 }

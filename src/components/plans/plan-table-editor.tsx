@@ -16,7 +16,7 @@ import {
   type ExerciseSet,
 } from "@/components/athletik/exercise-set-entry-dialog";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
-import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, DumbbellIcon, CopyIcon } from "lucide-react";
+import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, DumbbellIcon, CopyIcon, GripVerticalIcon } from "lucide-react";
 
 type Section = "kraft" | "cardio" | "sprung" | "runden";
 type DurationMode = "reps" | "duration";
@@ -215,6 +215,37 @@ export function PlanTableEditor({
     setRows((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Reordering within a section: `fromIndex`/`toIndex` are positions in the
+  // flat `rows` array, but a drag only ever happens between two rows of the
+  // same rendered (i.e. same-section) list, so moving the one element keeps
+  // every other section's relative order untouched.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  function moveRow(fromIndex: number, toIndex: number) {
+    setRows((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+  function dragHandleProps(index: number) {
+    return {
+      draggable: true,
+      onDragStart: () => setDragIndex(index),
+      onDragEnd: () => setDragIndex(null),
+    };
+  }
+  function dropTargetProps(index: number) {
+    return {
+      onDragOver: (e: React.DragEvent) => e.preventDefault(),
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault();
+        if (dragIndex !== null && dragIndex !== index) moveRow(dragIndex, index);
+        setDragIndex(null);
+      },
+    };
+  }
+
   // Single "Plan speichern" action for the whole editor — saves the
   // rahmendaten (title/date/time) and the exercise rows together instead of
   // the old two separate "Rahmendaten speichern" / "Übungstabelle speichern"
@@ -410,6 +441,7 @@ export function PlanTableEditor({
             <table className="table" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
+                  <th className="w-6" />
                   <th>Übung</th>
                   {trackResults && <th>Ergebnis</th>}
                   <th>Anzahl / Dauer</th>
@@ -421,7 +453,12 @@ export function PlanTableEditor({
               </thead>
               <tbody>
                 {kraftRows.map(({ row, index }) => (
-                  <tr key={index}>
+                  <tr key={index} {...dropTargetProps(index)} style={{ opacity: dragIndex === index ? 0.4 : 1 }}>
+                    <td>
+                      <span {...dragHandleProps(index)} aria-label="Zum Sortieren ziehen" style={{ cursor: "grab", display: "inline-flex", color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}>
+                        <GripVerticalIcon size={16} />
+                      </span>
+                    </td>
                     <td>
                       <input
                         className="input min-w-36"
@@ -540,6 +577,7 @@ export function PlanTableEditor({
             <table className="table" style={{ minWidth: 880 }}>
               <thead>
                 <tr>
+                  <th className="w-6" />
                   <th>Übung</th>
                   <th>Belastung</th>
                   <th>Pause</th>
@@ -553,7 +591,12 @@ export function PlanTableEditor({
               </thead>
               <tbody>
                 {cardioRows.map(({ row, index }) => (
-                  <tr key={index}>
+                  <tr key={index} {...dropTargetProps(index)} style={{ opacity: dragIndex === index ? 0.4 : 1 }}>
+                    <td>
+                      <span {...dragHandleProps(index)} aria-label="Zum Sortieren ziehen" style={{ cursor: "grab", display: "inline-flex", color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}>
+                        <GripVerticalIcon size={16} />
+                      </span>
+                    </td>
                     <td>
                       <input
                         className="input min-w-36"
@@ -668,6 +711,7 @@ export function PlanTableEditor({
             <table className="table" style={{ minWidth: 560 }}>
               <thead>
                 <tr>
+                  <th className="w-6" />
                   <th>Test</th>
                   <th>Versuche</th>
                   <th>Messgröße</th>
@@ -678,7 +722,12 @@ export function PlanTableEditor({
               </thead>
               <tbody>
                 {sprungRows.map(({ row, index }) => (
-                  <tr key={index}>
+                  <tr key={index} {...dropTargetProps(index)} style={{ opacity: dragIndex === index ? 0.4 : 1 }}>
+                    <td>
+                      <span {...dragHandleProps(index)} aria-label="Zum Sortieren ziehen" style={{ cursor: "grab", display: "inline-flex", color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}>
+                        <GripVerticalIcon size={16} />
+                      </span>
+                    </td>
                     <td>
                       <input
                         className="input min-w-36"
@@ -760,7 +809,19 @@ export function PlanTableEditor({
             {rundenRows.map(({ row, index }) => {
               const stepCount = row.instruction_steps.length;
               return (
-                <div key={index} style={{ border: "1px solid var(--dc-divider)" }}>
+                <div
+                  key={index}
+                  {...dropTargetProps(index)}
+                  style={{ border: "1px solid var(--dc-divider)", opacity: dragIndex === index ? 0.4 : 1 }}
+                >
+                  <div
+                    {...dragHandleProps(index)}
+                    aria-label="Zum Sortieren ziehen"
+                    className="flex items-center gap-1.5 text-xs text-muted"
+                    style={{ cursor: "grab", padding: "8px 16px 0" }}
+                  >
+                    <GripVerticalIcon size={14} /> Ziehen zum Sortieren
+                  </div>
                   <div
                     className="grid grid-cols-2 items-end gap-3 lg:[grid-template-columns:1fr_130px_90px_90px_40px]"
                     style={{ padding: 16 }}

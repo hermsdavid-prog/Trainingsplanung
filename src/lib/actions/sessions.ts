@@ -30,7 +30,6 @@ export async function saveSessionRpeAction(planId: string, rpe: number): Promise
 
   revalidatePath(`/athlete/plans/${planId}`);
   revalidatePath(`/athlete/plans/${planId}/session`);
-  revalidatePath("/trainer/athletik");
-  revalidatePath("/trainer/health");
+  revalidatePath("/trainer/athletes");
   return {};
 }

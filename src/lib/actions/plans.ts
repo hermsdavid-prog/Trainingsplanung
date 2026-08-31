@@ -99,62 +99,18 @@ async function requirePlanEditAccess(planId: string) {
       .eq("athlete_id", plan.athlete_id);
     const groupIds = (athleteGroups ?? []).map((g) => g.group_id);
     if (groupIds.length > 0) {
-      const { data: trainerGroup } = await supabase
+      const { data: trainerGroups } = await supabase
         .from("group_trainers")
         .select("group_id")
         .eq("trainer_id", user.id)
-        .in("group_id", groupIds)
-        .maybeSingle();
-      canEdit = !!trainerGroup;
+        .in("group_id", groupIds);
+      canEdit = (trainerGroups ?? []).length > 0;
     }
   }
 
   if (!canEdit) throw new Error("Keine Berechtigung, diesen Plan zu bearbeiten.");
 
   return { supabase, userId: user.id, role: profile.role };
-}
-
-// Deliberately narrower than requirePlanEditAccess — deleting an athlete's
-// self-created plan outright stays athlete/admin-only (a trainer fixing a
-// typo shouldn't be able to delete their whole personal training), unlike
-// editing it, so this intentionally does NOT get the athlete-in-my-group
-// branch above.
-async function requirePlanDeleteAccess(planId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nicht angemeldet.");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (!profile) throw new Error("Kein Profil gefunden.");
-
-  const { data: plan } = await supabase
-    .from("training_plans")
-    .select("id, created_by, group_id")
-    .eq("id", planId)
-    .single();
-  if (!plan) throw new Error("Plan nicht gefunden.");
-
-  let canDelete = profile.role === "admin" || plan.created_by === user.id;
-
-  if (!canDelete && profile.role === "trainer" && plan.group_id) {
-    const { data: trainerGroup } = await supabase
-      .from("group_trainers")
-      .select("group_id")
-      .eq("trainer_id", user.id)
-      .eq("group_id", plan.group_id)
-      .maybeSingle();
-    canDelete = !!trainerGroup;
-  }
-
-  if (!canDelete) throw new Error("Keine Berechtigung, diesen Plan zu löschen.");
-
-  return { supabase };
 }
 
 export async function createPlanAction(
@@ -169,8 +125,8 @@ export async function createPlanAction(
   const date = String(formData.get("date") ?? "");
   const time = String(formData.get("time") ?? "").trim() || null;
   const scopeType = String(formData.get("scope_type") ?? "") as PlanScope;
-  const groupId = String(formData.get("group_id") ?? "") || null;
-  const athleteId = String(formData.get("athlete_id") ?? "") || null;
+  const groupIds = formData.getAll("group_ids").map(String).filter(Boolean);
+  const athleteIds = formData.getAll("athlete_ids").map(String).filter(Boolean);
   const repeatUntil = String(formData.get("repeat_until") ?? "") || null;
   const templateId = String(formData.get("template_id") ?? "") || null;
 
@@ -180,34 +136,43 @@ export async function createPlanAction(
   if (!date) {
     return { error: "Bitte ein Datum angeben." };
   }
-  if (scopeType === "group" && !groupId) {
-    return { error: "Bitte eine Gruppe auswählen." };
+  if (scopeType === "group" && groupIds.length === 0) {
+    return { error: "Bitte mindestens eine Gruppe auswählen." };
   }
-  if (scopeType === "athlete" && !athleteId) {
-    return { error: "Bitte einen Athleten auswählen." };
+  if (scopeType === "athlete" && athleteIds.length === 0) {
+    return { error: "Bitte mindestens einen Athleten auswählen." };
   }
   if (repeatUntil && repeatUntil < date) {
     return { error: "Das Wiederholungsdatum muss nach dem Startdatum liegen." };
   }
 
   const dates = repeatUntil ? weeklyOccurrences(date, repeatUntil) : [date];
-  const seriesId = dates.length > 1 ? randomUUID() : null;
+  const targetIds = scopeType === "group" ? groupIds : athleteIds;
+  // One plan per (Ziel × Termin) combination. All share one series_id when
+  // there's more than one, the same mechanism weekly-repeat already used —
+  // it makes savePlanItemsAction's existing "propagate to still-empty
+  // siblings" behavior apply here too, so filling in the exercise table on
+  // the first plan (after the redirect below) fills in every other
+  // group's/athlete's copy for free instead of leaving them blank.
+  const seriesId = dates.length * targetIds.length > 1 ? randomUUID() : null;
+
+  const rows = targetIds.flatMap((targetId) =>
+    dates.map((occurrenceDate) => ({
+      title,
+      category_label: categoryLabel,
+      date: occurrenceDate,
+      time,
+      scope_type: scopeType,
+      group_id: scopeType === "group" ? targetId : null,
+      athlete_id: scopeType === "athlete" ? targetId : null,
+      series_id: seriesId,
+      created_by: userId,
+    }))
+  );
 
   const { data: plans, error } = await supabase
     .from("training_plans")
-    .insert(
-      dates.map((occurrenceDate) => ({
-        title,
-        category_label: categoryLabel,
-        date: occurrenceDate,
-        time,
-        scope_type: scopeType,
-        group_id: scopeType === "group" ? groupId : null,
-        athlete_id: scopeType === "athlete" ? athleteId : null,
-        series_id: seriesId,
-        created_by: userId,
-      }))
-    )
+    .insert(rows)
     .select("id, date")
     .order("date");
 
@@ -640,7 +605,7 @@ export async function duplicatePlanToDateAction(
 }
 
 export async function deletePlanAction(planId: string): Promise<ActionResult> {
-  const { supabase } = await requirePlanDeleteAccess(planId);
+  const { supabase } = await requirePlanEditAccess(planId);
 
   const { error } = await supabase.from("training_plans").delete().eq("id", planId);
   if (error) return { error: "Plan konnte nicht gelöscht werden." };

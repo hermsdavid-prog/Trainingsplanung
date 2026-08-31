@@ -109,18 +109,18 @@ export function CreatePlanForm({
       </div>
 
       {scopeType === "group" ? (
-        <div className="field mt-3.5">
-          <label htmlFor="group_id">Gruppe</label>
-          <select id="group_id" name="group_id" required className="input" defaultValue="">
-            <option value="" disabled>
-              Gruppe wählen
-            </option>
+        <div className="mt-3.5">
+          <span className="mb-1.5 block text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 70%, transparent)" }}>
+            Gruppe{groups.length > 1 ? "n" : ""} — Mehrfachauswahl möglich
+          </span>
+          <div className="flex flex-col gap-1.5">
             {groups.map((g) => (
-              <option key={g.id} value={g.id}>
+              <label key={g.id} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="group_ids" value={g.id} />
                 {g.name}
-              </option>
+              </label>
             ))}
-          </select>
+          </div>
           {groups.length === 0 && (
             <p className="mt-1.5 text-xs text-muted">
               Noch keine Gruppe vorhanden — lege zuerst eine Gruppe an.
@@ -128,18 +128,18 @@ export function CreatePlanForm({
           )}
         </div>
       ) : (
-        <div className="field mt-3.5">
-          <label htmlFor="athlete_id">Athlet</label>
-          <select id="athlete_id" name="athlete_id" required className="input" defaultValue="">
-            <option value="" disabled>
-              Athlet wählen
-            </option>
+        <div className="mt-3.5">
+          <span className="mb-1.5 block text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 70%, transparent)" }}>
+            Athlet{athletes.length > 1 ? "en" : ""} — Mehrfachauswahl möglich
+          </span>
+          <div className="flex max-h-52 flex-col gap-1.5 overflow-y-auto">
             {athletes.map((a) => (
-              <option key={a.id} value={a.id}>
+              <label key={a.id} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="athlete_ids" value={a.id} />
                 {a.full_name}
-              </option>
+              </label>
             ))}
-          </select>
+          </div>
           {athletes.length === 0 && (
             <p className="mt-1.5 text-xs text-muted">Noch kein Athlet in einer deiner Gruppen.</p>
           )}

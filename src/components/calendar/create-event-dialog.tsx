@@ -23,7 +23,8 @@ export function CreateEventDialog({
   const [error, setError] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
   const [kind, setKind] = useState<(typeof EVENT_KINDS)[number]["value"]>("Training");
-  const [who, setWho] = useState<string>("alle");
+  // Empty set = "Alle". Selecting any specific group clears that.
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(defaultDate);
   const [time, setTime] = useState("");
@@ -31,11 +32,20 @@ export function CreateEventDialog({
 
   function reset() {
     setKind("Training");
-    setWho("alle");
+    setSelectedGroups(new Set());
     setTitle("");
     setDate(defaultDate);
     setTime("");
     setError(undefined);
+  }
+
+  function toggleGroup(groupId: string) {
+    setSelectedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
   }
 
   function handleSave() {
@@ -50,7 +60,7 @@ export function CreateEventDialog({
         date,
         time,
         allDay: !time,
-        groupId: who !== "alle" ? who : null,
+        groupIds: Array.from(selectedGroups),
         athleteId: null,
         repeatUntil: null,
       });
@@ -136,37 +146,40 @@ export function CreateEventDialog({
           </div>
 
           <div className="mt-4 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
-            Für wen
+            Für wen — Mehrfachauswahl möglich
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
               className="chip"
-              onClick={() => setWho("alle")}
+              onClick={() => setSelectedGroups(new Set())}
               style={{
-                background: who === "alle" ? "var(--dc-accent)" : "transparent",
-                color: who === "alle" ? "var(--dc-bg)" : "var(--dc-text)",
+                background: selectedGroups.size === 0 ? "var(--dc-accent)" : "transparent",
+                color: selectedGroups.size === 0 ? "var(--dc-bg)" : "var(--dc-text)",
               }}
             >
               Alle
             </button>
-            {groups.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                className="chip"
-                onClick={() => setWho(g.id)}
-                style={{
-                  background: who === g.id ? "var(--dc-accent)" : "transparent",
-                  color: who === g.id ? "var(--dc-bg)" : "var(--dc-text)",
-                  maxWidth: "min(100%, 220px)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {g.name}
-              </button>
-            ))}
+            {groups.map((g) => {
+              const active = selectedGroups.has(g.id);
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  className="chip"
+                  onClick={() => toggleGroup(g.id)}
+                  style={{
+                    background: active ? "var(--dc-accent)" : "transparent",
+                    color: active ? "var(--dc-bg)" : "var(--dc-text)",
+                    maxWidth: "min(100%, 220px)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {g.name}
+                </button>
+              );
+            })}
           </div>
 
           {error && (

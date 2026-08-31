@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -105,6 +105,48 @@ export type Database = {
             columns: ["training_plan_item_id"]
             isOneToOne: false
             referencedRelation: "training_plan_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      athlete_notes: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          id: string
+          message: string
+          read_at: string | null
+          trainer_id: string
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          id?: string
+          message: string
+          read_at?: string | null
+          trainer_id: string
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          read_at?: string | null
+          trainer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_notes_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_notes_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -241,6 +283,7 @@ export type Database = {
           exercise_id: string
           id: string
           reps: number | null
+          rir: number | null
           set_number: number
           set_type: string
           status: string | null
@@ -256,6 +299,7 @@ export type Database = {
           exercise_id: string
           id?: string
           reps?: number | null
+          rir?: number | null
           set_number?: number
           set_type?: string
           status?: string | null
@@ -271,6 +315,7 @@ export type Database = {
           exercise_id?: string
           id?: string
           reps?: number | null
+          rir?: number | null
           set_number?: number
           set_type?: string
           status?: string | null

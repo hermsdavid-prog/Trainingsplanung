@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export type ReadinessRow = {
   athleteId: string;
+  groupId: string;
   fullName: string;
   level: "red" | "yellow" | "green" | "none";
   levelLabel: string;
@@ -18,6 +20,7 @@ export type ReadinessRow = {
 export function ReadinessPanel({ rows }: { rows: ReadinessRow[] }) {
   const redCount = rows.filter((r) => r.level === "red").length;
   const [open, setOpen] = useState(redCount > 0);
+  const router = useRouter();
 
   return (
     <div className="mt-8">
@@ -47,7 +50,11 @@ export function ReadinessPanel({ rows }: { rows: ReadinessRow[] }) {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.athleteId}>
+                  <tr
+                    key={row.athleteId}
+                    onClick={() => router.push(`/trainer/athletes?group=${row.groupId}&athlete=${row.athleteId}`)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <td className="text-[15px]">{row.fullName}</td>
                     <td>
                       <span className={`tag ${row.levelTagClass}`}>{row.levelLabel}</span>

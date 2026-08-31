@@ -25,7 +25,7 @@ export default async function TrainerDashboardPage() {
   const supabase = await createClient();
 
   const [{ data: groupAthleteRows }, { data: todaysPlans }, { data: proposedRows }] = await Promise.all([
-    supabase.from("group_athletes").select("athlete_id, profiles(full_name)"),
+    supabase.from("group_athletes").select("group_id, athlete_id, profiles(full_name)"),
     supabase
       .from("training_plans")
       .select("id, title, category_label, scope_type, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
@@ -47,8 +47,10 @@ export default async function TrainerDashboardPage() {
   }));
 
   const athleteMap = new Map<string, string>();
+  const groupIdByAthlete = new Map<string, string>();
   for (const row of groupAthleteRows ?? []) {
     if (row.profiles?.full_name) athleteMap.set(row.athlete_id, row.profiles.full_name);
+    if (!groupIdByAthlete.has(row.athlete_id)) groupIdByAthlete.set(row.athlete_id, row.group_id);
   }
   const athletes = Array.from(athleteMap.entries()).map(([id, full_name]) => ({
     id,
@@ -83,6 +85,7 @@ export default async function TrainerDashboardPage() {
 
   const readinessRows: ReadinessRow[] = rows.map(({ athlete, level, todayLog }) => ({
     athleteId: athlete.id,
+    groupId: groupIdByAthlete.get(athlete.id) ?? "",
     fullName: athlete.full_name,
     level,
     levelLabel: HEALTH_STATUS_LABEL[level],
