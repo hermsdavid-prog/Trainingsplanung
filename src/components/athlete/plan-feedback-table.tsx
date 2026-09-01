@@ -3,12 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { upsertFeedbackAction } from "@/lib/actions/feedback";
-import {
-  ExerciseSetEntryDialog,
-  type ExerciseSet,
-} from "@/components/athletik/exercise-set-entry-dialog";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
-import { DumbbellIcon } from "lucide-react";
 
 type Item = {
   id: string;
@@ -26,38 +21,24 @@ type Item = {
 };
 
 type FeedbackMap = Record<string, { actual_value: string }>;
-type ResultEntry = { sets: ExerciseSet[]; unit: string };
-type ResultMap = Record<string, ResultEntry>;
 
 export function PlanFeedbackTable({
   items,
   initialFeedback,
   categoryLabel,
-  planId,
-  planDate,
-  initialResults = {},
 }: {
   items: Item[];
   initialFeedback: FeedbackMap;
   categoryLabel?: string | null;
-  planId?: string;
-  planDate?: string;
-  initialResults?: ResultMap;
 }) {
   const [feedback, setFeedback] = useState<FeedbackMap>(initialFeedback);
-  const [results, setResults] = useState<ResultMap>(initialResults);
   const [notesOpenId, setNotesOpenId] = useState<string | null>(null);
-  const [resultsOpenId, setResultsOpenId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
 
   function getRow(id: string) {
     return feedback[id] ?? { actual_value: "" };
-  }
-
-  function getResult(exerciseId: string): ResultEntry {
-    return results[exerciseId] ?? { sets: [], unit: "kg" };
   }
 
   function updateActualValue(id: string, actual_value: string) {
@@ -74,7 +55,6 @@ export function PlanFeedbackTable({
   }
 
   const notesItem = items.find((i) => i.id === notesOpenId);
-  const resultsItem = items.find((i) => i.id === resultsOpenId);
 
   const kraftItems = items.filter((i) => !isAthletik || i.section !== "cardio");
   const cardioItems = items.filter((i) => isAthletik && i.section === "cardio");
@@ -92,7 +72,6 @@ export function PlanFeedbackTable({
           <thead>
             <tr>
               <th>Übung</th>
-              {isAthletik && <th>Ergebnis</th>}
               <th>Anzahl / Dauer</th>
               <th>Sätze</th>
               <th>Pause</th>
@@ -106,20 +85,6 @@ export function PlanFeedbackTable({
               return (
                 <tr key={item.id}>
                   <td className="text-[15px]">{item.exercise_name}</td>
-                  {isAthletik && (
-                    <td>
-                      {item.exercise_id ? (
-                        <button type="button" className="btn btn-secondary" onClick={() => setResultsOpenId(item.id)}>
-                          <DumbbellIcon />
-                          {getResult(item.exercise_id).sets.length > 0
-                            ? `${getResult(item.exercise_id).sets.length} ${getResult(item.exercise_id).sets.length > 1 ? "Sätze" : "Satz"}`
-                            : "Ergebnis"}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-muted">—</span>
-                      )}
-                    </td>
-                  )}
                   <td>{item.reps_or_duration || "—"}</td>
                   <td>{item.sets || "—"}</td>
                   <td>{item.rest_time || "—"}</td>
@@ -230,27 +195,6 @@ export function PlanFeedbackTable({
           </DialogContent>
         </DialogPortal>
       </Dialog>
-
-      {resultsItem && resultsItem.exercise_id && planId && planDate && (
-        <ExerciseSetEntryDialog
-          key={resultsOpenId}
-          open={resultsOpenId !== null}
-          onOpenChange={(open) => !open && setResultsOpenId(null)}
-          exerciseName={resultsItem.exercise_name}
-          exerciseId={resultsItem.exercise_id}
-          planId={planId}
-          planDate={planDate}
-          initialSets={getResult(resultsItem.exercise_id).sets}
-          initialUnit={getResult(resultsItem.exercise_id).unit}
-          suggestedSetCount={Number(resultsItem.sets) || 1}
-          onSaved={(sets, unit) => {
-            setResults((prev) => ({
-              ...prev,
-              [resultsItem.exercise_id!]: { sets: sets.filter((s) => s.weight.trim()), unit },
-            }));
-          }}
-        />
-      )}
     </div>
   );
 }

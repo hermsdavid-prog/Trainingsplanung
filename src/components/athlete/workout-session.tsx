@@ -151,18 +151,32 @@ export function WorkoutSession({
         rir: s.rir,
         confirmed: true,
       }));
+      // The trainer's prescribed set count is the number of WORK sets — a
+      // warm-up on top of that isn't one of the trainer's sets used up, it's
+      // extra ramp-up before them, so it's added in addition rather than
+      // carved out of the count (otherwise "3 Sätze" would only leave the
+      // athlete 2 actual work sets to do).
       const suggested = Number(ex.sets) || 1;
       const rows = [...confirmedSets];
       let nextSetNumber = rows.reduce((m, r) => Math.max(m, r.setNumber), 0) + 1;
-      // The first set prepared for a fresh exercise is always a warm-up, not
-      // a work set — matches how a lift is actually approached (ramp up,
-      // then work sets), and the athlete can still add/remove either kind
-      // freely from there via the existing +Aufwärmsatz/+Arbeitssatz buttons.
-      for (let i = rows.length; i < suggested; i++) {
+      const hasWarmup = rows.some((r) => r.type === "aufwaermsatz");
+      if (!hasWarmup) {
+        rows.unshift({
+          key: nextKey(),
+          setNumber: nextSetNumber++,
+          type: "aufwaermsatz",
+          reps: parseLeadingNumber(ex.spec),
+          weight: "",
+          rir: "",
+          confirmed: false,
+        });
+      }
+      const workSetCount = rows.filter((r) => r.type === "arbeitssatz").length;
+      for (let i = workSetCount; i < suggested; i++) {
         rows.push({
           key: nextKey(),
           setNumber: nextSetNumber++,
-          type: rows.length === 0 ? "aufwaermsatz" : "arbeitssatz",
+          type: "arbeitssatz",
           reps: parseLeadingNumber(ex.spec),
           weight: "",
           rir: "",
@@ -255,17 +269,25 @@ export function WorkoutSession({
     }));
   }
 
+  // A new Arbeitssatz always goes on the end. A new Aufwärmsatz goes right
+  // after the last existing warm-up instead — so warm-ups stay grouped
+  // together at the top of the list rather than trailing after work sets
+  // that were already logged.
   function addSet(itemId: string, type: SetType) {
     setSetsByItem((prev) => {
       const rows = prev[itemId] ?? [];
       const maxSetNumber = rows.reduce((m, r) => Math.max(m, r.setNumber), 0);
-      return {
-        ...prev,
-        [itemId]: [
-          ...rows,
-          { key: nextKey(), setNumber: maxSetNumber + 1, type, reps: "", weight: "", rir: "", confirmed: false },
-        ],
-      };
+      const newSet: SessionSet = { key: nextKey(), setNumber: maxSetNumber + 1, type, reps: "", weight: "", rir: "", confirmed: false };
+      if (type === "arbeitssatz") {
+        return { ...prev, [itemId]: [...rows, newSet] };
+      }
+      let insertAt = 0;
+      rows.forEach((r, i) => {
+        if (r.type === "aufwaermsatz") insertAt = i + 1;
+      });
+      const next = [...rows];
+      next.splice(insertAt, 0, newSet);
+      return { ...prev, [itemId]: next };
     });
   }
 

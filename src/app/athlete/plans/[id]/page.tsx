@@ -5,7 +5,6 @@ import { PlanFeedbackTable } from "@/components/athlete/plan-feedback-table";
 import { PlanTableEditor } from "@/components/plans/plan-table-editor";
 import { PlanActions } from "@/components/plans/plan-actions";
 import { CopyOwnPlanDialog } from "@/components/plans/copy-own-plan-dialog";
-import type { ExerciseSet } from "@/components/athletik/exercise-set-entry-dialog";
 import { formatDateShort } from "@/lib/date";
 
 export default async function AthletePlanPage({
@@ -50,28 +49,6 @@ export default async function AthletePlanPage({
     : { data: [] };
   const instructionsByExerciseId = new Map((instructionRows ?? []).map((r) => [r.exercise_id, r]));
 
-  const { data: existingResults } = isAthletik && user && exerciseIds.length
-    ? await supabase
-        .from("exercise_results")
-        .select("exercise_id, set_number, value, reps, unit, set_type")
-        .eq("athlete_id", user.id)
-        .eq("date", plan.date)
-        .in("exercise_id", exerciseIds)
-        .order("set_number")
-    : { data: [] };
-
-  const resultsByExercise: Record<string, { sets: ExerciseSet[]; unit: string }> = {};
-  for (const r of existingResults ?? []) {
-    const entry = resultsByExercise[r.exercise_id] ?? { sets: [], unit: r.unit ?? "kg" };
-    entry.sets.push({
-      weight: String(r.value),
-      reps: r.reps != null ? String(r.reps) : "",
-      type: r.set_type === "aufwaermsatz" ? "aufwaermsatz" : "arbeitssatz",
-    });
-    entry.unit = r.unit ?? entry.unit;
-    resultsByExercise[r.exercise_id] = entry;
-  }
-
   const isOwnPlan = plan.created_by === user?.id;
 
   if (isOwnPlan) {
@@ -84,7 +61,6 @@ export default async function AthletePlanPage({
             planId={plan.id}
             categoryLabel={plan.category_label}
             exerciseLibrary={exerciseLibrary ?? []}
-            trackResults
             initialTitle={plan.title}
             initialDate={plan.date}
             initialTime={plan.time}
@@ -127,8 +103,6 @@ export default async function AthletePlanPage({
                 duration_mode: item.duration_mode === "duration" ? "duration" : "reps",
                 instruction_steps: instruction?.steps ?? [],
                 instruction_video_url: instruction?.video_url ?? "",
-                result_sets: item.exercise_id ? resultsByExercise[item.exercise_id]?.sets ?? [] : [],
-                result_unit: item.exercise_id ? resultsByExercise[item.exercise_id]?.unit ?? "kg" : "kg",
               };
             })}
           />
@@ -184,9 +158,6 @@ export default async function AthletePlanPage({
           items={items ?? []}
           initialFeedback={initialFeedback}
           categoryLabel={plan.category_label}
-          planId={plan.id}
-          planDate={plan.date}
-          initialResults={resultsByExercise}
         />
       </div>
     </div>

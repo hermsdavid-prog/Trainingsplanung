@@ -11,12 +11,8 @@ import {
 } from "@/lib/actions/plans";
 import { upsertExerciseInstructionsAction } from "@/lib/actions/exercise-instructions";
 import { formatDateShort } from "@/lib/date";
-import {
-  ExerciseSetEntryDialog,
-  type ExerciseSet,
-} from "@/components/athletik/exercise-set-entry-dialog";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
-import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, DumbbellIcon, CopyIcon, GripVerticalIcon } from "lucide-react";
+import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, CopyIcon, GripVerticalIcon } from "lucide-react";
 
 type Section = "kraft" | "cardio" | "sprung" | "runden";
 type DurationMode = "reps" | "duration";
@@ -29,8 +25,6 @@ type Row = {
   notes: string;
   link_url: string;
   exercise_id?: string | null;
-  result_sets?: ExerciseSet[];
-  result_unit?: string;
   section: Section;
   round_rest: string;
   heart_rate_on: string;
@@ -49,8 +43,6 @@ const EMPTY_ROW: Omit<Row, "section"> = {
   notes: "",
   link_url: "",
   exercise_id: null,
-  result_sets: [],
-  result_unit: "kg",
   round_rest: "",
   heart_rate_on: "",
   heart_rate_off: "",
@@ -69,7 +61,6 @@ export function PlanTableEditor({
   initialItems,
   exerciseLibrary = [],
   categoryLabel,
-  trackResults = false,
   initialTitle = "",
   initialDate = "",
   initialTime = "",
@@ -84,7 +75,6 @@ export function PlanTableEditor({
   initialItems: Row[];
   exerciseLibrary?: { id: string; name: string }[];
   categoryLabel?: string | null;
-  trackResults?: boolean;
   initialTitle?: string;
   initialDate?: string;
   initialTime?: string | null;
@@ -110,23 +100,20 @@ export function PlanTableEditor({
   const [time, setTime] = useState(initialTime ?? "");
   const [notesOpenIndex, setNotesOpenIndex] = useState<number | null>(null);
   const [linkOpenIndex, setLinkOpenIndex] = useState<number | null>(null);
-  const [resultsOpenIndex, setResultsOpenIndex] = useState<number | null>(null);
   const [instrOpenIndex, setInstrOpenIndex] = useState<number | null>(null);
   const [stepDraftByIndex, setStepDraftByIndex] = useState<Record<number, string>>({});
   const [instrSaving, setInstrSaving] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isSavingTemplate, startTemplateTransition] = useTransition();
   const [resolvingIndex, setResolvingIndex] = useState<number | null>(null);
-  const planDate = date;
 
   const nameByLowercase = new Map(exerciseLibrary.map((e) => [e.name.toLowerCase(), e]));
 
-  // Lets the "Anweisung und Link" panel (Sportartspezifisch/Karate rows) and
-  // the "Ergebnis" dialog (Athletik Kraft rows) be used on a brand-new
-  // exercise name immediately, instead of requiring "Plan speichern" first.
-  // Looks up/auto-creates the library exercise on demand and stores the
-  // resolved id on the row so exercise-scoped saves (instructions, results)
-  // work right away.
+  // Lets the "Anweisung und Link" panel (Sportartspezifisch/Karate rows) be
+  // used on a brand-new exercise name immediately, instead of requiring
+  // "Plan speichern" first. Looks up/auto-creates the library exercise on
+  // demand and stores the resolved id on the row so exercise-scoped saves
+  // (instructions) work right away.
   async function resolveExerciseId(index: number): Promise<string | null> {
     const row = rows[index];
     if (row.exercise_id) return row.exercise_id;
@@ -208,7 +195,7 @@ export function PlanTableEditor({
     // exercise once renamed — the trigger behind several real mislinked
     // rows in production. Leaving it null defers to the same
     // create-or-find resolution a brand-new row gets.
-    setRows((prev) => [...prev, { ...prev[last.index], exercise_id: null, result_sets: [] }]);
+    setRows((prev) => [...prev, { ...prev[last.index], exercise_id: null }]);
   }
 
   function removeRow(index: number) {
@@ -443,7 +430,6 @@ export function PlanTableEditor({
                 <tr>
                   <th className="w-6" />
                   <th>Übung</th>
-                  {trackResults && <th>Ergebnis</th>}
                   <th>Anzahl / Dauer</th>
                   <th>Sätze</th>
                   <th>Pause</th>
@@ -468,26 +454,6 @@ export function PlanTableEditor({
                         list={EXERCISE_LIST_ID}
                       />
                     </td>
-                    {trackResults && (
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={async () => {
-                            const id = await resolveExerciseId(index);
-                            if (id) setResultsOpenIndex(index);
-                          }}
-                          disabled={!row.exercise_name.trim() || resolvingIndex === index}
-                        >
-                          <DumbbellIcon />
-                          {resolvingIndex === index
-                            ? "Wird angelegt…"
-                            : row.result_sets && row.result_sets.length > 0
-                              ? `${row.result_sets.length} ${row.result_sets.length > 1 ? "Sätze" : "Satz"}`
-                              : "Ergebnis"}
-                        </button>
-                      </td>
-                    )}
                     <td>
                       <input
                         className="input min-w-32"
@@ -548,13 +514,6 @@ export function PlanTableEditor({
               </tbody>
             </table>
             </div>
-
-            {trackResults && (
-              <p className="mt-2 text-xs text-muted">
-                Trage bei Übungen aus der Athletik-Bibliothek Wiederholungen und Gewicht je Satz ein —
-                das wird für die Fortschrittskurve gespeichert.
-              </p>
-            )}
 
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" className="btn btn-secondary" onClick={() => addRow("kraft")}>
@@ -1052,29 +1011,6 @@ export function PlanTableEditor({
           </DialogContent>
         </DialogPortal>
       </Dialog>
-
-      {resultsOpenIndex !== null && planDate && (
-        <ExerciseSetEntryDialog
-          key={resultsOpenIndex}
-          open={resultsOpenIndex !== null}
-          onOpenChange={(open) => !open && setResultsOpenIndex(null)}
-          exerciseName={rows[resultsOpenIndex].exercise_name}
-          exerciseId={rows[resultsOpenIndex].exercise_id ?? null}
-          planId={planId}
-          planDate={planDate}
-          initialSets={rows[resultsOpenIndex].result_sets ?? []}
-          initialUnit={rows[resultsOpenIndex].result_unit}
-          suggestedSetCount={Number(rows[resultsOpenIndex].sets) || 1}
-          onSaved={(sets, unit) => {
-            const idx = resultsOpenIndex;
-            setRows((prev) =>
-              prev.map((row, i) =>
-                i === idx ? { ...row, result_sets: sets.filter((s) => s.weight.trim()), result_unit: unit } : row
-              )
-            );
-          }}
-        />
-      )}
     </div>
   );
 }
