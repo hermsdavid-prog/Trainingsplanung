@@ -93,6 +93,11 @@ export default async function AthletePlanPage({
             subtitle="Nur du und dein Trainer können dieses Training sehen."
             headerActions={
               <>
+                {(items ?? []).length > 0 && (
+                  <Link href={`/athlete/plans/${plan.id}/session`} className="btn btn-primary">
+                    Training starten
+                  </Link>
+                )}
                 <CopyOwnPlanDialog planId={plan.id} />
                 <PlanActions planId={plan.id} />
               </>

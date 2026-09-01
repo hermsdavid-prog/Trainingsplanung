@@ -25,6 +25,9 @@ export function HealthCheckinCard({ date }: { date: string }) {
         toast.error(result.error);
       } else {
         toast.success("Gesundheitsdaten gespeichert.");
+        for (const badge of result.newBadges ?? []) {
+          toast.success(`${badge.icon} ${badge.title}`, { description: badge.description });
+        }
         router.refresh();
       }
     });

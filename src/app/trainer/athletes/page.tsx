@@ -7,6 +7,7 @@ import { AthleteGroupTabs } from "@/components/athletes/athlete-group-tabs";
 import { AthleteSelect } from "@/components/athletes/athlete-select";
 import { AthleteExercisePicker } from "@/components/athletes/athlete-exercise-picker";
 import { SendNoteForm } from "@/components/athletes/send-note-form";
+import { BadgesList } from "@/components/athletes/badges-list";
 
 const METRICS: { key: "hrv" | "resting_hr" | "wellbeing"; label: string; unit: string; domain?: [number, number] }[] = [
   { key: "hrv", label: "HRV", unit: "ms" },
@@ -127,6 +128,23 @@ export default async function TrainerAthletesPage({
     trainerName: n.profiles?.full_name ?? "—",
   }));
 
+  // — Erfolge —
+  const { data: badgeRows } = selected
+    ? await supabase
+        .from("athlete_badges")
+        .select("badge_key, title, description, icon, earned_at")
+        .eq("athlete_id", selected.id)
+        .order("earned_at", { ascending: false })
+        .limit(20)
+    : { data: [] };
+  const badges = (badgeRows ?? []).map((b) => ({
+    key: b.badge_key,
+    title: b.title,
+    description: b.description,
+    icon: b.icon,
+    earnedAt: b.earned_at,
+  }));
+
   return (
     <div>
       <div className="kicker">Gesundheit, Fortschritt und Hinweise</div>
@@ -229,6 +247,11 @@ export default async function TrainerAthletesPage({
                     </>
                   )}
                 </div>
+              </div>
+
+              <div className="mt-9">
+                <div className="kicker-muted">Erfolge</div>
+                <BadgesList badges={badges} />
               </div>
 
               <div className="mt-9 max-w-[640px]">

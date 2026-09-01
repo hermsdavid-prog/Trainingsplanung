@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { checkHealthBadges, type BadgeAward } from "@/lib/badges";
 
 export type ActionResult = { error?: string };
 
@@ -10,7 +11,7 @@ export async function upsertHealthLogAction(input: {
   hrv: string;
   restingHr: string;
   wellbeing: number;
-}): Promise<ActionResult> {
+}): Promise<ActionResult & { newBadges?: BadgeAward[] }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -46,5 +47,7 @@ export async function upsertHealthLogAction(input: {
 
   revalidatePath("/athlete");
   revalidatePath("/trainer/athletes");
-  return {};
+
+  const newBadges = await checkHealthBadges(supabase, user.id);
+  return newBadges.length > 0 ? { newBadges } : {};
 }

@@ -12,6 +12,7 @@ import { computeExerciseTrends } from "@/lib/exercise-trend";
 import { ExerciseTrendList } from "@/components/athletik/exercise-trend-list";
 import { HealthChart } from "@/components/health/health-chart";
 import { CoachNotesBanner } from "@/components/athletes/coach-notes-banner";
+import { BadgesList } from "@/components/athletes/badges-list";
 
 const LEVEL_TAG: Record<HealthStatusLevel, string> = {
   red: "tag-accent-2",
@@ -35,7 +36,7 @@ export default async function AthleteTodayPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: plans }, { data: healthLog }, { data: recentLogs }, { data: exerciseResultRows }, { data: unreadNoteRows }] =
+  const [{ data: plans }, { data: healthLog }, { data: recentLogs }, { data: exerciseResultRows }, { data: unreadNoteRows }, { data: badgeRows }] =
     await Promise.all([
       supabase
         .from("training_plans")
@@ -73,7 +74,22 @@ export default async function AthleteTodayPage({
             .is("read_at", null)
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: [] }),
+      user
+        ? supabase
+            .from("athlete_badges")
+            .select("badge_key, title, description, icon, earned_at")
+            .eq("athlete_id", user.id)
+            .order("earned_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
     ]);
+
+  const badges = (badgeRows ?? []).map((b) => ({
+    key: b.badge_key,
+    title: b.title,
+    description: b.description,
+    icon: b.icon,
+    earnedAt: b.earned_at,
+  }));
 
   const unreadNotes = (unreadNoteRows ?? []).map((n) => ({
     id: n.id,
@@ -188,6 +204,9 @@ export default async function AthleteTodayPage({
               )}
             </>
           )}
+
+          <div className="kicker mt-7">Erfolge</div>
+          <BadgesList badges={badges} />
         </>
         }
       />

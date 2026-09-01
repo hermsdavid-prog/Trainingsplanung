@@ -9,6 +9,7 @@ import {
   deleteExerciseResultSetAction,
 } from "@/lib/actions/exercise-results";
 import { saveSessionRpeAction } from "@/lib/actions/sessions";
+import type { BadgeAward } from "@/lib/badges";
 
 type SetType = "aufwaermsatz" | "arbeitssatz";
 
@@ -71,6 +72,12 @@ function formatMMSS(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function notifyNewBadges(badges: BadgeAward[] | undefined) {
+  for (const badge of badges ?? []) {
+    toast.success(`${badge.icon} ${badge.title}`, { description: badge.description });
+  }
 }
 
 const SET_TYPE_LABEL: Record<SetType, string> = {
@@ -315,6 +322,7 @@ export function WorkoutSession({
     if (ex.restSeconds > 0) {
       setRestRemaining(ex.restSeconds);
     }
+    notifyNewBadges(result.newBadges);
   }
 
   // The field to fill in always starts empty (or with whatever the athlete
@@ -388,6 +396,7 @@ export function WorkoutSession({
       return;
     }
     toast.success("Training gespeichert.");
+    notifyNewBadges(result.newBadges);
     router.push("/athlete");
   }
 

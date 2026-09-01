@@ -3,10 +3,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/actions/plans";
+import { checkSessionBadges, type BadgeAward } from "@/lib/badges";
 
 // Belastungsempfinden (RPE) for a whole training session, saved once when the
 // athlete taps "Training beenden" at the end of a live workout session.
-export async function saveSessionRpeAction(planId: string, rpe: number): Promise<ActionResult> {
+export async function saveSessionRpeAction(
+  planId: string,
+  rpe: number
+): Promise<ActionResult & { newBadges?: BadgeAward[] }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -30,6 +34,9 @@ export async function saveSessionRpeAction(planId: string, rpe: number): Promise
 
   revalidatePath(`/athlete/plans/${planId}`);
   revalidatePath(`/athlete/plans/${planId}/session`);
+  revalidatePath("/athlete");
   revalidatePath("/trainer/athletes");
-  return {};
+
+  const newBadges = await checkSessionBadges(supabase, user.id);
+  return newBadges.length > 0 ? { newBadges } : {};
 }

@@ -32,6 +32,50 @@ export type Database = {
         }
         Relationships: []
       }
+      athlete_badges: {
+        Row: {
+          athlete_id: string
+          badge_key: string
+          context: Json | null
+          created_at: string
+          description: string
+          earned_at: string
+          icon: string
+          id: string
+          title: string
+        }
+        Insert: {
+          athlete_id: string
+          badge_key: string
+          context?: Json | null
+          created_at?: string
+          description: string
+          earned_at?: string
+          icon: string
+          id?: string
+          title: string
+        }
+        Update: {
+          athlete_id?: string
+          badge_key?: string
+          context?: Json | null
+          created_at?: string
+          description?: string
+          earned_at?: string
+          icon?: string
+          id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_badges_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_consents: {
         Row: {
           athlete_id: string

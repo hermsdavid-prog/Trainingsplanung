@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/actions/plans";
+import { checkExercisePr, type BadgeAward } from "@/lib/badges";
 
 export async function upsertExerciseResultAction(
   exerciseId: string,
@@ -14,7 +15,7 @@ export async function upsertExerciseResultAction(
   planId: string,
   setType: "aufwaermsatz" | "arbeitssatz" = "arbeitssatz",
   rir: number | null = null
-): Promise<ActionResult> {
+): Promise<ActionResult & { newBadges?: BadgeAward[] }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -41,6 +42,15 @@ export async function upsertExerciseResultAction(
 
   revalidatePath("/trainer/athletes");
   revalidatePath("/athlete/athletik");
+  revalidatePath("/athlete");
+
+  if (setType === "arbeitssatz") {
+    const { data: exercise } = await supabase.from("exercises").select("name").eq("id", exerciseId).maybeSingle();
+    if (exercise?.name) {
+      const award = await checkExercisePr(supabase, user.id, exerciseId, exercise.name);
+      if (award) return { newBadges: [award] };
+    }
+  }
   return {};
 }
 
