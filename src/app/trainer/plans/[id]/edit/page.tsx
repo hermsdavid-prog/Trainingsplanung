@@ -222,7 +222,12 @@ export default async function EditPlanPage({
                     Sätze, Wdh. und Gewichte ansehen
                   </Link>
                 )}
-                {canDelete && <PlanActions planId={plan.id} />}
+                {canDelete && (
+                  <PlanActions
+                    planId={plan.id}
+                    redirectTo={`/trainer/plans?type=${isAthletik ? "Athletik" : "Sportartspezifisch"}`}
+                  />
+                )}
                 <CopyPlanDialog planId={plan.id} groups={groups ?? []} athletes={athletes} />
               </>
             }

@@ -4,23 +4,27 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 export type ActionResult = { error: string } | { error?: undefined };
+export type LoginActionResult = ActionResult & { email?: string };
 
 export async function loginAction(
-  _prevState: ActionResult,
+  _prevState: LoginActionResult,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<LoginActionResult> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    return { error: "Bitte E-Mail und Passwort eingeben." };
+    return { error: "Bitte E-Mail und Passwort eingeben.", email };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: "E-Mail oder Passwort ist falsch." };
+    // React resets uncontrolled form fields after every action dispatch, so
+    // without echoing the email back the field would go blank alongside the
+    // (intentionally cleared) password on a failed login attempt.
+    return { error: "E-Mail oder Passwort ist falsch.", email };
   }
 
   redirect("/");

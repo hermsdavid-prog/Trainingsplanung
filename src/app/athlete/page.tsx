@@ -36,7 +36,7 @@ export default async function AthleteTodayPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: plans }, { data: healthLog }, { data: recentLogs }, { data: exerciseResultRows }, { data: unreadNoteRows }, { data: badgeRows }] =
+  const [{ data: plans }, { data: healthLog }, { data: recentLogs }, { data: exerciseResultRows }, { data: unreadNoteRows }, { data: badgeRows }, { data: ratingRows }] =
     await Promise.all([
       supabase
         .from("training_plans")
@@ -81,7 +81,16 @@ export default async function AthleteTodayPage({
             .eq("athlete_id", user.id)
             .order("earned_at", { ascending: false })
         : Promise.resolve({ data: [] }),
+      user
+        ? supabase
+            .from("session_ratings")
+            .select("training_plan_id, training_plans!inner(date)")
+            .eq("athlete_id", user.id)
+            .eq("training_plans.date", date)
+        : Promise.resolve({ data: [] }),
     ]);
+
+  const completedPlanIds = new Set((ratingRows ?? []).map((r) => r.training_plan_id));
 
   const badges = (badgeRows ?? []).map((b) => ({
     key: b.badge_key,
@@ -154,7 +163,10 @@ export default async function AthleteTodayPage({
                 >
                   <div className="flex items-baseline justify-between gap-2.5">
                     <span className="text-[17px] leading-[1.2]">{plan.title}</span>
-                    <span className="tag tag-outline">{plan.category_label}</span>
+                    <span className="flex items-center gap-1.5">
+                      {completedPlanIds.has(plan.id) && <span className="tag tag-neutral">✓ Erledigt</span>}
+                      <span className="tag tag-outline">{plan.category_label}</span>
+                    </span>
                   </div>
                   <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
                     {plan.scope_type === "group"

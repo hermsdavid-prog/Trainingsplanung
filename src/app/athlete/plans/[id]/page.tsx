@@ -99,7 +99,7 @@ export default async function AthletePlanPage({
                   </Link>
                 )}
                 <CopyOwnPlanDialog planId={plan.id} />
-                <PlanActions planId={plan.id} />
+                <PlanActions planId={plan.id} redirectTo="/athlete" />
               </>
             }
             initialItems={(items ?? []).map((item) => {

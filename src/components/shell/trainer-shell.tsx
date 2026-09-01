@@ -11,14 +11,16 @@ const NAV = [
   {
     href: "/trainer/plans?type=Athletik",
     label: "Athletik",
-    match: (p: string, sp: string) =>
-      p.startsWith("/trainer/plans") && sp !== "Sportartspezifisch",
+    match: (p: string, sp: string) => p.startsWith("/trainer/plans") && sp === "Athletik",
   },
   {
     href: "/trainer/plans?type=Sportartspezifisch",
     label: "Karate",
+    // Sportartspezifisch is the default category when the plans page has no
+    // ?type= param (see PLAN_TYPES[0] in src/lib/plan-type.ts), so treat a
+    // missing param the same as an explicit match here.
     match: (p: string, sp: string) =>
-      p.startsWith("/trainer/plans") && sp === "Sportartspezifisch",
+      p.startsWith("/trainer/plans") && sp !== "Athletik",
   },
   { href: "/trainer/calendar", label: "Kalender", match: (p: string) => p.startsWith("/trainer/calendar") },
   { href: "/trainer/groups", label: "Gruppen", match: (p: string) => p.startsWith("/trainer/groups") },

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { deletePlanAction } from "@/lib/actions/plans";
 
-export function PlanActions({ planId }: { planId: string }) {
+export function PlanActions({ planId, redirectTo = "/trainer/plans" }: { planId: string; redirectTo?: string }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -16,7 +16,7 @@ export function PlanActions({ planId }: { planId: string }) {
       if (result.error) {
         toast.error(result.error);
       } else {
-        router.push("/trainer/plans");
+        router.push(redirectTo);
       }
     });
   }

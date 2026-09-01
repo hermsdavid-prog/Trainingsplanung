@@ -1,11 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { loginAction, type ActionResult } from "@/lib/actions/auth";
+import { loginAction, type LoginActionResult } from "@/lib/actions/auth";
 import { PrivacyPolicyDialog } from "@/components/shell/privacy-policy-dialog";
 import { ImprintDialog } from "@/components/shell/imprint-dialog";
 
-const initialState: ActionResult = {};
+const initialState: LoginActionResult = {};
 
 export function LoginForm() {
   const [state, formAction, isPending] = useActionState(loginAction, initialState);
@@ -22,6 +22,7 @@ export function LoginForm() {
           required
           className="input"
           placeholder="name@verein.de"
+          defaultValue={state.email ?? ""}
         />
       </div>
       <div className="field mt-3.5">
