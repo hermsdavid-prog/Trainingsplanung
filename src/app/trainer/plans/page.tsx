@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DeletePlanRowButton } from "@/components/plans/delete-plan-row-button";
 import { PlanOccurrenceDropdown } from "@/components/plans/plan-occurrence-dropdown";
+import { PlanListFilters } from "@/components/plans/plan-list-filters";
 import { formatDateShort } from "@/lib/date";
 import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
 
@@ -19,9 +20,9 @@ type PlanGroup = {
 export default async function TrainerPlansPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ type?: string; group?: string; athlete?: string }>;
 }) {
-  const { type } = await searchParams;
+  const { type, group: groupFilter, athlete: athleteFilter } = await searchParams;
   const category = isValidPlanType(type ?? "") ? (type as string) : PLAN_TYPES[0];
   const supabase = await createClient();
 
@@ -29,21 +30,33 @@ export default async function TrainerPlansPage({
     data: { user: currentUser },
   } = await supabase.auth.getUser();
 
+  let plansQuery = supabase
+    .from("training_plans")
+    .select(
+      "id, title, category_label, date, time, scope_type, created_by, group_id, athlete_id, series_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)"
+    )
+    .eq("category_label", category);
+  if (groupFilter) plansQuery = plansQuery.eq("group_id", groupFilter);
+  if (athleteFilter) plansQuery = plansQuery.eq("athlete_id", athleteFilter);
+
   // Capped so this list stays fast as plan history grows; older plans are still
   // reachable via the calendar's date navigation.
-  const [{ data: plans }, { data: profile }] = await Promise.all([
-    supabase
-      .from("training_plans")
-      .select(
-        "id, title, category_label, date, time, scope_type, created_by, group_id, athlete_id, series_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)"
-      )
-      .eq("category_label", category)
-      .order("date", { ascending: false })
-      .limit(300),
+  const [{ data: plans }, { data: profile }, { data: allGroups }, { data: groupAthleteRows }] = await Promise.all([
+    plansQuery.order("date", { ascending: false }).limit(300),
     currentUser
       ? supabase.from("profiles").select("role").eq("id", currentUser.id).single()
       : Promise.resolve({ data: null }),
+    supabase.from("groups").select("id, name").order("name"),
+    supabase.from("group_athletes").select("athlete_id, profiles(full_name)"),
   ]);
+
+  const athleteMap = new Map<string, string>();
+  for (const row of groupAthleteRows ?? []) {
+    if (row.profiles?.full_name) athleteMap.set(row.athlete_id, row.profiles.full_name);
+  }
+  const athletes = Array.from(athleteMap.entries())
+    .map(([id, full_name]) => ({ id, full_name }))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   const isKarate = category === "Sportartspezifisch";
 
@@ -102,7 +115,11 @@ export default async function TrainerPlansPage({
         </Link>
       </div>
 
-      <div className="mt-7 overflow-x-auto">
+      <div className="mt-5">
+        <PlanListFilters groups={allGroups ?? []} athletes={athletes} selectedGroup={groupFilter} selectedAthlete={athleteFilter} />
+      </div>
+
+      <div className="mt-5 overflow-x-auto">
         <table className="table" style={{ minWidth: 560 }}>
           <thead>
             <tr>
@@ -164,7 +181,9 @@ export default async function TrainerPlansPage({
             {groups.length === 0 && (
               <tr>
                 <td colSpan={5} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
-                  Noch keine Trainingspläne angelegt.
+                  {groupFilter || athleteFilter
+                    ? "Keine Trainingspläne für diese Auswahl."
+                    : "Noch keine Trainingspläne angelegt."}
                 </td>
               </tr>
             )}
