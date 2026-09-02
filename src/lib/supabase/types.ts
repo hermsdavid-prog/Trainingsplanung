@@ -771,6 +771,70 @@ export type Database = {
           },
         ]
       }
+      training_mesocycles: {
+        Row: {
+          athlete_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          group_id: string | null
+          id: string
+          scope_type: Database["public"]["Enums"]["plan_scope"]
+          start_date: string
+          title: string
+          updated_at: string
+          weeks: number
+        }
+        Insert: {
+          athlete_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          group_id?: string | null
+          id?: string
+          scope_type: Database["public"]["Enums"]["plan_scope"]
+          start_date: string
+          title: string
+          updated_at?: string
+          weeks: number
+        }
+        Update: {
+          athlete_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          group_id?: string | null
+          id?: string
+          scope_type?: Database["public"]["Enums"]["plan_scope"]
+          start_date?: string
+          title?: string
+          updated_at?: string
+          weeks?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_mesocycles_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_mesocycles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_mesocycles_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_plan_items: {
         Row: {
           created_at: string
@@ -855,6 +919,7 @@ export type Database = {
           date: string
           group_id: string | null
           id: string
+          mesocycle_id: string | null
           scope_type: Database["public"]["Enums"]["plan_scope"]
           series_id: string | null
           time: string | null
@@ -869,6 +934,7 @@ export type Database = {
           date: string
           group_id?: string | null
           id?: string
+          mesocycle_id?: string | null
           scope_type: Database["public"]["Enums"]["plan_scope"]
           series_id?: string | null
           time?: string | null
@@ -883,6 +949,7 @@ export type Database = {
           date?: string
           group_id?: string | null
           id?: string
+          mesocycle_id?: string | null
           scope_type?: Database["public"]["Enums"]["plan_scope"]
           series_id?: string | null
           time?: string | null
@@ -909,6 +976,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_plans_mesocycle_id_fkey"
+            columns: ["mesocycle_id"]
+            isOneToOne: false
+            referencedRelation: "training_mesocycles"
             referencedColumns: ["id"]
           },
         ]

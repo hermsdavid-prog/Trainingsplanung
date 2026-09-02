@@ -22,7 +22,7 @@ export default async function EditPlanPage({
     await Promise.all([
       supabase
         .from("training_plans")
-        .select("id, title, category_label, date, time, scope_type, group_id, athlete_id, created_by, series_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
+        .select("id, title, category_label, date, time, scope_type, group_id, athlete_id, created_by, series_id, mesocycle_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
         .eq("id", id)
         .single(),
       supabase
@@ -43,6 +43,16 @@ export default async function EditPlanPage({
   if (!plan) notFound();
 
   const isAthletik = plan.category_label?.trim().toLowerCase() === "athletik";
+
+  // Mesozyklen für dasselbe Scope-Ziel wie dieser Plan (Gruppe oder Athlet)
+  // — nur die sind als Zuordnung sinnvoll.
+  const { data: mesocycleRows } =
+    plan.scope_type === "group" && plan.group_id
+      ? await supabase.from("training_mesocycles").select("id, title").eq("group_id", plan.group_id).order("start_date", { ascending: false })
+      : plan.scope_type === "athlete" && plan.athlete_id
+        ? await supabase.from("training_mesocycles").select("id, title").eq("athlete_id", plan.athlete_id).order("start_date", { ascending: false })
+        : { data: [] };
+  const mesocycles = mesocycleRows ?? [];
 
   // The Sportartspezifisch row editor's "Anweisung und Link" panel edits
   // exercise_instructions (steps + video), shared per exercise_id — preload
@@ -193,6 +203,8 @@ export default async function EditPlanPage({
             kicker={kicker}
             backHref={backHref}
             allowSaveAsTemplate
+            mesocycles={mesocycles}
+            initialMesocycleId={plan.mesocycle_id}
             subtitle={`Für: ${targetLabel ?? "—"} (${plan.scope_type === "group" ? "Gruppe" : "Einzelplan"})${
               plan.scope_type === "athlete" ? " · Vom Athleten selbst erstellt" : ""
             }${

@@ -246,7 +246,7 @@ export async function createOwnPlanAction(
 // used to create the plan) and isn't editable here.
 export async function updatePlanMetaAction(
   planId: string,
-  meta: { title: string; date: string; time: string }
+  meta: { title: string; date: string; time: string; mesocycleId?: string | null }
 ): Promise<ActionResult> {
   const { supabase } = await requirePlanEditAccess(planId);
 
@@ -263,7 +263,7 @@ export async function updatePlanMetaAction(
 
   const { error } = await supabase
     .from("training_plans")
-    .update({ title, date, time })
+    .update({ title, date, time, ...(meta.mesocycleId !== undefined ? { mesocycle_id: meta.mesocycleId } : {}) })
     .eq("id", planId);
 
   if (error) return { error: "Änderungen konnten nicht gespeichert werden." };
@@ -274,6 +274,7 @@ export async function updatePlanMetaAction(
   revalidatePath("/athlete");
   revalidatePath("/trainer/calendar");
   revalidatePath("/athlete/calendar");
+  revalidatePath("/trainer/mesocycles");
   return {};
 }
 

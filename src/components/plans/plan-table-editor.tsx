@@ -70,6 +70,8 @@ export function PlanTableEditor({
   backHref,
   headerActions,
   allowSaveAsTemplate = false,
+  mesocycles,
+  initialMesocycleId = null,
 }: {
   planId: string;
   initialItems: Row[];
@@ -87,6 +89,11 @@ export function PlanTableEditor({
   // reusable plan_templates row. Not shown on the athlete's own-plan editor
   // — plan_templates_insert RLS only allows admin/trainer to create one.
   allowSaveAsTemplate?: boolean;
+  // Trainer-only: lets this plan be assigned to one of the Mesozyklen
+  // already set up for its own group/athlete. Not shown on the athlete's
+  // own-plan editor — Mesozyklen are a trainer planning tool.
+  mesocycles?: { id: string; title: string }[];
+  initialMesocycleId?: string | null;
 }) {
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
 
@@ -98,6 +105,7 @@ export function PlanTableEditor({
   const [title, setTitle] = useState(initialTitle);
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(initialTime ?? "");
+  const [mesocycleId, setMesocycleId] = useState(initialMesocycleId ?? "");
   const [notesOpenIndex, setNotesOpenIndex] = useState<number | null>(null);
   const [linkOpenIndex, setLinkOpenIndex] = useState<number | null>(null);
   const [instrOpenIndex, setInstrOpenIndex] = useState<number | null>(null);
@@ -239,7 +247,12 @@ export function PlanTableEditor({
   // buttons.
   function handleAssign() {
     startTransition(async () => {
-      const metaResult = await updatePlanMetaAction(planId, { title, date, time });
+      const metaResult = await updatePlanMetaAction(planId, {
+        title,
+        date,
+        time,
+        ...(mesocycles ? { mesocycleId: mesocycleId || null } : {}),
+      });
       if (metaResult.error) {
         toast.error(metaResult.error);
         return;
@@ -417,6 +430,24 @@ export function PlanTableEditor({
               placeholder={isAthletik ? "17:30" : "19:15"}
             />
           </div>
+          {mesocycles && (
+            <div className="field" style={{ width: 220, margin: 0 }}>
+              <label htmlFor="plan-mesocycle">Mesozyklus</label>
+              <select
+                id="plan-mesocycle"
+                className="input"
+                value={mesocycleId}
+                onChange={(e) => setMesocycleId(e.target.value)}
+              >
+                <option value="">Kein Mesozyklus</option>
+                {mesocycles.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
