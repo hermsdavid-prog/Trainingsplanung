@@ -1,3 +1,10 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { formatDateCompact } from "@/lib/date";
+import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
+
 const DAY_PX = 7;
 const ROW_HEIGHT = 40;
 const PALETTE = ["var(--dc-accent)", "var(--dc-accent-2-500)", "var(--dc-neutral-400)", "var(--dc-accent-700)"];
@@ -6,7 +13,14 @@ const MONTH_LABELS = [
   "Juli", "August", "September", "Oktober", "November", "Dezember",
 ];
 
-type TimelineMesocycle = { id: string; title: string; start_date: string; weeks: number };
+type TimelineMesocycle = {
+  id: string;
+  title: string;
+  description: string | null;
+  start_date: string;
+  weeks: number;
+  plans: { id: string; title: string; date: string }[];
+};
 
 // Pure calendar-date arithmetic (no timezone involved, these are plain
 // YYYY-MM-DD strings) — day-diff and month-add are the two operations this
@@ -37,7 +51,11 @@ function addDays(dateStr: string, n: number): string {
 // Horizontal timeline (one row per Mesozyklus, a bar spanning its
 // Startdatum..+Wochen) across the months the selected scope's cycles cover —
 // the "kann ich auf einen Blick sehen, welche Phase wann ist"-Ansicht.
+// Clicking a bar opens its assigned Trainingseinheiten in a dialog.
 export function MesocycleTimeline({ mesocycles, todayIso }: { mesocycles: TimelineMesocycle[]; todayIso: string }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openMesocycle = mesocycles.find((m) => m.id === openId) ?? null;
+
   if (mesocycles.length === 0) {
     return <p className="mt-3 text-sm text-muted">Noch kein Mesozyklus angelegt.</p>;
   }
@@ -121,8 +139,10 @@ export function MesocycleTimeline({ mesocycles, todayIso }: { mesocycles: Timeli
             const widthDays = m.weeks * 7;
             return (
               <div key={m.id} style={{ position: "relative", height: ROW_HEIGHT }}>
-                <div
+                <button
+                  type="button"
                   className="text-[12px]"
+                  onClick={() => setOpenId(m.id)}
                   style={{
                     position: "absolute",
                     left: offsetDays * DAY_PX,
@@ -137,16 +157,59 @@ export function MesocycleTimeline({ mesocycles, todayIso }: { mesocycles: Timeli
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
+                    cursor: "pointer",
                   }}
                   title={`${m.title} · ${m.weeks} Wochen`}
                 >
                   {m.title}
-                </div>
+                </button>
               </div>
             );
           })}
         </div>
       </div>
+
+      <Dialog open={openMesocycle !== null} onOpenChange={(open) => !open && setOpenId(null)}>
+        <DialogPortal>
+          <DialogOverlay />
+          <DialogContent className="dc-dialog max-w-[440px]">
+            {openMesocycle && (
+              <div className="min-w-0">
+                <div className="kicker-muted">{openMesocycle.title}</div>
+                <div className="mt-1 text-xs text-muted">
+                  {formatDateCompact(openMesocycle.start_date)} –{" "}
+                  {formatDateCompact(addDays(openMesocycle.start_date, openMesocycle.weeks * 7 - 1))} ·{" "}
+                  {openMesocycle.weeks} {openMesocycle.weeks === 1 ? "Woche" : "Wochen"}
+                </div>
+                {openMesocycle.description && (
+                  <p className="mt-2 text-[13px] leading-[1.5]">{openMesocycle.description}</p>
+                )}
+
+                <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--dc-divider)" }}>
+                  <div className="kicker-muted">Zugeordnete Trainings</div>
+                  {openMesocycle.plans.length === 0 ? (
+                    <p className="mt-2 text-[13px] text-muted">Diesem Mesozyklus sind noch keine Trainings zugeordnet.</p>
+                  ) : (
+                    <div className="mt-2 flex flex-col gap-1">
+                      {openMesocycle.plans.map((p) => (
+                        <Link
+                          key={p.id}
+                          href={`/trainer/plans/${p.id}/edit`}
+                          className="flex items-center justify-between gap-2 text-[13px] no-underline"
+                          style={{ color: "inherit" }}
+                        >
+                          <span>{p.title}</span>
+                          <span className="text-muted">{formatDateCompact(p.date)}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </DialogPortal>
+      </Dialog>
     </div>
   );
 }

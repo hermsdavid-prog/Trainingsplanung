@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { Typeahead } from "@/components/ui/typeahead";
 
 // Zwei unabhängige Filterachsen für die Plan-Liste (Athletik/Karate): nach
 // Gruppe oder nach Sportler. Da ein Plan entweder gruppen- oder
 // athletenbezogen ist, schließen sich beide gegenseitig aus — die Auswahl
-// der einen setzt die andere zurück.
+// der einen setzt die andere zurück. Buchstaben-Eingabe statt Dropdown,
+// damit das bei vielen Gruppen/Sportlern nicht unhandlich wird.
 export function PlanListFilters({
   groups,
   athletes,
@@ -32,38 +34,30 @@ export function PlanListFilters({
 
   return (
     <div className="flex flex-wrap gap-3">
-      <div className="field w-auto max-w-[240px]">
-        <label htmlFor="plan-filter-group">Gruppe</label>
-        <select
-          id="plan-filter-group"
-          className="input"
-          value={selectedGroup ?? ""}
-          onChange={(e) => apply({ group: e.target.value })}
-        >
-          <option value="">Alle Gruppen</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field w-auto max-w-[240px]">
-        <label htmlFor="plan-filter-athlete">Sportler</label>
-        <select
-          id="plan-filter-athlete"
-          className="input"
-          value={selectedAthlete ?? ""}
-          onChange={(e) => apply({ athlete: e.target.value })}
-        >
-          <option value="">Alle Sportler</option>
-          {athletes.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.full_name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Typeahead
+        key={`group-${selectedGroup ?? "none"}`}
+        id="plan-filter-group"
+        label="Gruppe"
+        items={groups.map((g) => ({ id: g.id, label: g.name }))}
+        selectedId={selectedGroup}
+        onSelect={(id) => apply({ group: id })}
+        allowClear
+        clearLabel="Alle Gruppen"
+        placeholder="Alle Gruppen"
+        emptyMessage="Keine Gruppe gefunden."
+      />
+      <Typeahead
+        key={`athlete-${selectedAthlete ?? "none"}`}
+        id="plan-filter-athlete"
+        label="Sportler"
+        items={athletes.map((a) => ({ id: a.id, label: a.full_name }))}
+        selectedId={selectedAthlete}
+        onSelect={(id) => apply({ athlete: id })}
+        allowClear
+        clearLabel="Alle Sportler"
+        placeholder="Alle Sportler"
+        emptyMessage="Kein Sportler gefunden."
+      />
     </div>
   );
 }

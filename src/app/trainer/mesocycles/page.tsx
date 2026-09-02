@@ -125,7 +125,10 @@ export default async function TrainerMesocyclesPage({
               </div>
 
               {view === "calendar" ? (
-                <MesocycleTimeline mesocycles={mesocycles} todayIso={todayISO()} />
+                <MesocycleTimeline
+                  mesocycles={mesocycles.map((m) => ({ ...m, plans: plansByMesocycle.get(m.id) ?? [] }))}
+                  todayIso={todayISO()}
+                />
               ) : mesocycles.length === 0 ? (
                 <p className="mt-3 text-sm text-muted">Noch kein Mesozyklus angelegt.</p>
               ) : (
