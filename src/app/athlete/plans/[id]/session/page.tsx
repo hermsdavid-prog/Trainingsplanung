@@ -53,12 +53,18 @@ export default async function AthleteWorkoutSessionPage({
 
   const [{ data: existingResults }, { data: instructions }, { data: rating }, { data: historyRows }] =
     await Promise.all([
+      // Scoped to this plan specifically (not just athlete+date+exercise) —
+      // without training_plan_id here, two plans on the same day that both
+      // reference the same exercise would bleed into each other's set list,
+      // and confirming a set in one could silently overwrite the other's
+      // saved data (same athlete_id/exercise_id/date/set_number).
       exerciseIds.length
         ? supabase
             .from("exercise_results")
             .select("exercise_id, set_number, value, reps, unit, set_type, rir")
             .eq("athlete_id", user.id)
             .eq("date", plan.date)
+            .eq("training_plan_id", id)
             .in("exercise_id", exerciseIds)
             .order("set_number")
         : Promise.resolve({ data: [] }),

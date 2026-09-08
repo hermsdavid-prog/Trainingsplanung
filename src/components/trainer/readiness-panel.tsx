@@ -37,7 +37,7 @@ export function ReadinessPanel({ rows }: { rows: ReadinessRow[] }) {
 
       {open &&
         (rows.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">Noch keine Athleten in deinen Gruppen.</p>
+          <p className="mt-3 text-sm text-muted">Noch keine Athleten heute eingecheckt.</p>
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="table" style={{ minWidth: 480 }}>

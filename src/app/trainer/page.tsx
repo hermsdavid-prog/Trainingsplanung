@@ -83,19 +83,22 @@ export default async function TrainerDashboardPage() {
   const redCount = rows.filter((r) => r.level === "red").length;
   const checkedInCount = rows.filter((r) => r.todayLog).length;
 
-  const readinessRows: ReadinessRow[] = rows.map(({ athlete, level, todayLog }) => ({
-    athleteId: athlete.id,
-    groupId: groupIdByAthlete.get(athlete.id) ?? "",
-    fullName: athlete.full_name,
-    level,
-    levelLabel: HEALTH_STATUS_LABEL[level],
-    levelTagClass: LEVEL_TAG[level],
-    todayLabel: todayLog
-      ? `Wohlbefinden ${todayLog.wellbeing ?? "—"}${
-          todayLog.hrv != null ? ` · HRV ${todayLog.hrv}` : ""
-        }${todayLog.resting_hr != null ? ` · Ruhe-HF ${todayLog.resting_hr}` : ""}`
-      : "Noch keine Eingabe für heute",
-  }));
+  // Nur Athleten, die sich heute auch eingetragen haben — wer noch keinen
+  // Check-in gemacht hat, ist in der Athleten-Sektion einsehbar, muss aber
+  // die Trainingsbereitschafts-Übersicht nicht mit "keine Angabe" füllen.
+  const readinessRows: ReadinessRow[] = rows
+    .filter((r) => r.todayLog)
+    .map(({ athlete, level, todayLog }) => ({
+      athleteId: athlete.id,
+      groupId: groupIdByAthlete.get(athlete.id) ?? "",
+      fullName: athlete.full_name,
+      level,
+      levelLabel: HEALTH_STATUS_LABEL[level],
+      levelTagClass: LEVEL_TAG[level],
+      todayLabel: `Wohlbefinden ${todayLog!.wellbeing ?? "—"}${
+        todayLog!.hrv != null ? ` · HRV ${todayLog!.hrv}` : ""
+      }${todayLog!.resting_hr != null ? ` · Ruhe-HF ${todayLog!.resting_hr}` : ""}`,
+    }));
 
   return (
     <div>

@@ -50,6 +50,7 @@ export default async function TrainerAthletePlanPage({
         .select("exercise_id, set_number, value, reps, unit, set_type")
         .eq("athlete_id", athleteId)
         .eq("date", plan.date)
+        .eq("training_plan_id", id)
         .in("exercise_id", exerciseIds)
         .order("set_number")
     : { data: [] };

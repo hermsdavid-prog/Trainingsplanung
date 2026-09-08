@@ -35,7 +35,7 @@ export async function upsertExerciseResultAction(
       set_type: setType,
       rir,
     },
-    { onConflict: "athlete_id,exercise_id,date,set_number" }
+    { onConflict: "training_plan_id,athlete_id,exercise_id,date,set_number" }
   );
 
   if (error) return { error: "Ergebnis konnte nicht gespeichert werden." };
@@ -57,7 +57,8 @@ export async function upsertExerciseResultAction(
 export async function deleteExerciseResultSetAction(
   exerciseId: string,
   date: string,
-  setNumber: number
+  setNumber: number,
+  planId: string
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const {
@@ -71,7 +72,8 @@ export async function deleteExerciseResultSetAction(
     .eq("athlete_id", user.id)
     .eq("exercise_id", exerciseId)
     .eq("date", date)
-    .eq("set_number", setNumber);
+    .eq("set_number", setNumber)
+    .eq("training_plan_id", planId);
 
   if (error) return { error: "Satz konnte nicht gelöscht werden." };
 

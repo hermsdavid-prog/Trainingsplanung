@@ -295,7 +295,7 @@ export function WorkoutSession({
     if (set.confirmed) {
       if (!ex.exerciseId) return;
       setPendingKey(set.key);
-      const result = await deleteExerciseResultSetAction(ex.exerciseId, planDate, set.setNumber);
+      const result = await deleteExerciseResultSetAction(ex.exerciseId, planDate, set.setNumber, planId);
       setPendingKey(null);
       if (result.error) {
         toast.error(result.error);
