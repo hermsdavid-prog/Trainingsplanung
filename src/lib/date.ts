@@ -112,6 +112,23 @@ export function getMonthGridDays(monthStr: string): string[] {
   return days;
 }
 
+// Every date (YYYY-MM-DD) from startDate up to and including endDate —
+// used for a contiguous multi-day span (e.g. a trainer's absence), unlike
+// weeklyOccurrences below which steps by 7 days for a recurring weekday.
+export function dailyOccurrences(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const [sy, sm, sd] = startDate.split("-").map(Number);
+  const cursor = new Date(Date.UTC(sy, sm - 1, sd));
+  const until = new Date(endDate + "T23:59:59Z");
+  let guard = 0;
+  while (cursor <= until && guard < 366) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    guard++;
+  }
+  return dates;
+}
+
 // Returns weekly occurrence dates (YYYY-MM-DD), starting at startDate and
 // repeating on the same weekday up to and including untilDate.
 export function weeklyOccurrences(startDate: string, untilDate: string): string[] {

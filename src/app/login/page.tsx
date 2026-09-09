@@ -1,5 +1,16 @@
 import { LoginForm } from "@/components/auth/login-form";
 
+// This page has no dynamic API calls, so Next.js treats it as fully static
+// and would otherwise send Cache-Control: s-maxage=31536000 (one year).
+// Hostinger's CDN honors that literally and doesn't purge its edge cache on
+// deploy, so an edge node that cached the page before a release keeps
+// serving its old HTML — which references JS chunk files a newer build has
+// since removed — until that edge's copy expires, i.e. up to a year. That's
+// what caused the intermittent "This page couldn't load" on /login. Capping
+// revalidation here forces the CDN to re-check with the origin often enough
+// that a stale edge self-heals within a minute of any deploy.
+export const revalidate = 60;
+
 export default function LoginPage() {
   return (
     <div

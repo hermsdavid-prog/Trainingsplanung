@@ -79,6 +79,7 @@ export default async function AthleteTodayPage({
             .from("athlete_badges")
             .select("badge_key, title, description, icon, earned_at")
             .eq("athlete_id", user.id)
+            .is("dismissed_at", null)
             .order("earned_at", { ascending: false })
         : Promise.resolve({ data: [] }),
       user
@@ -218,7 +219,7 @@ export default async function AthleteTodayPage({
           )}
 
           <div className="kicker mt-7">Erfolge</div>
-          <BadgesList badges={badges} />
+          <BadgesList badges={badges} dismissible />
         </>
         }
       />

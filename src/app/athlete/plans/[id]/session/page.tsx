@@ -43,6 +43,15 @@ export default async function AthleteWorkoutSessionPage({
 
   if (!plan || !user) notFound();
 
+  // Adding an exercise mid-session is only offered for the athlete's own
+  // self-built trainings — training_plan_items_insert RLS only allows it
+  // when the plan's created_by is the athlete themselves, so a
+  // trainer-assigned plan's items stay exactly as prescribed.
+  const canAddExercises = plan.created_by === user.id;
+  const { data: exerciseLibraryRows } = canAddExercises
+    ? await supabase.from("exercises").select("id, name").order("name")
+    : { data: [] };
+
   const { data: trainerProfile } = plan.created_by
     ? await supabase.from("profiles").select("full_name").eq("id", plan.created_by).maybeSingle()
     : { data: null };
@@ -202,6 +211,8 @@ export default async function AthleteWorkoutSessionPage({
       instructionsByExercise={instructionsByExercise}
       initialRpe={rating?.rpe ?? null}
       lastKnownByExercise={lastKnownByExercise}
+      canAddExercises={canAddExercises}
+      exerciseLibrary={exerciseLibraryRows ?? []}
     />
   );
 }

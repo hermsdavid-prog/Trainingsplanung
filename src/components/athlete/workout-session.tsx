@@ -9,6 +9,7 @@ import {
   deleteExerciseResultSetAction,
 } from "@/lib/actions/exercise-results";
 import { saveSessionRpeAction } from "@/lib/actions/sessions";
+import { addSessionExerciseAction } from "@/lib/actions/session-exercises";
 import type { BadgeAward } from "@/lib/badges";
 
 type SetType = "aufwaermsatz" | "arbeitssatz";
@@ -104,6 +105,50 @@ function nextKey() {
   return `s${uid}`;
 }
 
+// Same warm-up-plus-prescribed-work-sets shape the initial set list is
+// built with below, factored out so a freshly added exercise (added mid-
+// session, see addExercise) starts with the same pre-populated rows
+// instead of an empty list the athlete would have to build up manually.
+function buildInitialSets(ex: SessionExercise): SessionSet[] {
+  const confirmedSets: SessionSet[] = ex.initialSets.map((s) => ({
+    key: nextKey(),
+    setNumber: s.setNumber,
+    type: s.type,
+    reps: s.reps,
+    weight: s.weight,
+    rir: s.rir,
+    confirmed: true,
+  }));
+  const suggested = Number(ex.sets) || 1;
+  const rows = [...confirmedSets];
+  let nextSetNumber = rows.reduce((m, r) => Math.max(m, r.setNumber), 0) + 1;
+  const hasWarmup = rows.some((r) => r.type === "aufwaermsatz");
+  if (!hasWarmup) {
+    rows.unshift({
+      key: nextKey(),
+      setNumber: nextSetNumber++,
+      type: "aufwaermsatz",
+      reps: parseLeadingNumber(ex.spec),
+      weight: "",
+      rir: "",
+      confirmed: false,
+    });
+  }
+  const workSetCount = rows.filter((r) => r.type === "arbeitssatz").length;
+  for (let i = workSetCount; i < suggested; i++) {
+    rows.push({
+      key: nextKey(),
+      setNumber: nextSetNumber++,
+      type: "arbeitssatz",
+      reps: parseLeadingNumber(ex.spec),
+      weight: "",
+      rir: "",
+      confirmed: false,
+    });
+  }
+  return rows;
+}
+
 export function WorkoutSession({
   planId,
   planDate,
@@ -111,12 +156,14 @@ export function WorkoutSession({
   planKicker,
   backHref,
   categoryLabel,
-  exercises,
+  exercises: initialExercises,
   cardio,
   karateRows,
   instructionsByExercise,
   initialRpe,
   lastKnownByExercise = {},
+  canAddExercises = false,
+  exerciseLibrary = [],
 }: {
   planId: string;
   planDate: string;
@@ -130,6 +177,8 @@ export function WorkoutSession({
   instructionsByExercise: Record<string, ExerciseInstructions>;
   initialRpe: number | null;
   lastKnownByExercise?: Record<string, { weight: string; reps: string }>;
+  canAddExercises?: boolean;
+  exerciseLibrary?: { id: string; name: string }[];
 }) {
   const isAthletik = categoryLabel.trim().toLowerCase() === "athletik";
   const router = useRouter();
@@ -139,56 +188,49 @@ export function WorkoutSession({
   // straight into live entry, with an explicit opt-in to keep editing.
   const [editMode, setEditMode] = useState(initialRpe === null);
 
+  const [exercises, setExercises] = useState<SessionExercise[]>(initialExercises);
+
   const [setsByItem, setSetsByItem] = useState<Record<string, SessionSet[]>>(() => {
     const map: Record<string, SessionSet[]> = {};
-    for (const ex of exercises) {
-      const confirmedSets: SessionSet[] = ex.initialSets.map((s) => ({
-        key: nextKey(),
-        setNumber: s.setNumber,
-        type: s.type,
-        reps: s.reps,
-        weight: s.weight,
-        rir: s.rir,
-        confirmed: true,
-      }));
-      // The trainer's prescribed set count is the number of WORK sets — a
-      // warm-up on top of that isn't one of the trainer's sets used up, it's
-      // extra ramp-up before them, so it's added in addition rather than
-      // carved out of the count (otherwise "3 Sätze" would only leave the
-      // athlete 2 actual work sets to do).
-      const suggested = Number(ex.sets) || 1;
-      const rows = [...confirmedSets];
-      let nextSetNumber = rows.reduce((m, r) => Math.max(m, r.setNumber), 0) + 1;
-      const hasWarmup = rows.some((r) => r.type === "aufwaermsatz");
-      if (!hasWarmup) {
-        rows.unshift({
-          key: nextKey(),
-          setNumber: nextSetNumber++,
-          type: "aufwaermsatz",
-          reps: parseLeadingNumber(ex.spec),
-          weight: "",
-          rir: "",
-          confirmed: false,
-        });
-      }
-      const workSetCount = rows.filter((r) => r.type === "arbeitssatz").length;
-      for (let i = workSetCount; i < suggested; i++) {
-        rows.push({
-          key: nextKey(),
-          setNumber: nextSetNumber++,
-          type: "arbeitssatz",
-          reps: parseLeadingNumber(ex.spec),
-          weight: "",
-          rir: "",
-          confirmed: false,
-        });
-      }
-      map[ex.itemId] = rows;
+    for (const ex of initialExercises) {
+      map[ex.itemId] = buildInitialSets(ex);
     }
     return map;
   });
 
-  const [activeItemId, setActiveItemId] = useState<string>(exercises[0]?.itemId ?? "");
+  const [activeItemId, setActiveItemId] = useState<string>(initialExercises[0]?.itemId ?? "");
+
+  const [addExerciseName, setAddExerciseName] = useState("");
+  const [isAddingExercise, setIsAddingExercise] = useState(false);
+
+  async function addExercise() {
+    const name = addExerciseName.trim();
+    if (!name) return;
+    setIsAddingExercise(true);
+    const result = await addSessionExerciseAction(planId, name);
+    setIsAddingExercise(false);
+    if (result.error || !result.item) {
+      toast.error(result.error ?? "Übung konnte nicht hinzugefügt werden.");
+      return;
+    }
+    const newExercise: SessionExercise = {
+      itemId: result.item.itemId,
+      exerciseId: result.item.exerciseId,
+      name: result.item.name,
+      spec: "",
+      sets: "3",
+      restLabel: "",
+      restSeconds: 0,
+      note: "",
+      unit: "kg",
+      initialSets: [],
+    };
+    setExercises((prev) => [...prev, newExercise]);
+    setSetsByItem((prev) => ({ ...prev, [newExercise.itemId]: buildInitialSets(newExercise) }));
+    setActiveItemId(newExercise.itemId);
+    setAddExerciseName("");
+    toast.success(`${newExercise.name} hinzugefügt.`);
+  }
 
   const [restRemaining, setRestRemaining] = useState<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -637,6 +679,39 @@ export function WorkoutSession({
                     })}
                 </div>
               </>
+            )}
+
+            {canAddExercises && (
+              <div className="mt-6.5" style={{ marginTop: 26 }}>
+                <datalist id="session-exercise-library-options">
+                  {exerciseLibrary.map((e) => (
+                    <option key={e.id} value={e.name} />
+                  ))}
+                </datalist>
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1"
+                    value={addExerciseName}
+                    onChange={(e) => setAddExerciseName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addExercise();
+                      }
+                    }}
+                    placeholder="Übung hinzufügen — z. B. Kniebeuge"
+                    list="session-exercise-library-options"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={isAddingExercise || !addExerciseName.trim()}
+                    onClick={addExercise}
+                  >
+                    {isAddingExercise ? "…" : "+ Hinzufügen"}
+                  </button>
+                </div>
+              </div>
             )}
 
             {cardio.map((c) => (

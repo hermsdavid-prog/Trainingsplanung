@@ -7,6 +7,7 @@ import { AthleteGroupTabs } from "@/components/athletes/athlete-group-tabs";
 import { AthleteSelect } from "@/components/athletes/athlete-select";
 import { AthleteExercisePicker } from "@/components/athletes/athlete-exercise-picker";
 import { SendNoteForm } from "@/components/athletes/send-note-form";
+import { NoteHistory } from "@/components/athletes/note-history";
 import { BadgesList } from "@/components/athletes/badges-list";
 
 const METRICS: { key: "hrv" | "resting_hr" | "wellbeing"; label: string; unit: string; domain?: [number, number] }[] = [
@@ -134,6 +135,7 @@ export default async function TrainerAthletesPage({
         .from("athlete_badges")
         .select("badge_key, title, description, icon, earned_at")
         .eq("athlete_id", selected.id)
+        .is("dismissed_at", null)
         .order("earned_at", { ascending: false })
         .limit(20)
     : { data: [] };
@@ -262,19 +264,7 @@ export default async function TrainerAthletesPage({
                 <div className="mt-3">
                   <SendNoteForm athleteId={selected.id} />
                 </div>
-                {notes.length > 0 && (
-                  <div className="mt-5 flex flex-col gap-2">
-                    {notes.map((n) => (
-                      <div key={n.id} className="p-3" style={{ background: "var(--dc-surface)", borderLeft: n.read ? "2px solid var(--dc-divider)" : "2px solid var(--dc-accent)" }}>
-                        <p className="text-[14px] leading-[1.5]">{n.message}</p>
-                        <p className="mt-1 text-xs text-muted">
-                          {n.trainerName} · {new Date(n.createdAt).toLocaleDateString("de-DE")}
-                          {n.read ? " · gelesen" : " · ungelesen"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <NoteHistory notes={notes} />
               </div>
             </>
           )}

@@ -53,6 +53,9 @@ export async function markAthleteNoteReadAction(noteId: string): Promise<ActionR
   return {};
 }
 
+// Deletable by the trainer who sent it or the athlete who received it
+// (athlete_notes_delete RLS enforces exactly that) — no ownership filter
+// needed here beyond the id itself.
 export async function deleteAthleteNoteAction(noteId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const {
@@ -60,10 +63,11 @@ export async function deleteAthleteNoteAction(noteId: string): Promise<ActionRes
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
-  const { error } = await supabase.from("athlete_notes").delete().eq("id", noteId).eq("trainer_id", user.id);
+  const { error } = await supabase.from("athlete_notes").delete().eq("id", noteId);
 
   if (error) return { error: "Hinweis konnte nicht gelöscht werden." };
 
   revalidatePath("/trainer/athletes");
+  revalidatePath("/athlete");
   return {};
 }

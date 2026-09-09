@@ -15,6 +15,7 @@ import {
 import { CalendarGrid, type CalendarItem } from "@/components/calendar/calendar-grid";
 import { CalendarFilters } from "@/components/calendar/calendar-filters";
 import { CreateEventDialog } from "@/components/calendar/create-event-dialog";
+import { ReportAbsenceDialog } from "@/components/calendar/report-absence-dialog";
 import { WeekBoard, type WeekItem } from "@/components/calendar/week-board";
 import { CalendarArmedProvider } from "@/components/calendar/armed-item-context";
 
@@ -204,7 +205,10 @@ export default async function TrainerCalendarPage({
           <div className="kicker">{formatWeekLabel(today)}</div>
           <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Kalender</h2>
         </div>
-        <CreateEventDialog defaultDate={today} groups={groups ?? []} athletes={athletes} />
+        <div className="flex flex-none flex-col items-end gap-2">
+          <CreateEventDialog defaultDate={today} groups={groups ?? []} athletes={athletes} />
+          <ReportAbsenceDialog defaultDate={today} />
+        </div>
       </div>
 
       <div className="mt-5 max-w-[420px]">

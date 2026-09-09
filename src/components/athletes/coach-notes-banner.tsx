@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { markAthleteNoteReadAction } from "@/lib/actions/athlete-notes";
+import { markAthleteNoteReadAction, deleteAthleteNoteAction } from "@/lib/actions/athlete-notes";
 
 export type CoachNote = {
   id: string;
@@ -27,6 +27,13 @@ export function CoachNotesBanner({ notes }: { notes: CoachNote[] }) {
     });
   }
 
+  function remove(id: string) {
+    startTransition(async () => {
+      await deleteAthleteNoteAction(id);
+      router.refresh();
+    });
+  }
+
   return (
     <div className="mt-4 flex flex-col gap-2">
       {notes.map((n) => (
@@ -36,15 +43,26 @@ export function CoachNotesBanner({ notes }: { notes: CoachNote[] }) {
               <div className="kicker">Hinweis von {n.trainerName}</div>
               <p className="mt-1 text-[14px] leading-[1.5]">{n.message}</p>
             </div>
-            <button
-              type="button"
-              className="btn btn-ghost shrink-0"
-              disabled={isPending}
-              onClick={() => markRead(n.id)}
-              aria-label="Als gelesen markieren"
-            >
-              ✓ gelesen
-            </button>
+            <div className="flex shrink-0 gap-1.5">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={isPending}
+                onClick={() => markRead(n.id)}
+                aria-label="Als gelesen markieren"
+              >
+                ✓ gelesen
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={isPending}
+                onClick={() => remove(n.id)}
+                aria-label="Nachricht löschen"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         </div>
       ))}
