@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO, formatDateCompact } from "@/lib/date";
-import { MesocycleGroupTabs } from "@/components/mesocycles/mesocycle-group-tabs";
-import { MesocycleAthleteSelect } from "@/components/mesocycles/mesocycle-athlete-select";
+import { MesocycleFilters } from "@/components/mesocycles/mesocycle-filters";
 import { CreateMesocycleDialog } from "@/components/mesocycles/create-mesocycle-dialog";
 import { EditMesocycleDialog } from "@/components/mesocycles/edit-mesocycle-dialog";
 import { MesocycleTimeline } from "@/components/mesocycles/mesocycle-timeline";
@@ -194,11 +193,8 @@ export default async function TrainerMesocyclesPage({
       <div className="kicker">Trainingsperiodisierung</div>
       <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Mesozyklen</h2>
 
-      <div className="mt-[22px]">
-        <MesocycleGroupTabs groups={groups} selectedGroup={selectedGroupFilter} allowAll />
-      </div>
-      <div className="mt-3">
-        <MesocycleAthleteSelect athletes={athletes} selectedAthlete={selectedAthleteFilter} allowAll />
+      <div className="mt-5">
+        <MesocycleFilters groups={groups} athletes={athletes} selectedGroup={selectedGroupFilter} selectedAthlete={selectedAthleteFilter} />
       </div>
 
       <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
