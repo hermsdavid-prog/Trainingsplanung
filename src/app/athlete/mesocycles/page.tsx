@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO, formatDateCompact } from "@/lib/date";
 import { MesocycleCarousel } from "@/components/mesocycles/mesocycle-carousel";
+import { MesocycleTimeline } from "@/components/mesocycles/mesocycle-timeline";
+import { MesocycleViewToggle } from "@/components/mesocycles/view-toggle";
 
 type Mesocycle = { id: string; title: string; description: string | null; start_date: string; weeks: number };
 type Plan = { id: string; title: string; date: string };
@@ -10,6 +12,10 @@ function daysBetween(a: string, b: string): number {
   const [ay, am, ad] = a.split("-").map(Number);
   const [by, bm, bd] = b.split("-").map(Number);
   return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+}
+
+function athletePlanHref(planId: string) {
+  return `/athlete/plans/${planId}`;
 }
 
 function MesocycleProgressCard({ m, plans, todayIso }: { m: Mesocycle; plans: Plan[]; todayIso: string }) {
@@ -44,7 +50,7 @@ function MesocycleProgressCard({ m, plans, todayIso }: { m: Mesocycle; plans: Pl
           {plans.map((p) => (
             <Link
               key={p.id}
-              href={`/athlete/plans/${p.id}`}
+              href={athletePlanHref(p.id)}
               className="flex items-center justify-between gap-2 text-[13px] no-underline"
               style={{ color: "inherit" }}
             >
@@ -58,10 +64,55 @@ function MesocycleProgressCard({ m, plans, todayIso }: { m: Mesocycle; plans: Pl
   );
 }
 
+function MesocycleSection({
+  label,
+  mesocycles,
+  plansByMesocycle,
+  view,
+  todayIso,
+}: {
+  label: string;
+  mesocycles: Mesocycle[];
+  plansByMesocycle: Map<string, Plan[]>;
+  view: "list" | "calendar";
+  todayIso: string;
+}) {
+  if (mesocycles.length === 0) return null;
+  return (
+    <div>
+      <div className="kicker-muted">{label}</div>
+      {view === "calendar" ? (
+        <MesocycleTimeline
+          mesocycles={mesocycles.map((m) => ({ ...m, plans: plansByMesocycle.get(m.id) ?? [] }))}
+          todayIso={todayIso}
+          planLinkRole="athlete"
+        />
+      ) : (
+        <div className="mt-3">
+          <MesocycleCarousel>
+            {mesocycles.map((m) => (
+              <MesocycleProgressCard key={m.id} m={m} plans={plansByMesocycle.get(m.id) ?? []} todayIso={todayIso} />
+            ))}
+          </MesocycleCarousel>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Read-only counterpart to /trainer/mesocycles — an athlete can't create,
 // edit or delete a Mesozyklus, just see where they stand in the ones their
-// trainer assigned (their groups' cycles, plus any personal one).
-export default async function AthleteMesocyclesPage() {
+// trainer assigned (their groups' cycles, plus any personal one). Kalender
+// is the default view, same as the trainer's page; clicking a Mesozyklus
+// bar there opens the same detail dialog (title, dates, progress,
+// assigned trainings) MesocycleTimeline already provides.
+export default async function AthleteMesocyclesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const params = await searchParams;
+  const view: "list" | "calendar" = params.view === "list" ? "list" : "calendar";
   const supabase = await createClient();
   const {
     data: { user },
@@ -117,43 +168,30 @@ export default async function AthleteMesocyclesPage() {
 
   return (
     <div>
-      <div className="kicker">Trainingsperiodisierung</div>
-      <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Mesozyklen</h2>
-      <p className="mt-2 text-sm text-muted">Dein Fortschritt in den Trainingsblöcken deiner Trainer.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="kicker">Trainingsperiodisierung</div>
+          <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Mesozyklen</h2>
+          <p className="mt-2 text-sm text-muted">Dein Fortschritt in den Trainingsblöcken deiner Trainer.</p>
+        </div>
+        {hasAny && <MesocycleViewToggle hrefBase="/athlete/mesocycles" view={view} />}
+      </div>
 
       {!hasAny ? (
         <p className="mt-5 text-sm text-muted">Noch kein Mesozyklus zugeordnet.</p>
       ) : (
         <div className="mt-6 flex flex-col gap-7">
-          {ownMesocycles.length > 0 && (
-            <div>
-              <div className="kicker-muted">Persönlich</div>
-              <div className="mt-3">
-                <MesocycleCarousel>
-                  {ownMesocycles.map((m) => (
-                    <MesocycleProgressCard key={m.id} m={m} plans={plansByMesocycle.get(m.id) ?? []} todayIso={todayIso} />
-                  ))}
-                </MesocycleCarousel>
-              </div>
-            </div>
-          )}
-
-          {groups.map((g) => {
-            const mesocycles = mesocyclesByGroup.get(g.id) ?? [];
-            if (mesocycles.length === 0) return null;
-            return (
-              <div key={g.id}>
-                <div className="kicker-muted">{g.name}</div>
-                <div className="mt-3">
-                  <MesocycleCarousel>
-                    {mesocycles.map((m) => (
-                      <MesocycleProgressCard key={m.id} m={m} plans={plansByMesocycle.get(m.id) ?? []} todayIso={todayIso} />
-                    ))}
-                  </MesocycleCarousel>
-                </div>
-              </div>
-            );
-          })}
+          <MesocycleSection label="Persönlich" mesocycles={ownMesocycles} plansByMesocycle={plansByMesocycle} view={view} todayIso={todayIso} />
+          {groups.map((g) => (
+            <MesocycleSection
+              key={g.id}
+              label={g.name}
+              mesocycles={mesocyclesByGroup.get(g.id) ?? []}
+              plansByMesocycle={plansByMesocycle}
+              view={view}
+              todayIso={todayIso}
+            />
+          ))}
         </div>
       )}
     </div>

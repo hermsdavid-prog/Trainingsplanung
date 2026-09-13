@@ -52,7 +52,22 @@ function addDays(dateStr: string, n: number): string {
 // Startdatum..+Wochen) across the months the selected scope's cycles cover —
 // the "kann ich auf einen Blick sehen, welche Phase wann ist"-Ansicht.
 // Clicking a bar opens its assigned Trainingseinheiten in a dialog.
-export function MesocycleTimeline({ mesocycles, todayIso }: { mesocycles: TimelineMesocycle[]; todayIso: string }) {
+// A plain function prop can't cross the server/client boundary (this is a
+// client component, its callers are server components), so which link
+// pattern to use is passed as data instead.
+function planHref(role: "trainer" | "athlete", planId: string): string {
+  return role === "athlete" ? `/athlete/plans/${planId}` : `/trainer/plans/${planId}/edit`;
+}
+
+export function MesocycleTimeline({
+  mesocycles,
+  todayIso,
+  planLinkRole = "trainer",
+}: {
+  mesocycles: TimelineMesocycle[];
+  todayIso: string;
+  planLinkRole?: "trainer" | "athlete";
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
   const openMesocycle = mesocycles.find((m) => m.id === openId) ?? null;
 
@@ -173,40 +188,59 @@ export function MesocycleTimeline({ mesocycles, todayIso }: { mesocycles: Timeli
         <DialogPortal>
           <DialogOverlay />
           <DialogContent className="dc-dialog max-w-[440px]">
-            {openMesocycle && (
-              <div className="min-w-0">
-                <div className="kicker-muted">{openMesocycle.title}</div>
-                <div className="mt-1 text-xs text-muted">
-                  {formatDateCompact(openMesocycle.start_date)} –{" "}
-                  {formatDateCompact(addDays(openMesocycle.start_date, openMesocycle.weeks * 7 - 1))} ·{" "}
-                  {openMesocycle.weeks} {openMesocycle.weeks === 1 ? "Woche" : "Wochen"}
-                </div>
-                {openMesocycle.description && (
-                  <p className="mt-2 text-[13px] leading-[1.5]">{openMesocycle.description}</p>
-                )}
-
-                <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--dc-divider)" }}>
-                  <div className="kicker-muted">Zugeordnete Trainings</div>
-                  {openMesocycle.plans.length === 0 ? (
-                    <p className="mt-2 text-[13px] text-muted">Diesem Mesozyklus sind noch keine Trainings zugeordnet.</p>
-                  ) : (
-                    <div className="mt-2 flex flex-col gap-1">
-                      {openMesocycle.plans.map((p) => (
-                        <Link
-                          key={p.id}
-                          href={`/trainer/plans/${p.id}/edit`}
-                          className="flex items-center justify-between gap-2 text-[13px] no-underline"
-                          style={{ color: "inherit" }}
-                        >
-                          <span>{p.title}</span>
-                          <span className="text-muted">{formatDateCompact(p.date)}</span>
-                        </Link>
-                      ))}
+            {openMesocycle &&
+              (() => {
+                const totalDays = openMesocycle.weeks * 7;
+                const elapsed = daysBetween(openMesocycle.start_date, todayIso);
+                const progressPct = Math.max(0, Math.min(100, (elapsed / totalDays) * 100));
+                const statusLabel =
+                  elapsed < 0
+                    ? `Startet am ${formatDateCompact(openMesocycle.start_date)}`
+                    : elapsed >= totalDays
+                      ? "Abgeschlossen"
+                      : `Woche ${Math.floor(elapsed / 7) + 1} von ${openMesocycle.weeks}`;
+                return (
+                  <div className="min-w-0">
+                    <div className="kicker-muted">{openMesocycle.title}</div>
+                    <div className="mt-1 text-xs text-muted">
+                      {formatDateCompact(openMesocycle.start_date)} –{" "}
+                      {formatDateCompact(addDays(openMesocycle.start_date, openMesocycle.weeks * 7 - 1))} ·{" "}
+                      {openMesocycle.weeks} {openMesocycle.weeks === 1 ? "Woche" : "Wochen"}
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
+                    {openMesocycle.description && (
+                      <p className="mt-2 text-[13px] leading-[1.5]">{openMesocycle.description}</p>
+                    )}
+
+                    <div className="mt-3 flex items-baseline justify-between text-[13px]">
+                      <span>{statusLabel}</span>
+                    </div>
+                    <div className="mt-1.5 h-[3px]" style={{ background: "color-mix(in srgb, var(--dc-text) 12%, transparent)" }}>
+                      <div className="h-[3px]" style={{ background: "var(--dc-accent)", width: `${progressPct}%` }} />
+                    </div>
+
+                    <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--dc-divider)" }}>
+                      <div className="kicker-muted">Zugeordnete Trainings</div>
+                      {openMesocycle.plans.length === 0 ? (
+                        <p className="mt-2 text-[13px] text-muted">Diesem Mesozyklus sind noch keine Trainings zugeordnet.</p>
+                      ) : (
+                        <div className="mt-2 flex flex-col gap-1">
+                          {openMesocycle.plans.map((p) => (
+                            <Link
+                              key={p.id}
+                              href={planHref(planLinkRole, p.id)}
+                              className="flex items-center justify-between gap-2 text-[13px] no-underline"
+                              style={{ color: "inherit" }}
+                            >
+                              <span>{p.title}</span>
+                              <span className="text-muted">{formatDateCompact(p.date)}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
           </DialogContent>
         </DialogPortal>
       </Dialog>

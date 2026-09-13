@@ -1,37 +1,16 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO, formatDateCompact } from "@/lib/date";
-import { MesocycleScopeToggle } from "@/components/mesocycles/mesocycle-scope-toggle";
 import { MesocycleGroupTabs } from "@/components/mesocycles/mesocycle-group-tabs";
 import { MesocycleAthleteSelect } from "@/components/mesocycles/mesocycle-athlete-select";
 import { CreateMesocycleDialog } from "@/components/mesocycles/create-mesocycle-dialog";
 import { EditMesocycleDialog } from "@/components/mesocycles/edit-mesocycle-dialog";
 import { MesocycleTimeline } from "@/components/mesocycles/mesocycle-timeline";
 import { MesocycleCarousel } from "@/components/mesocycles/mesocycle-carousel";
+import { MesocycleViewToggle } from "@/components/mesocycles/view-toggle";
 
 type Mesocycle = { id: string; title: string; description: string | null; start_date: string; weeks: number };
 type Plan = { id: string; title: string; date: string };
-
-function ListToggle({ hrefBase, view }: { hrefBase: string; view: "list" | "calendar" }) {
-  return (
-    <div className="flex gap-1">
-      <Link
-        href={`${hrefBase}&view=list`}
-        className="chip"
-        style={view === "list" ? { background: "var(--dc-accent)", color: "var(--dc-bg)" } : undefined}
-      >
-        Liste
-      </Link>
-      <Link
-        href={`${hrefBase}&view=calendar`}
-        className="chip"
-        style={view === "calendar" ? { background: "var(--dc-accent)", color: "var(--dc-bg)" } : undefined}
-      >
-        Kalender
-      </Link>
-    </div>
-  );
-}
 
 function MesocycleCard({ m, plans }: { m: Mesocycle; plans: Plan[] }) {
   const endDate = shiftDateISO(m.start_date, m.weeks * 7 - 1);
@@ -67,19 +46,60 @@ function MesocycleCard({ m, plans }: { m: Mesocycle; plans: Plan[] }) {
   );
 }
 
+function MesocycleSection({
+  label,
+  mesocycles,
+  plansByMesocycle,
+  view,
+  emptyState,
+}: {
+  label: string;
+  mesocycles: Mesocycle[];
+  plansByMesocycle: Map<string, Plan[]>;
+  view: "list" | "calendar";
+  emptyState: boolean;
+}) {
+  if (mesocycles.length === 0 && !emptyState) return null;
+  return (
+    <div>
+      <div className="kicker-muted">{label}</div>
+      {mesocycles.length === 0 ? (
+        <p className="mt-2 text-sm text-muted">Noch kein Mesozyklus angelegt.</p>
+      ) : view === "calendar" ? (
+        <MesocycleTimeline
+          mesocycles={mesocycles.map((m) => ({ ...m, plans: plansByMesocycle.get(m.id) ?? [] }))}
+          todayIso={todayISO()}
+        />
+      ) : (
+        <div className="mt-3">
+          <MesocycleCarousel>
+            {mesocycles.map((m) => (
+              <MesocycleCard key={m.id} m={m} plans={plansByMesocycle.get(m.id) ?? []} />
+            ))}
+          </MesocycleCarousel>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Mesozyklen sind eine rein optionale Organisationsebene über den
 // Trainingsplänen — ein benannter, beschriebener Block fester Länge (z. B.
 // "Kraftaufbau", 6 Wochen), einer Gruppe oder einem einzelnen Athleten
 // zugeordnet. Trainer legen sie hier an; die Zuordnung einzelner
 // Trainingseinheiten passiert auf der jeweiligen Plan-Bearbeiten-Seite.
+//
+// Shows every Mesozyklus the trainer has access to at once — every
+// group's and every athlete's personal one — rather than requiring a
+// scope pick first; the group/athlete filters below just narrow that
+// down. Kalender is the default landing view (view=list opts out).
 export default async function TrainerMesocyclesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ scope?: string; group?: string; athlete?: string; view?: string }>;
+  searchParams: Promise<{ group?: string; athlete?: string; view?: string }>;
 }) {
   const params = await searchParams;
-  const scope: "group" | "athlete" = params.scope === "athlete" ? "athlete" : "group";
-  const view: "list" | "calendar" = params.view === "calendar" ? "calendar" : "list";
+  const view: "list" | "calendar" = params.view === "list" ? "list" : "calendar";
   const supabase = await createClient();
 
   // groups_select RLS already scopes this to the trainer's own groups, so
@@ -97,128 +117,77 @@ export default async function TrainerMesocyclesPage({
     );
   }
 
-  const plansByMesocycle = new Map<string, Plan[]>();
-  async function loadPlans(mesocycleIds: string[]) {
-    const { data: planRows } = mesocycleIds.length
-      ? await supabase
-          .from("training_plans")
-          .select("id, title, date, mesocycle_id")
-          .in("mesocycle_id", mesocycleIds)
-          .order("date")
-      : { data: [] };
-    for (const p of planRows ?? []) {
-      if (!p.mesocycle_id) continue;
-      const list = plansByMesocycle.get(p.mesocycle_id) ?? [];
-      list.push({ id: p.id, title: p.title, date: p.date });
-      plansByMesocycle.set(p.mesocycle_id, list);
-    }
-  }
-
-  if (scope === "athlete") {
-    const selectedGroup =
-      params.group && groups.some((g) => g.id === params.group) ? params.group : groups[0]?.id;
-
-    const { data: groupAthleteRows } = selectedGroup
-      ? await supabase.from("group_athletes").select("athlete_id, profiles(full_name)").eq("group_id", selectedGroup)
-      : { data: [] };
-    const athletes = (groupAthleteRows ?? [])
-      .filter((row) => row.profiles?.full_name)
-      .map((row) => ({ id: row.athlete_id, full_name: row.profiles!.full_name }))
-      .sort((a, b) => a.full_name.localeCompare(b.full_name));
-
-    const selectedAthlete =
-      params.athlete && athletes.some((a) => a.id === params.athlete) ? params.athlete : athletes[0]?.id;
-
-    const { data: mesocycleRows } = selectedAthlete
-      ? await supabase
-          .from("training_mesocycles")
-          .select("id, title, description, start_date, weeks")
-          .eq("athlete_id", selectedAthlete)
-          .order("start_date", { ascending: false })
-      : { data: [] };
-    const mesocycles = mesocycleRows ?? [];
-    await loadPlans(mesocycles.map((m) => m.id));
-
-    const hrefBase = `/trainer/mesocycles?scope=athlete&group=${selectedGroup ?? ""}&athlete=${selectedAthlete ?? ""}`;
-
-    return (
-      <div>
-        <div className="kicker">Trainingsperiodisierung</div>
-        <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Mesozyklen</h2>
-
-        <div className="mt-[22px]">
-          <MesocycleScopeToggle scope={scope} />
-        </div>
-        <div className="mt-3.5">
-          <MesocycleGroupTabs groups={groups} selectedGroup={selectedGroup} />
-        </div>
-        <div className="mt-3">
-          {athletes.length > 0 ? (
-            <MesocycleAthleteSelect athletes={athletes} selectedAthlete={selectedAthlete} />
-          ) : (
-            <p className="text-sm text-muted">Noch kein Athlet in dieser Gruppe.</p>
-          )}
-        </div>
-
-        {selectedAthlete && (
-          <>
-            <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-[20px]">
-                Mesozyklen — {athletes.find((a) => a.id === selectedAthlete)?.full_name ?? "—"}
-              </h3>
-              <div className="flex items-center gap-2">
-                <ListToggle hrefBase={hrefBase} view={view} />
-                <CreateMesocycleDialog scopeType="athlete" targetId={selectedAthlete} />
-              </div>
-            </div>
-
-            {view === "calendar" ? (
-              <MesocycleTimeline
-                mesocycles={mesocycles.map((m) => ({ ...m, plans: plansByMesocycle.get(m.id) ?? [] }))}
-                todayIso={todayISO()}
-              />
-            ) : mesocycles.length === 0 ? (
-              <p className="mt-3 text-sm text-muted">Noch kein Mesozyklus angelegt.</p>
-            ) : (
-              <div className="mt-4">
-                <MesocycleCarousel>
-                  {mesocycles.map((m) => (
-                    <MesocycleCard key={m.id} m={m} plans={plansByMesocycle.get(m.id) ?? []} />
-                  ))}
-                </MesocycleCarousel>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    );
-  }
-
-  // scope === "group": defaults to every one of the trainer's groups
-  // stacked underneath each other, each labeled with its group name — an
-  // explicit ?group= filter narrows that down to just one.
-  const selectedGroupFilter = params.group && groups.some((g) => g.id === params.group) ? params.group : undefined;
-  const targetGroups = selectedGroupFilter ? groups.filter((g) => g.id === selectedGroupFilter) : groups;
-
-  const { data: mesocycleRows } = await supabase
-    .from("training_mesocycles")
-    .select("id, title, description, start_date, weeks, group_id")
+  const { data: groupAthleteRows } = await supabase
+    .from("group_athletes")
+    .select("athlete_id, profiles(full_name)")
     .in(
       "group_id",
-      targetGroups.map((g) => g.id)
-    )
-    .order("start_date", { ascending: false });
+      groups.map((g) => g.id)
+    );
+  const athleteMap = new Map<string, string>();
+  for (const row of groupAthleteRows ?? []) {
+    if (row.profiles?.full_name) athleteMap.set(row.athlete_id, row.profiles.full_name);
+  }
+  const athletes = Array.from(athleteMap.entries())
+    .map(([id, full_name]) => ({ id, full_name }))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+  const selectedGroupFilter = params.group && groups.some((g) => g.id === params.group) ? params.group : undefined;
+  const selectedAthleteFilter =
+    params.athlete && athletes.some((a) => a.id === params.athlete) ? params.athlete : undefined;
+  const targetGroups = selectedGroupFilter ? groups.filter((g) => g.id === selectedGroupFilter) : groups;
+  const targetAthletes = selectedAthleteFilter ? athletes.filter((a) => a.id === selectedAthleteFilter) : athletes;
+
+  const [{ data: groupMesocycleRows }, { data: athleteMesocycleRows }] = await Promise.all([
+    supabase
+      .from("training_mesocycles")
+      .select("id, title, description, start_date, weeks, group_id")
+      .in(
+        "group_id",
+        targetGroups.map((g) => g.id)
+      )
+      .order("start_date", { ascending: false }),
+    targetAthletes.length
+      ? supabase
+          .from("training_mesocycles")
+          .select("id, title, description, start_date, weeks, athlete_id")
+          .in(
+            "athlete_id",
+            targetAthletes.map((a) => a.id)
+          )
+          .order("start_date", { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
+
   const mesocyclesByGroup = new Map<string, Mesocycle[]>();
-  for (const m of mesocycleRows ?? []) {
+  for (const m of groupMesocycleRows ?? []) {
     if (!m.group_id) continue;
     const list = mesocyclesByGroup.get(m.group_id) ?? [];
     list.push(m);
     mesocyclesByGroup.set(m.group_id, list);
   }
-  await loadPlans((mesocycleRows ?? []).map((m) => m.id));
+  const mesocyclesByAthlete = new Map<string, Mesocycle[]>();
+  for (const m of athleteMesocycleRows ?? []) {
+    if (!m.athlete_id) continue;
+    const list = mesocyclesByAthlete.get(m.athlete_id) ?? [];
+    list.push(m);
+    mesocyclesByAthlete.set(m.athlete_id, list);
+  }
 
-  const totalCount = mesocycleRows?.length ?? 0;
-  const hrefBase = `/trainer/mesocycles?scope=group&group=${selectedGroupFilter ?? ""}`;
+  const allIds = [...(groupMesocycleRows ?? []).map((m) => m.id), ...(athleteMesocycleRows ?? []).map((m) => m.id)];
+  const { data: planRows } = allIds.length
+    ? await supabase.from("training_plans").select("id, title, date, mesocycle_id").in("mesocycle_id", allIds).order("date")
+    : { data: [] };
+  const plansByMesocycle = new Map<string, Plan[]>();
+  for (const p of planRows ?? []) {
+    if (!p.mesocycle_id) continue;
+    const list = plansByMesocycle.get(p.mesocycle_id) ?? [];
+    list.push({ id: p.id, title: p.title, date: p.date });
+    plansByMesocycle.set(p.mesocycle_id, list);
+  }
+
+  const totalCount = allIds.length;
+  const hrefBase = `/trainer/mesocycles?group=${selectedGroupFilter ?? ""}&athlete=${selectedAthleteFilter ?? ""}`;
 
   return (
     <div>
@@ -226,19 +195,22 @@ export default async function TrainerMesocyclesPage({
       <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Mesozyklen</h2>
 
       <div className="mt-[22px]">
-        <MesocycleScopeToggle scope={scope} />
-      </div>
-      <div className="mt-3.5">
         <MesocycleGroupTabs groups={groups} selectedGroup={selectedGroupFilter} allowAll />
+      </div>
+      <div className="mt-3">
+        <MesocycleAthleteSelect athletes={athletes} selectedAthlete={selectedAthleteFilter} allowAll />
       </div>
 
       <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-[20px]">
-          Mesozyklen{selectedGroupFilter ? ` — ${groups.find((g) => g.id === selectedGroupFilter)?.name}` : " — alle Gruppen"}
-        </h3>
+        <h3 className="text-[20px]">Mesozyklen</h3>
         <div className="flex items-center gap-2">
-          <ListToggle hrefBase={hrefBase} view={view} />
-          <CreateMesocycleDialog scopeType="group" groups={groups} defaultGroupId={selectedGroupFilter} />
+          <MesocycleViewToggle hrefBase={hrefBase} view={view} />
+          <CreateMesocycleDialog
+            groups={groups}
+            athletes={athletes}
+            defaultGroupId={selectedGroupFilter}
+            defaultAthleteId={selectedAthleteFilter}
+          />
         </div>
       </div>
 
@@ -246,39 +218,26 @@ export default async function TrainerMesocyclesPage({
         <p className="mt-3 text-sm text-muted">Noch kein Mesozyklus angelegt.</p>
       ) : (
         <div className="mt-4 flex flex-col gap-7">
-          {targetGroups.map((g) => {
-            const mesocycles = mesocyclesByGroup.get(g.id) ?? [];
-            if (mesocycles.length === 0) {
-              // Skip a silent group in the "all groups" overview so it doesn't
-              // clutter the page with empty sections — an explicit single-group
-              // filter still shows it, since that's a deliberate "this one" pick.
-              return selectedGroupFilter ? (
-                <div key={g.id}>
-                  <div className="kicker-muted">{g.name}</div>
-                  <p className="mt-2 text-sm text-muted">Noch kein Mesozyklus angelegt.</p>
-                </div>
-              ) : null;
-            }
-            return (
-              <div key={g.id}>
-                <div className="kicker-muted">{g.name}</div>
-                {view === "calendar" ? (
-                  <MesocycleTimeline
-                    mesocycles={mesocycles.map((m) => ({ ...m, plans: plansByMesocycle.get(m.id) ?? [] }))}
-                    todayIso={todayISO()}
-                  />
-                ) : (
-                  <div className="mt-3">
-                    <MesocycleCarousel>
-                      {mesocycles.map((m) => (
-                        <MesocycleCard key={m.id} m={m} plans={plansByMesocycle.get(m.id) ?? []} />
-                      ))}
-                    </MesocycleCarousel>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {targetGroups.map((g) => (
+            <MesocycleSection
+              key={`group-${g.id}`}
+              label={g.name}
+              mesocycles={mesocyclesByGroup.get(g.id) ?? []}
+              plansByMesocycle={plansByMesocycle}
+              view={view}
+              emptyState={!!selectedGroupFilter}
+            />
+          ))}
+          {targetAthletes.map((a) => (
+            <MesocycleSection
+              key={`athlete-${a.id}`}
+              label={`Persönlich — ${a.full_name}`}
+              mesocycles={mesocyclesByAthlete.get(a.id) ?? []}
+              plansByMesocycle={plansByMesocycle}
+              view={view}
+              emptyState={!!selectedAthleteFilter}
+            />
+          ))}
         </div>
       )}
     </div>

@@ -6,41 +6,48 @@ import { toast } from "sonner";
 import { createMesocycleAction } from "@/lib/actions/mesocycles";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 
-// Group scope has no single fixed target when the page is showing all of
-// the trainer's groups stacked together (see trainer/mesocycles/page.tsx),
-// so it gets its own group picker here; athlete scope still comes from one
-// already-selected athlete upstream.
-type Props =
-  | { scopeType: "group"; groups: { id: string; name: string }[]; defaultGroupId?: string }
-  | { scopeType: "athlete"; targetId: string };
-
-export function CreateMesocycleDialog(props: Props) {
+// The page no longer imposes a single Gruppe/Athlet scope (it shows every
+// Mesozyklus at once), so the target — scope, then group or athlete — is
+// picked entirely inside this dialog instead of coming from the page.
+export function CreateMesocycleDialog({
+  groups,
+  athletes,
+  defaultGroupId,
+  defaultAthleteId,
+}: {
+  groups: { id: string; name: string }[];
+  athletes: { id: string; full_name: string }[];
+  defaultGroupId?: string;
+  defaultAthleteId?: string;
+}) {
   const [open, setOpen] = useState(false);
+  const [scopeType, setScopeType] = useState<"group" | "athlete">("group");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [weeks, setWeeks] = useState("6");
-  const [groupId, setGroupId] = useState(
-    props.scopeType === "group" ? (props.defaultGroupId ?? props.groups[0]?.id ?? "") : ""
-  );
+  const [groupId, setGroupId] = useState(defaultGroupId ?? groups[0]?.id ?? "");
+  const [athleteId, setAthleteId] = useState(defaultAthleteId ?? athletes[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function reset() {
+    setScopeType("group");
     setTitle("");
     setDescription("");
     setStartDate("");
     setWeeks("6");
+    setGroupId(defaultGroupId ?? groups[0]?.id ?? "");
+    setAthleteId(defaultAthleteId ?? athletes[0]?.id ?? "");
     setError(null);
-    if (props.scopeType === "group") setGroupId(props.defaultGroupId ?? props.groups[0]?.id ?? "");
   }
 
   function handleSubmit() {
     setError(null);
-    const targetId = props.scopeType === "athlete" ? props.targetId : groupId;
+    const targetId = scopeType === "group" ? groupId : athleteId;
     if (!targetId) {
-      setError(props.scopeType === "group" ? "Bitte eine Gruppe wählen." : "Bitte einen Athleten wählen.");
+      setError(scopeType === "group" ? "Bitte eine Gruppe wählen." : "Bitte einen Athleten wählen.");
       return;
     }
     startTransition(async () => {
@@ -49,7 +56,7 @@ export function CreateMesocycleDialog(props: Props) {
         description,
         startDate,
         weeks: Number(weeks),
-        scopeType: props.scopeType,
+        scopeType,
         targetId,
       });
       if (result.error) {
@@ -74,16 +81,42 @@ export function CreateMesocycleDialog(props: Props) {
           <div className="flex flex-col">
             <div className="kicker-muted">Mesozyklus anlegen</div>
 
-            {props.scopeType === "group" && (
+            <div className="seg mt-3.5">
+              <label className="seg-opt">
+                <input type="radio" name="create-mesocycle-scope" checked={scopeType === "group"} onChange={() => setScopeType("group")} />
+                Gruppe
+              </label>
+              <label className="seg-opt">
+                <input type="radio" name="create-mesocycle-scope" checked={scopeType === "athlete"} onChange={() => setScopeType("athlete")} />
+                Einzelner Athlet
+              </label>
+            </div>
+
+            {scopeType === "group" ? (
               <div className="field mt-3.5">
                 <label htmlFor="mesocycle-group">Gruppe</label>
                 <select id="mesocycle-group" className="input" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-                  {props.groups.map((g) => (
+                  {groups.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
                     </option>
                   ))}
                 </select>
+              </div>
+            ) : (
+              <div className="field mt-3.5">
+                <label htmlFor="mesocycle-athlete">Athlet</label>
+                {athletes.length === 0 ? (
+                  <p className="text-sm text-muted">Noch kein Athlet zugeordnet.</p>
+                ) : (
+                  <select id="mesocycle-athlete" className="input" value={athleteId} onChange={(e) => setAthleteId(e.target.value)}>
+                    {athletes.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.full_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
 
