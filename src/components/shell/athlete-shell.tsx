@@ -8,6 +8,7 @@ const TABS = [
   { href: "/athlete", label: "Heute", match: (p: string) => p === "/athlete" },
   { href: "/athlete/calendar", label: "Kalender", match: (p: string) => p.startsWith("/athlete/calendar") },
   { href: "/athlete/athletik", label: "Athletik", match: (p: string) => p.startsWith("/athlete/athletik") },
+  { href: "/athlete/mesocycles", label: "Zyklen", match: (p: string) => p.startsWith("/athlete/mesocycles") },
   { href: "/athlete/plans/new", label: "Erstellen", match: (p: string) => p.startsWith("/athlete/plans/new") },
 ];
 

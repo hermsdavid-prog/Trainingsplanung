@@ -6,18 +6,23 @@ import { toast } from "sonner";
 import { createMesocycleAction } from "@/lib/actions/mesocycles";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 
-export function CreateMesocycleDialog({
-  scopeType,
-  targetId,
-}: {
-  scopeType: "group" | "athlete";
-  targetId: string;
-}) {
+// Group scope has no single fixed target when the page is showing all of
+// the trainer's groups stacked together (see trainer/mesocycles/page.tsx),
+// so it gets its own group picker here; athlete scope still comes from one
+// already-selected athlete upstream.
+type Props =
+  | { scopeType: "group"; groups: { id: string; name: string }[]; defaultGroupId?: string }
+  | { scopeType: "athlete"; targetId: string };
+
+export function CreateMesocycleDialog(props: Props) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [weeks, setWeeks] = useState("6");
+  const [groupId, setGroupId] = useState(
+    props.scopeType === "group" ? (props.defaultGroupId ?? props.groups[0]?.id ?? "") : ""
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -28,17 +33,23 @@ export function CreateMesocycleDialog({
     setStartDate("");
     setWeeks("6");
     setError(null);
+    if (props.scopeType === "group") setGroupId(props.defaultGroupId ?? props.groups[0]?.id ?? "");
   }
 
   function handleSubmit() {
     setError(null);
+    const targetId = props.scopeType === "athlete" ? props.targetId : groupId;
+    if (!targetId) {
+      setError(props.scopeType === "group" ? "Bitte eine Gruppe wählen." : "Bitte einen Athleten wählen.");
+      return;
+    }
     startTransition(async () => {
       const result = await createMesocycleAction({
         title,
         description,
         startDate,
         weeks: Number(weeks),
-        scopeType,
+        scopeType: props.scopeType,
         targetId,
       });
       if (result.error) {
@@ -62,6 +73,19 @@ export function CreateMesocycleDialog({
         <DialogContent showCloseButton={false} className="dc-dialog max-w-[420px]">
           <div className="flex flex-col">
             <div className="kicker-muted">Mesozyklus anlegen</div>
+
+            {props.scopeType === "group" && (
+              <div className="field mt-3.5">
+                <label htmlFor="mesocycle-group">Gruppe</label>
+                <select id="mesocycle-group" className="input" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+                  {props.groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="field mt-3.5">
               <label htmlFor="mesocycle-title">Titel</label>

@@ -29,7 +29,7 @@ export default async function AthleteWorkoutSessionPage({
   const [{ data: plan }, { data: items }] = await Promise.all([
     supabase
       .from("training_plans")
-      .select("id, title, category_label, date, scope_type, created_by, groups(name)")
+      .select("id, title, category_label, date, scope_type, created_by, athlete_id, groups(name)")
       .eq("id", id)
       .single(),
     supabase
@@ -43,11 +43,14 @@ export default async function AthleteWorkoutSessionPage({
 
   if (!plan || !user) notFound();
 
-  // Adding an exercise mid-session is only offered for the athlete's own
-  // self-built trainings — training_plan_items_insert RLS only allows it
-  // when the plan's created_by is the athlete themselves, so a
-  // trainer-assigned plan's items stay exactly as prescribed.
-  const canAddExercises = plan.created_by === user.id;
+  // Adding an exercise mid-session is offered for any training assigned
+  // directly to this athlete — their own self-built plans and individual
+  // trainer-assigned ones alike (training_plan_items_insert RLS covers
+  // both: plan.created_by === them, or plan.athlete_id === them). A
+  // shared group plan's items stay exactly as the trainer prescribed,
+  // since one athlete's ad-hoc addition would otherwise show up for
+  // everyone else in that group's session too.
+  const canAddExercises = plan.athlete_id === user.id;
   const { data: exerciseLibraryRows } = canAddExercises
     ? await supabase.from("exercises").select("id, name").order("name")
     : { data: [] };

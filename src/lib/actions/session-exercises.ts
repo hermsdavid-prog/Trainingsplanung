@@ -11,10 +11,10 @@ export type AddedSessionItem = {
 };
 
 // Lets an athlete add a Kraft exercise to a training that's already under
-// way — training_plan_items_insert RLS only allows this when the plan's
-// created_by is the athlete themselves (i.e. their own self-built training,
-// see createOwnPlanAction), so a trainer-assigned plan's item list stays
-// fixed as prescribed.
+// way — training_plan_items_insert RLS allows this when the plan is
+// assigned directly to them, whether they built it themselves
+// (createOwnPlanAction) or a trainer assigned it to them individually. A
+// shared group plan's item list stays fixed as the trainer prescribed it.
 export async function addSessionExerciseAction(
   planId: string,
   exerciseName: string
