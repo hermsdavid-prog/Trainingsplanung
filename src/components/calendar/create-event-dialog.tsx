@@ -27,6 +27,7 @@ export function CreateEventDialog({
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(defaultDate);
+  const [endDate, setEndDate] = useState("");
   const [time, setTime] = useState("");
   const router = useRouter();
 
@@ -35,6 +36,7 @@ export function CreateEventDialog({
     setSelectedGroups(new Set());
     setTitle("");
     setDate(defaultDate);
+    setEndDate("");
     setTime("");
     setError(undefined);
   }
@@ -58,6 +60,7 @@ export function CreateEventDialog({
         eventType: kind,
         color: kindMeta.bg.startsWith("var(") ? resolveVar(kindMeta.bg) : kindMeta.bg,
         date,
+        endDate: endDate || null,
         time,
         allDay: !time,
         groupIds: Array.from(selectedGroups),
@@ -124,13 +127,27 @@ export function CreateEventDialog({
               />
             </div>
             <div className="field w-[170px]">
-              <label htmlFor="ev-date">Datum · {formatDateLabel(date)}</label>
+              <label htmlFor="ev-date">Von · {formatDateLabel(date)}</label>
               <input
                 id="ev-date"
                 type="date"
                 className="input"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  if (endDate && e.target.value > endDate) setEndDate(e.target.value);
+                }}
+              />
+            </div>
+            <div className="field w-[170px]">
+              <label htmlFor="ev-end-date">Bis (optional)</label>
+              <input
+                id="ev-end-date"
+                type="date"
+                className="input"
+                value={endDate}
+                min={date}
+                onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
             <div className="field w-[110px]">

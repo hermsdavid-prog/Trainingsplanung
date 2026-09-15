@@ -57,7 +57,7 @@ export default async function AthleteCalendarPage({
       .lte("date", rangeEnd),
     supabase
       .from("events")
-      .select("id, title, description, start_at, event_type, color, status, group_id, athlete_id, all_day")
+      .select("id, title, description, start_at, event_type, color, status, group_id, athlete_id, all_day, series_id")
       .gte("start_at", `${rangeStart}T00:00:00Z`)
       .lte("start_at", `${rangeEnd}T23:59:59Z`),
   ]);
@@ -99,24 +99,42 @@ export default async function AthleteCalendarPage({
     }
   }
 
+  // An athlete who belongs to several of the same trainer's groups gets one
+  // events row PER GROUP for anything sent to "all my groups" (e.g. a
+  // reported absence) — same series_id, same date. Only the first row per
+  // (date, series_id) becomes a card so it doesn't look like duplicate
+  // entries stacked on one day.
+  const seenMonthEventKeysByDate = new Map<string, Set<string>>();
+  const seenAgendaEventKeysByDate = new Map<string, Set<string>>();
+
   for (const event of events ?? []) {
     const date = event.all_day ? event.start_at.slice(0, 10) : utcISOToAppDateString(event.start_at);
+    const mergeKey = event.series_id ?? event.id;
     if (days.includes(date)) {
-      itemsByDate[date] = [
-        ...(itemsByDate[date] ?? []),
-        {
-          id: event.id,
-          title: event.title,
-          color: event.color,
-          href: `/athlete/calendar?month=${date.slice(0, 7)}`,
-          status: event.status,
-          subtitle: event.event_type,
-          description: event.description,
-          kind: "event" as const,
-        },
-      ];
+      const seen = seenMonthEventKeysByDate.get(date) ?? new Set<string>();
+      if (!seen.has(mergeKey)) {
+        seen.add(mergeKey);
+        seenMonthEventKeysByDate.set(date, seen);
+        itemsByDate[date] = [
+          ...(itemsByDate[date] ?? []),
+          {
+            id: event.id,
+            title: event.title,
+            color: event.color,
+            href: `/athlete/calendar?month=${date.slice(0, 7)}`,
+            status: event.status,
+            subtitle: event.event_type,
+            description: event.description,
+            kind: "event" as const,
+          },
+        ];
+      }
     }
     if (weekDaySet.has(date)) {
+      const seen = seenAgendaEventKeysByDate.get(date) ?? new Set<string>();
+      if (seen.has(mergeKey)) continue;
+      seen.add(mergeKey);
+      seenAgendaEventKeysByDate.set(date, seen);
       const time = event.all_day
         ? "Ganztägig"
         : new Date(event.start_at).toLocaleTimeString("de-DE", {

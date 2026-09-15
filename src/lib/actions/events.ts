@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { weeklyOccurrences, appWallTimeToUTCISOString } from "@/lib/date";
+import { weeklyOccurrences, dailyOccurrences, appWallTimeToUTCISOString } from "@/lib/date";
 
 export type ActionResult = { error?: string };
 
@@ -22,6 +22,11 @@ export type CreateEventInput = {
   eventType: string;
   color: string;
   date: string;
+  // A contiguous multi-day span ("von/bis") — every day from date through
+  // endDate (inclusive) gets its own event row. Independent of repeatUntil
+  // below, which is the older weekly-recurrence path (same weekday each
+  // week); a caller sets at most one of the two.
+  endDate: string | null;
   time: string;
   allDay: boolean;
   // Empty array = "Alle" (not scoped to any specific group, the previous
@@ -37,13 +42,18 @@ export async function createEventAction(input: CreateEventInput): Promise<Action
   if (!input.title.trim() || !input.date) {
     return { error: "Bitte Titel und Datum angeben." };
   }
+  if (input.endDate && input.endDate < input.date) {
+    return { error: "Das Enddatum muss nach dem Startdatum liegen." };
+  }
   if (input.repeatUntil && input.repeatUntil < input.date) {
     return { error: "Das Wiederholungsdatum muss nach dem Startdatum liegen." };
   }
 
-  const dates = input.repeatUntil
-    ? weeklyOccurrences(input.date, input.repeatUntil)
-    : [input.date];
+  const dates = input.endDate
+    ? dailyOccurrences(input.date, input.endDate)
+    : input.repeatUntil
+      ? weeklyOccurrences(input.date, input.repeatUntil)
+      : [input.date];
   const targetGroupIds: (string | null)[] = input.groupIds.length > 0 ? input.groupIds : [null];
   const seriesId = dates.length * targetGroupIds.length > 1 ? randomUUID() : null;
 

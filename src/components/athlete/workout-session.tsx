@@ -418,10 +418,14 @@ export function WorkoutSession({
     setPad({ ...pad, buffer: String(next).replace(".", ",") });
   }
 
-  // Auto-save: once both weight and reps for a set are filled in (whichever
-  // field got typed second), persist immediately instead of requiring a
-  // separate tap on ✓ — the manual ✓ button still works for weight-only
-  // saves (reps stay optional) and for re-saving a correction afterwards.
+  // Auto-save whenever there's a weight to save: a fresh set becomes
+  // confirmed as soon as it has one (reps stay optional, matching
+  // confirmSet's own validation), and editing an ALREADY-confirmed set
+  // (e.g. fixing a typo after the session) re-saves it immediately too.
+  // This used to only fire for brand-new sets — a correction to a
+  // confirmed set only updated local state and silently never reached the
+  // server, so "Nachträglich bearbeiten" looked like it worked but the fix
+  // was lost on reload.
   function padSave() {
     if (!pad) return;
     const { itemId, setKey, field, buffer } = pad;
@@ -430,7 +434,7 @@ export function WorkoutSession({
     const current = (setsByItem[itemId] ?? []).find((s) => s.key === setKey);
     if (!current) return;
     const updated = { ...current, [field]: buffer };
-    if (!updated.confirmed && updated.weight.trim() && updated.reps.trim()) {
+    if (updated.weight.trim()) {
       const ex = exercises.find((e) => e.itemId === itemId);
       if (ex) confirmSet(ex, updated);
     }

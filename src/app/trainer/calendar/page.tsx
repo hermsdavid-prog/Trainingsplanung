@@ -75,7 +75,7 @@ export default async function TrainerCalendarPage({
 
   let eventsQuery = supabase
     .from("events")
-    .select("id, title, description, start_at, event_type, color, status, group_id, athlete_id, all_day")
+    .select("id, title, description, start_at, event_type, color, status, group_id, athlete_id, all_day, series_id")
     .gte("start_at", `${rangeStart}T00:00:00Z`)
     .lte("start_at", `${rangeEnd}T23:59:59Z`);
   if (params.group) eventsQuery = eventsQuery.eq("group_id", params.group);
@@ -97,7 +97,10 @@ export default async function TrainerCalendarPage({
       plan.scope_type === "group"
         ? groupColor.get(plan.group_id ?? "") ?? INDIVIDUAL_PLAN_COLOR
         : INDIVIDUAL_PLAN_COLOR;
-    const who = plan.scope_type === "group" ? groupLabel.get(plan.group_id ?? "") ?? "Gruppe" : "Einzelplan";
+    const who =
+      plan.scope_type === "group"
+        ? groupLabel.get(plan.group_id ?? "") ?? "Gruppe"
+        : athleteMap.get(plan.athlete_id ?? "") ?? "Einzelplan";
     if (days.includes(plan.date)) {
       itemsByDate[plan.date] = [
         ...(itemsByDate[plan.date] ?? []),
@@ -128,6 +131,16 @@ export default async function TrainerCalendarPage({
     }
   }
 
+  // A trainer belonging to several groups gets one events row PER GROUP for
+  // anything sent to "all my groups" (e.g. reported absences) — same
+  // series_id, same date. Shown individually they'd look like duplicate
+  // entries stacked on one day, so only the first row per (date, series_id)
+  // becomes a calendar card; the week board's card folds the extra groups'
+  // names into one combined "who" instead of dropping them silently.
+  const seenMonthEventKeysByDate = new Map<string, Set<string>>();
+  const weekEventItemByKey = new Map<string, WeekItem>();
+  const weekEventWhoSetByKey = new Map<string, Set<string>>();
+
   for (const event of events ?? []) {
     const date = event.all_day ? event.start_at.slice(0, 10) : utcISOToAppDateString(event.start_at);
     const who = event.group_id
@@ -135,20 +148,26 @@ export default async function TrainerCalendarPage({
       : event.athlete_id
         ? athleteMap.get(event.athlete_id) ?? "Athlet"
         : "Alle";
+    const mergeKey = event.series_id ?? event.id;
     if (days.includes(date)) {
-      itemsByDate[date] = [
-        ...(itemsByDate[date] ?? []),
-        {
-          id: event.id,
-          title: event.title,
-          color: event.color,
-          href: `/trainer/calendar?month=${date.slice(0, 7)}`,
-          status: event.status,
-          subtitle: event.event_type,
-          description: event.description,
-          kind: "event" as const,
-        },
-      ];
+      const seen = seenMonthEventKeysByDate.get(date) ?? new Set<string>();
+      if (!seen.has(mergeKey)) {
+        seen.add(mergeKey);
+        seenMonthEventKeysByDate.set(date, seen);
+        itemsByDate[date] = [
+          ...(itemsByDate[date] ?? []),
+          {
+            id: event.id,
+            title: event.title,
+            color: event.color,
+            href: `/trainer/calendar?month=${date.slice(0, 7)}`,
+            status: event.status,
+            subtitle: event.event_type,
+            description: event.description,
+            kind: "event" as const,
+          },
+        ];
+      }
     }
     if (weekDaySet.has(date)) {
       const time = event.all_day
@@ -158,21 +177,31 @@ export default async function TrainerCalendarPage({
             minute: "2-digit",
             timeZone: "Europe/Berlin",
           });
-      weekItemsByDate[date] = [
-        ...(weekItemsByDate[date] ?? []),
-        {
-          id: event.id,
-          kind: "event",
-          title: event.title,
-          href: null,
-          who,
-          time,
-          tone: event.color,
-          typeLabel: event.event_type,
-          status: event.status,
-          description: event.description,
-        },
-      ];
+      const weekKey = `${date}::${mergeKey}`;
+      const existingItem = weekEventItemByKey.get(weekKey);
+      if (existingItem) {
+        const whoSet = weekEventWhoSetByKey.get(weekKey)!;
+        if (!whoSet.has(who)) {
+          whoSet.add(who);
+          existingItem.who = Array.from(whoSet).join(", ");
+        }
+        continue;
+      }
+      const item: WeekItem = {
+        id: event.id,
+        kind: "event",
+        title: event.title,
+        href: null,
+        who,
+        time,
+        tone: event.color,
+        typeLabel: event.event_type,
+        status: event.status,
+        description: event.description,
+      };
+      weekEventItemByKey.set(weekKey, item);
+      weekEventWhoSetByKey.set(weekKey, new Set([who]));
+      weekItemsByDate[date] = [...(weekItemsByDate[date] ?? []), item];
     }
   }
 
