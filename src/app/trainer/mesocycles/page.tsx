@@ -134,18 +134,33 @@ export default async function TrainerMesocyclesPage({
   const selectedGroupFilter = params.group && groups.some((g) => g.id === params.group) ? params.group : undefined;
   const selectedAthleteFilter =
     params.athlete && athletes.some((a) => a.id === params.athlete) ? params.athlete : undefined;
-  const targetGroups = selectedGroupFilter ? groups.filter((g) => g.id === selectedGroupFilter) : groups;
-  const targetAthletes = selectedAthleteFilter ? athletes.filter((a) => a.id === selectedAthleteFilter) : athletes;
+
+  // Picking just one filter narrows the WHOLE page to that axis, not only
+  // its own section — e.g. filtering to one group hides every athlete's
+  // unrelated personal Mesozyklus instead of leaving them all showing
+  // underneath. Setting both filters together keeps both of the picked
+  // sections (that's a deliberate "this group AND this athlete" ask).
+  const showGroupSections = !(selectedAthleteFilter && !selectedGroupFilter);
+  const showAthleteSections = !(selectedGroupFilter && !selectedAthleteFilter);
+
+  const targetGroups = showGroupSections ? (selectedGroupFilter ? groups.filter((g) => g.id === selectedGroupFilter) : groups) : [];
+  const targetAthletes = showAthleteSections
+    ? selectedAthleteFilter
+      ? athletes.filter((a) => a.id === selectedAthleteFilter)
+      : athletes
+    : [];
 
   const [{ data: groupMesocycleRows }, { data: athleteMesocycleRows }] = await Promise.all([
-    supabase
-      .from("training_mesocycles")
-      .select("id, title, description, start_date, weeks, group_id")
-      .in(
-        "group_id",
-        targetGroups.map((g) => g.id)
-      )
-      .order("start_date", { ascending: false }),
+    targetGroups.length
+      ? supabase
+          .from("training_mesocycles")
+          .select("id, title, description, start_date, weeks, group_id")
+          .in(
+            "group_id",
+            targetGroups.map((g) => g.id)
+          )
+          .order("start_date", { ascending: false })
+      : Promise.resolve({ data: [] }),
     targetAthletes.length
       ? supabase
           .from("training_mesocycles")
