@@ -8,7 +8,7 @@ import {
   toggleMesocycleGoalAction,
 } from "@/lib/actions/mesocycle-goals";
 
-export type TrainerGoal = { id: string; text: string; achievedAt: string | null };
+export type TrainerGoal = { id: string; text: string; achievedAt: string | null; selfAuthored: boolean };
 
 // The trainer's own view of the selected athlete's goals, grouped by
 // Mesozyklus — add/edit/delete live here; the athlete's matching view
@@ -97,6 +97,11 @@ export function GoalList({
                       style={{ textDecoration: g.achievedAt ? "line-through" : "none", opacity: g.achievedAt ? 0.6 : 1 }}
                     >
                       {g.text}
+                      {g.selfAuthored && (
+                        <span className="ml-1.5 tag tag-outline" style={{ verticalAlign: "middle" }}>
+                          vom Athleten
+                        </span>
+                      )}
                     </span>
                     <button type="button" className="btn btn-ghost shrink-0" onClick={() => startEdit(g)}>
                       Bearbeiten

@@ -23,11 +23,13 @@ function MesocycleProgressCard({
   m,
   plans,
   goals,
+  athleteId,
   todayIso,
 }: {
   m: Mesocycle;
   plans: Plan[];
   goals: MesocycleGoal[];
+  athleteId: string;
   todayIso: string;
 }) {
   const totalDays = m.weeks * 7;
@@ -56,7 +58,7 @@ function MesocycleProgressCard({
         <div className="h-[3px]" style={{ background: "var(--dc-accent)", width: `${progressPct}%` }} />
       </div>
 
-      <GoalToggleList goals={goals} />
+      <GoalToggleList goals={goals} mesocycleId={m.id} athleteId={athleteId} />
 
       {plans.length > 0 && (
         <div className="mt-3 flex flex-col gap-1 border-t pt-3" style={{ borderColor: "var(--dc-divider)" }}>
@@ -82,6 +84,7 @@ function MesocycleSection({
   mesocycles,
   plansByMesocycle,
   goalsByMesocycle,
+  athleteId,
   view,
   todayIso,
 }: {
@@ -89,6 +92,7 @@ function MesocycleSection({
   mesocycles: Mesocycle[];
   plansByMesocycle: Map<string, Plan[]>;
   goalsByMesocycle: Map<string, MesocycleGoal[]>;
+  athleteId: string;
   view: "list" | "calendar";
   todayIso: string;
 }) {
@@ -105,6 +109,7 @@ function MesocycleSection({
           }))}
           todayIso={todayIso}
           planLinkRole="athlete"
+          viewerAthleteId={athleteId}
         />
       ) : (
         <div className="mt-3">
@@ -115,6 +120,7 @@ function MesocycleSection({
                 m={m}
                 plans={plansByMesocycle.get(m.id) ?? []}
                 goals={goalsByMesocycle.get(m.id) ?? []}
+                athleteId={athleteId}
                 todayIso={todayIso}
               />
             ))}
@@ -191,7 +197,7 @@ export default async function AthleteMesocyclesPage({
   const { data: goalRows } = allIds.length
     ? await supabase
         .from("mesocycle_goals")
-        .select("id, mesocycle_id, text, achieved_at")
+        .select("id, mesocycle_id, text, achieved_at, created_by")
         .eq("athlete_id", user.id)
         .in("mesocycle_id", allIds)
         .order("position")
@@ -199,7 +205,7 @@ export default async function AthleteMesocyclesPage({
   const goalsByMesocycle = new Map<string, MesocycleGoal[]>();
   for (const g of goalRows ?? []) {
     const list = goalsByMesocycle.get(g.mesocycle_id) ?? [];
-    list.push({ id: g.id, text: g.text, achievedAt: g.achieved_at });
+    list.push({ id: g.id, text: g.text, achievedAt: g.achieved_at, ownGoal: g.created_by === user.id });
     goalsByMesocycle.set(g.mesocycle_id, list);
   }
 
@@ -226,6 +232,7 @@ export default async function AthleteMesocyclesPage({
             mesocycles={ownMesocycles}
             plansByMesocycle={plansByMesocycle}
             goalsByMesocycle={goalsByMesocycle}
+            athleteId={user.id}
             view={view}
             todayIso={todayIso}
           />
@@ -236,6 +243,7 @@ export default async function AthleteMesocyclesPage({
               mesocycles={mesocyclesByGroup.get(g.id) ?? []}
               plansByMesocycle={plansByMesocycle}
               goalsByMesocycle={goalsByMesocycle}
+              athleteId={user.id}
               view={view}
               todayIso={todayIso}
             />

@@ -65,10 +65,14 @@ export function MesocycleTimeline({
   mesocycles,
   todayIso,
   planLinkRole = "trainer",
+  viewerAthleteId,
 }: {
   mesocycles: TimelineMesocycle[];
   todayIso: string;
   planLinkRole?: "trainer" | "athlete";
+  // Only meaningful (and only ever passed) when planLinkRole === "athlete" —
+  // lets the viewer add their own goal directly from the detail dialog.
+  viewerAthleteId?: string;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const openMesocycle = mesocycles.find((m) => m.id === openId) ?? null;
@@ -220,7 +224,13 @@ export function MesocycleTimeline({
                       <div className="h-[3px]" style={{ background: "var(--dc-accent)", width: `${progressPct}%` }} />
                     </div>
 
-                    {planLinkRole === "athlete" && <GoalToggleList goals={openMesocycle.goals ?? []} />}
+                    {planLinkRole === "athlete" && viewerAthleteId && (
+                      <GoalToggleList
+                        goals={openMesocycle.goals ?? []}
+                        mesocycleId={openMesocycle.id}
+                        athleteId={viewerAthleteId}
+                      />
+                    )}
 
                     <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--dc-divider)" }}>
                       <div className="kicker-muted">Zugeordnete Trainings</div>

@@ -178,7 +178,7 @@ export default async function TrainerAthletesPage({
   const { data: goalRows } = selected && mesoIds.length
     ? await supabase
         .from("mesocycle_goals")
-        .select("id, mesocycle_id, text, achieved_at")
+        .select("id, mesocycle_id, text, achieved_at, created_by")
         .eq("athlete_id", selected.id)
         .in("mesocycle_id", mesoIds)
         .order("position")
@@ -186,7 +186,12 @@ export default async function TrainerAthletesPage({
   const goalsByMesocycle = new Map<string, TrainerGoal[]>();
   for (const g of goalRows ?? []) {
     const list = goalsByMesocycle.get(g.mesocycle_id) ?? [];
-    list.push({ id: g.id, text: g.text, achievedAt: g.achieved_at });
+    list.push({
+      id: g.id,
+      text: g.text,
+      achievedAt: g.achieved_at,
+      selfAuthored: g.created_by === selected?.id,
+    });
     goalsByMesocycle.set(g.mesocycle_id, list);
   }
 
