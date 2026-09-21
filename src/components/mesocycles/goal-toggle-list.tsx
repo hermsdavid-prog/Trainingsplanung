@@ -19,10 +19,15 @@ export function GoalToggleList({
   goals,
   mesocycleId,
   athleteId,
+  heading = "Trainingsziele",
 }: {
   goals: MesocycleGoal[];
   mesocycleId: string;
   athleteId: string;
+  // Overridable so a caller that already groups several Mesozyklen under
+  // one "Trainingsziele" heading (see GoalsPanel) can label each instance
+  // by Mesozyklus name instead of repeating the generic heading.
+  heading?: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -55,7 +60,7 @@ export function GoalToggleList({
 
   return (
     <div className="mt-3 flex flex-col gap-1.5 border-t pt-3" style={{ borderColor: "var(--dc-divider)" }}>
-      <div className="kicker-muted">Trainingsziele</div>
+      <div className="kicker-muted">{heading}</div>
       {goals.length === 0 && !adding && <p className="text-xs text-muted">Noch keine Ziele.</p>}
       {goals.map((g) => (
         <div key={g.id} className="flex items-center gap-2 text-[13px]" style={{ opacity: g.achievedAt ? 0.6 : 1 }}>

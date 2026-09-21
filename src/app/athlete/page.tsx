@@ -13,6 +13,7 @@ import { ExerciseTrendList } from "@/components/athletik/exercise-trend-list";
 import { HealthChart } from "@/components/health/health-chart";
 import { CoachNotesBanner } from "@/components/athletes/coach-notes-banner";
 import { BadgesList } from "@/components/athletes/badges-list";
+import { GoalsPanel, type MesocycleGoalGroup } from "@/components/athletes/goals-panel";
 
 const LEVEL_TAG: Record<HealthStatusLevel, string> = {
   red: "tag-accent-2",
@@ -108,6 +109,53 @@ export default async function AthleteTodayPage({
     trainerName: n.profiles?.full_name ?? "Trainer",
   }));
 
+  // — Trainingsziele — same "this athlete's relevant Mesozyklen" union
+  // query as /athlete/mesocycles, just trimmed to id+title since the
+  // Startseite panel only needs the goal list, not dates/progress.
+  const { data: goalGroupRows } = user
+    ? await supabase.from("group_athletes").select("group_id").eq("athlete_id", user.id)
+    : { data: [] };
+  const goalGroupIds = (goalGroupRows ?? []).map((r) => r.group_id);
+
+  const [{ data: groupMesoRows }, { data: ownMesoRows }] = user
+    ? await Promise.all([
+        goalGroupIds.length
+          ? supabase
+              .from("training_mesocycles")
+              .select("id, title")
+              .in("group_id", goalGroupIds)
+              .order("start_date", { ascending: false })
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from("training_mesocycles")
+          .select("id, title")
+          .eq("athlete_id", user.id)
+          .order("start_date", { ascending: false }),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const relevantMesocycles = [...(groupMesoRows ?? []), ...(ownMesoRows ?? [])];
+
+  const relevantMesoIds = relevantMesocycles.map((m) => m.id);
+  const { data: mesoGoalRows } = user && relevantMesoIds.length
+    ? await supabase
+        .from("mesocycle_goals")
+        .select("id, mesocycle_id, text, achieved_at, created_by")
+        .eq("athlete_id", user.id)
+        .in("mesocycle_id", relevantMesoIds)
+        .order("position")
+    : { data: [] };
+  const goalsByMesocycle = new Map<string, MesocycleGoalGroup["goals"]>();
+  for (const g of mesoGoalRows ?? []) {
+    const list = goalsByMesocycle.get(g.mesocycle_id) ?? [];
+    list.push({ id: g.id, text: g.text, achievedAt: g.achieved_at, ownGoal: g.created_by === user!.id });
+    goalsByMesocycle.set(g.mesocycle_id, list);
+  }
+  const goalGroups: MesocycleGoalGroup[] = relevantMesocycles.map((m) => ({
+    mesocycleId: m.id,
+    mesocycleTitle: m.title,
+    goals: goalsByMesocycle.get(m.id) ?? [],
+  }));
+
   const readiness = computeHealthStatus(recentLogs ?? [], today);
   const trends = computeExerciseTrends(
     (exerciseResultRows ?? [])
@@ -129,6 +177,8 @@ export default async function AthleteTodayPage({
       <div className="kicker">{formatDateLabel(date)}</div>
 
       <CoachNotesBanner notes={unreadNotes} />
+
+      {user && <GoalsPanel groups={goalGroups} athleteId={user.id} />}
 
       <CheckinGate
         showCheckin={showCheckin}
