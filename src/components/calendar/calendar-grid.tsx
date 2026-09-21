@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatDateLabel, formatDateShort } from "@/lib/date";
-import { reschedulePlanAction, duplicatePlanToDateAction } from "@/lib/actions/plans";
+import { reschedulePlanAction, duplicatePlanToDateAction, duplicateDayToDateAction } from "@/lib/actions/plans";
 import {
   rescheduleEventAction,
   duplicateEventToDateAction,
@@ -60,6 +60,9 @@ export function CalendarGrid({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showCreatePicker, setShowCreatePicker] = useState(false);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [showCopyDayPicker, setShowCopyDayPicker] = useState(false);
+  const [copyDayTargetDate, setCopyDayTargetDate] = useState("");
+  const [isCopyingDay, setIsCopyingDay] = useState(false);
   // Native HTML5 drag-and-drop doesn't reliably support touch (this is a
   // long-standing WebKit/iPadOS limitation, not specific to this app —
   // dragstart/dragover/drop don't fire reliably even on an iPad Pro with a
@@ -112,7 +115,28 @@ export function CalendarGrid({
       setSelectedDate(null);
       setShowCreatePicker(false);
       setExpandedEventId(null);
+      setShowCopyDayPicker(false);
+      setCopyDayTargetDate("");
     }
+  }
+
+  function copyDay() {
+    if (!selectedDate || !copyDayTargetDate) return;
+    setIsCopyingDay(true);
+    startTransition(async () => {
+      const result = await duplicateDayToDateAction(selectedDate, copyDayTargetDate);
+      setIsCopyingDay(false);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(
+          `${result.count} ${result.count === 1 ? "Training" : "Trainings"} kopiert.`
+        );
+        setShowCopyDayPicker(false);
+        setCopyDayTargetDate("");
+        router.refresh();
+      }
+    });
   }
 
   function toggleExpandedEvent(id: string) {
@@ -471,6 +495,56 @@ export function CalendarGrid({
                           )}
                         </div>
                       )
+                    )}
+                  </div>
+                )}
+
+                {enableDragDrop && selectedItems.some((i) => i.kind === "plan") && (
+                  <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--dc-divider)" }}>
+                    {!showCopyDayPicker ? (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setShowCopyDayPicker(true)}
+                      >
+                        <CopyIcon /> Ganzen Tag kopieren
+                      </button>
+                    ) : (
+                      <div>
+                        <div className="kicker-muted">
+                          Alle Trainings vom {formatDateShort(selectedDate)} kopieren auf
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-end gap-2">
+                          <div className="field" style={{ margin: 0 }}>
+                            <label htmlFor="copy-day-date">Neues Datum</label>
+                            <input
+                              id="copy-day-date"
+                              type="date"
+                              className="input"
+                              value={copyDayTargetDate}
+                              onChange={(e) => setCopyDayTargetDate(e.target.value)}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            disabled={!copyDayTargetDate || isCopyingDay}
+                            onClick={copyDay}
+                          >
+                            {isCopyingDay ? "Wird kopiert…" : "Kopieren"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => {
+                              setShowCopyDayPicker(false);
+                              setCopyDayTargetDate("");
+                            }}
+                          >
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}

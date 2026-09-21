@@ -605,6 +605,91 @@ export async function duplicatePlanToDateAction(
   return {};
 }
 
+// Copies every training plan on sourceDate to targetDate in one go — the
+// "Ganzen Tag kopieren" button in the calendar's day-detail dialog, for
+// when a whole day's Trainings (not events) should be repeated on another
+// date instead of copying each plan one at a time. Each plan keeps its own
+// scope (group_id/athlete_id) exactly like duplicatePlanToDateAction does
+// for a single plan; training_plans_select RLS already limits sourcePlans
+// to ones this trainer manages, so no separate per-plan access check is
+// needed here.
+export async function duplicateDayToDateAction(
+  sourceDate: string,
+  targetDate: string
+): Promise<ActionResult & { count?: number }> {
+  const { supabase, userId } = await requireTrainerOrAdmin();
+
+  if (!sourceDate || !targetDate) {
+    return { error: "Bitte ein Zieldatum angeben." };
+  }
+
+  const { data: sourcePlans } = await supabase
+    .from("training_plans")
+    .select("id, title, category_label, time, scope_type, group_id, athlete_id")
+    .eq("date", sourceDate);
+
+  if (!sourcePlans || sourcePlans.length === 0) {
+    return { error: "Für diesen Tag sind keine Trainingspläne vorhanden." };
+  }
+
+  let copiedCount = 0;
+  for (const sourcePlan of sourcePlans) {
+    const { data: sourceItems } = await supabase
+      .from("training_plan_items")
+      .select(
+        "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes, description, duration_mode"
+      )
+      .eq("training_plan_id", sourcePlan.id)
+      .order("position");
+
+    const { data: newPlan, error } = await supabase
+      .from("training_plans")
+      .insert({
+        title: sourcePlan.title,
+        category_label: sourcePlan.category_label,
+        date: targetDate,
+        time: sourcePlan.time,
+        scope_type: sourcePlan.scope_type,
+        group_id: sourcePlan.group_id,
+        athlete_id: sourcePlan.athlete_id,
+        created_by: userId,
+      })
+      .select("id")
+      .single();
+
+    if (error || !newPlan) continue;
+
+    if (sourceItems && sourceItems.length > 0) {
+      await supabase.from("training_plan_items").insert(
+        sourceItems.map((item) => ({
+          training_plan_id: newPlan.id,
+          position: item.position,
+          exercise_name: item.exercise_name,
+          exercise_id: item.exercise_id,
+          section: item.section,
+          reps_or_duration: item.reps_or_duration,
+          sets: item.sets,
+          rest_time: item.rest_time,
+          round_rest: item.round_rest,
+          heart_rate_on: item.heart_rate_on,
+          heart_rate_off: item.heart_rate_off,
+          link_url: item.link_url,
+          notes: item.notes,
+          description: item.description,
+          duration_mode: item.duration_mode,
+        }))
+      );
+    }
+    copiedCount++;
+  }
+
+  if (copiedCount === 0) return { error: "Kein Plan konnte kopiert werden." };
+
+  revalidatePath("/trainer/calendar");
+  revalidatePath("/trainer/plans");
+  return { count: copiedCount };
+}
+
 export async function deletePlanAction(planId: string): Promise<ActionResult> {
   const { supabase } = await requirePlanEditAccess(planId);
 
