@@ -563,6 +563,61 @@ export type Database = {
           },
         ]
       }
+      mesocycle_goals: {
+        Row: {
+          achieved_at: string | null
+          athlete_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          mesocycle_id: string
+          position: number
+          text: string
+        }
+        Insert: {
+          achieved_at?: string | null
+          athlete_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mesocycle_id: string
+          position?: number
+          text: string
+        }
+        Update: {
+          achieved_at?: string | null
+          athlete_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mesocycle_id?: string
+          position?: number
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mesocycle_goals_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mesocycle_goals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mesocycle_goals_mesocycle_id_fkey"
+            columns: ["mesocycle_id"]
+            isOneToOne: false
+            referencedRelation: "training_mesocycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_change_log: {
         Row: {
           changed_at: string

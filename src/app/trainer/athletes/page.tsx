@@ -9,6 +9,8 @@ import { AthleteExercisePicker } from "@/components/athletes/athlete-exercise-pi
 import { SendNoteForm } from "@/components/athletes/send-note-form";
 import { NoteHistory } from "@/components/athletes/note-history";
 import { BadgesList } from "@/components/athletes/badges-list";
+import { AddGoalForm } from "@/components/athletes/goal-form";
+import { GoalList, type TrainerGoal } from "@/components/athletes/goal-list";
 
 const METRICS: { key: "hrv" | "resting_hr" | "wellbeing"; label: string; unit: string; domain?: [number, number] }[] = [
   { key: "hrv", label: "HRV", unit: "ms" },
@@ -147,6 +149,47 @@ export default async function TrainerAthletesPage({
     earnedAt: b.earned_at,
   }));
 
+  // — Trainingsziele — the athlete's relevant Mesozyklen (their groups' +
+  // any personal one), same union query shape as athlete/mesocycles/page.tsx.
+  const { data: athleteGroupRows } = selected
+    ? await supabase.from("group_athletes").select("group_id").eq("athlete_id", selected.id)
+    : { data: [] };
+  const athleteGroupIds = (athleteGroupRows ?? []).map((r) => r.group_id);
+
+  const [{ data: groupMesoRows }, { data: ownMesoRows }] = selected
+    ? await Promise.all([
+        athleteGroupIds.length
+          ? supabase
+              .from("training_mesocycles")
+              .select("id, title, start_date, weeks")
+              .in("group_id", athleteGroupIds)
+              .order("start_date", { ascending: false })
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from("training_mesocycles")
+          .select("id, title, start_date, weeks")
+          .eq("athlete_id", selected.id)
+          .order("start_date", { ascending: false }),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const availableMesocycles = [...(groupMesoRows ?? []), ...(ownMesoRows ?? [])];
+
+  const mesoIds = availableMesocycles.map((m) => m.id);
+  const { data: goalRows } = selected && mesoIds.length
+    ? await supabase
+        .from("mesocycle_goals")
+        .select("id, mesocycle_id, text, achieved_at")
+        .eq("athlete_id", selected.id)
+        .in("mesocycle_id", mesoIds)
+        .order("position")
+    : { data: [] };
+  const goalsByMesocycle = new Map<string, TrainerGoal[]>();
+  for (const g of goalRows ?? []) {
+    const list = goalsByMesocycle.get(g.mesocycle_id) ?? [];
+    list.push({ id: g.id, text: g.text, achievedAt: g.achieved_at });
+    goalsByMesocycle.set(g.mesocycle_id, list);
+  }
+
   return (
     <div>
       <div className="kicker">Gesundheit, Fortschritt und Hinweise</div>
@@ -265,6 +308,25 @@ export default async function TrainerAthletesPage({
                   <SendNoteForm athleteId={selected.id} />
                 </div>
                 <NoteHistory notes={notes} />
+              </div>
+
+              <div className="mt-9 max-w-[640px]">
+                <div className="kicker-muted">Trainingsziele für {selected.full_name}</div>
+                {availableMesocycles.length === 0 ? (
+                  <p className="mt-1.5 text-[13px] text-muted">
+                    Noch kein Mesozyklus für diesen Athleten angelegt.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-1.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+                      Worauf {selected.full_name} im jeweiligen Mesozyklus achten soll.
+                    </p>
+                    <div className="mt-3">
+                      <AddGoalForm athleteId={selected.id} mesocycles={availableMesocycles} />
+                    </div>
+                    <GoalList goalsByMesocycle={goalsByMesocycle} mesocycles={availableMesocycles} />
+                  </>
+                )}
               </div>
             </>
           )}

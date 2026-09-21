@@ -4,6 +4,7 @@ import { todayISO, shiftDateISO, formatDateCompact } from "@/lib/date";
 import { MesocycleCarousel } from "@/components/mesocycles/mesocycle-carousel";
 import { MesocycleTimeline } from "@/components/mesocycles/mesocycle-timeline";
 import { MesocycleViewToggle } from "@/components/mesocycles/view-toggle";
+import { GoalToggleList, type MesocycleGoal } from "@/components/mesocycles/goal-toggle-list";
 
 type Mesocycle = { id: string; title: string; description: string | null; start_date: string; weeks: number };
 type Plan = { id: string; title: string; date: string };
@@ -18,7 +19,17 @@ function athletePlanHref(planId: string) {
   return `/athlete/plans/${planId}`;
 }
 
-function MesocycleProgressCard({ m, plans, todayIso }: { m: Mesocycle; plans: Plan[]; todayIso: string }) {
+function MesocycleProgressCard({
+  m,
+  plans,
+  goals,
+  todayIso,
+}: {
+  m: Mesocycle;
+  plans: Plan[];
+  goals: MesocycleGoal[];
+  todayIso: string;
+}) {
   const totalDays = m.weeks * 7;
   const endDate = shiftDateISO(m.start_date, totalDays - 1);
   const elapsed = daysBetween(m.start_date, todayIso);
@@ -45,6 +56,8 @@ function MesocycleProgressCard({ m, plans, todayIso }: { m: Mesocycle; plans: Pl
         <div className="h-[3px]" style={{ background: "var(--dc-accent)", width: `${progressPct}%` }} />
       </div>
 
+      <GoalToggleList goals={goals} />
+
       {plans.length > 0 && (
         <div className="mt-3 flex flex-col gap-1 border-t pt-3" style={{ borderColor: "var(--dc-divider)" }}>
           {plans.map((p) => (
@@ -68,12 +81,14 @@ function MesocycleSection({
   label,
   mesocycles,
   plansByMesocycle,
+  goalsByMesocycle,
   view,
   todayIso,
 }: {
   label: string;
   mesocycles: Mesocycle[];
   plansByMesocycle: Map<string, Plan[]>;
+  goalsByMesocycle: Map<string, MesocycleGoal[]>;
   view: "list" | "calendar";
   todayIso: string;
 }) {
@@ -83,7 +98,11 @@ function MesocycleSection({
       <div className="kicker-muted">{label}</div>
       {view === "calendar" ? (
         <MesocycleTimeline
-          mesocycles={mesocycles.map((m) => ({ ...m, plans: plansByMesocycle.get(m.id) ?? [] }))}
+          mesocycles={mesocycles.map((m) => ({
+            ...m,
+            plans: plansByMesocycle.get(m.id) ?? [],
+            goals: goalsByMesocycle.get(m.id) ?? [],
+          }))}
           todayIso={todayIso}
           planLinkRole="athlete"
         />
@@ -91,7 +110,13 @@ function MesocycleSection({
         <div className="mt-3">
           <MesocycleCarousel>
             {mesocycles.map((m) => (
-              <MesocycleProgressCard key={m.id} m={m} plans={plansByMesocycle.get(m.id) ?? []} todayIso={todayIso} />
+              <MesocycleProgressCard
+                key={m.id}
+                m={m}
+                plans={plansByMesocycle.get(m.id) ?? []}
+                goals={goalsByMesocycle.get(m.id) ?? []}
+                todayIso={todayIso}
+              />
             ))}
           </MesocycleCarousel>
         </div>
@@ -163,6 +188,21 @@ export default async function AthleteMesocyclesPage({
     plansByMesocycle.set(p.mesocycle_id, list);
   }
 
+  const { data: goalRows } = allIds.length
+    ? await supabase
+        .from("mesocycle_goals")
+        .select("id, mesocycle_id, text, achieved_at")
+        .eq("athlete_id", user.id)
+        .in("mesocycle_id", allIds)
+        .order("position")
+    : { data: [] };
+  const goalsByMesocycle = new Map<string, MesocycleGoal[]>();
+  for (const g of goalRows ?? []) {
+    const list = goalsByMesocycle.get(g.mesocycle_id) ?? [];
+    list.push({ id: g.id, text: g.text, achievedAt: g.achieved_at });
+    goalsByMesocycle.set(g.mesocycle_id, list);
+  }
+
   const todayIso = todayISO();
   const hasAny = ownMesocycles.length > 0 || [...mesocyclesByGroup.values()].some((list) => list.length > 0);
 
@@ -181,13 +221,21 @@ export default async function AthleteMesocyclesPage({
         <p className="mt-5 text-sm text-muted">Noch kein Mesozyklus zugeordnet.</p>
       ) : (
         <div className="mt-6 flex flex-col gap-7">
-          <MesocycleSection label="Persönlich" mesocycles={ownMesocycles} plansByMesocycle={plansByMesocycle} view={view} todayIso={todayIso} />
+          <MesocycleSection
+            label="Persönlich"
+            mesocycles={ownMesocycles}
+            plansByMesocycle={plansByMesocycle}
+            goalsByMesocycle={goalsByMesocycle}
+            view={view}
+            todayIso={todayIso}
+          />
           {groups.map((g) => (
             <MesocycleSection
               key={g.id}
               label={g.name}
               mesocycles={mesocyclesByGroup.get(g.id) ?? []}
               plansByMesocycle={plansByMesocycle}
+              goalsByMesocycle={goalsByMesocycle}
               view={view}
               todayIso={todayIso}
             />

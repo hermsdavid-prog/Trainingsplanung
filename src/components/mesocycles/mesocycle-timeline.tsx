@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { formatDateCompact } from "@/lib/date";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
+import { GoalToggleList, type MesocycleGoal } from "@/components/mesocycles/goal-toggle-list";
 
 const DAY_PX = 7;
 const ROW_HEIGHT = 40;
@@ -20,6 +21,7 @@ type TimelineMesocycle = {
   start_date: string;
   weeks: number;
   plans: { id: string; title: string; date: string }[];
+  goals?: MesocycleGoal[];
 };
 
 // Pure calendar-date arithmetic (no timezone involved, these are plain
@@ -217,6 +219,8 @@ export function MesocycleTimeline({
                     <div className="mt-1.5 h-[3px]" style={{ background: "color-mix(in srgb, var(--dc-text) 12%, transparent)" }}>
                       <div className="h-[3px]" style={{ background: "var(--dc-accent)", width: `${progressPct}%` }} />
                     </div>
+
+                    {planLinkRole === "athlete" && <GoalToggleList goals={openMesocycle.goals ?? []} />}
 
                     <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--dc-divider)" }}>
                       <div className="kicker-muted">Zugeordnete Trainings</div>
