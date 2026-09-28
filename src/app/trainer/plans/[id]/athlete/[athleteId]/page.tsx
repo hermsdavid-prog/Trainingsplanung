@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateLabel } from "@/lib/date";
+import { signCardioScreenshots } from "@/lib/cardio-screenshots";
 
 const SET_TYPE_LABEL: Record<string, string> = {
   aufwaermsatz: "Aufwärmsatz",
@@ -46,7 +47,7 @@ export default async function TrainerAthletePlanPage({
   const { data: cardioFeedback } = cardioItems.length
     ? await supabase
         .from("athlete_feedback")
-        .select("training_plan_item_id, actual_value")
+        .select("training_plan_item_id, actual_value, screenshot_path")
         .eq("athlete_id", athleteId)
         .in(
           "training_plan_item_id",
@@ -54,6 +55,13 @@ export default async function TrainerAthletePlanPage({
         )
     : { data: [] };
   const cardioResultByItem = new Map((cardioFeedback ?? []).map((f) => [f.training_plan_item_id, f.actual_value ?? ""]));
+  const screenshotUrls = await signCardioScreenshots(
+    supabase,
+    (cardioFeedback ?? []).map((f) => f.screenshot_path).filter((p): p is string => !!p)
+  );
+  const screenshotUrlByItem = new Map(
+    (cardioFeedback ?? []).map((f) => [f.training_plan_item_id, f.screenshot_path ? screenshotUrls.get(f.screenshot_path) : undefined])
+  );
   const exerciseIds = Array.from(new Set(kraftItems.map((i) => i.exercise_id as string)));
 
   const { data: results } = exerciseIds.length
@@ -134,28 +142,45 @@ export default async function TrainerAthletePlanPage({
           <div className="mt-2 flex flex-col gap-2">
             {cardioItems.map((c) => {
               const result = cardioResultByItem.get(c.id);
+              const screenshotUrl = screenshotUrlByItem.get(c.id);
               return (
                 <div
                   key={c.id}
-                  className="flex flex-wrap items-baseline justify-between gap-3 p-3.5"
+                  className="p-3.5"
                   style={{ background: "var(--dc-surface)", border: "1px solid var(--dc-divider)" }}
                 >
-                  <div className="min-w-0">
-                    <div className="text-[16px]">
-                      {c.exercise_name}
-                      {c.reps_or_duration ? <span style={{ color: "var(--dc-muted)" }}> — {c.reps_or_duration}</span> : null}
-                    </div>
-                    {(c.heart_rate_on || c.heart_rate_off) && (
-                      <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
-                        {c.heart_rate_on && `On ${c.heart_rate_on}`}
-                        {c.heart_rate_off && ` · Off ${c.heart_rate_off}`}
+                  <div className="flex flex-wrap items-baseline justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[16px]">
+                        {c.exercise_name}
+                        {c.reps_or_duration ? <span style={{ color: "var(--dc-muted)" }}> — {c.reps_or_duration}</span> : null}
                       </div>
-                    )}
+                      {(c.heart_rate_on || c.heart_rate_off) && (
+                        <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
+                          {c.heart_rate_on && `On ${c.heart_rate_on}`}
+                          {c.heart_rate_off && ` · Off ${c.heart_rate_off}`}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="kicker-muted">Ergebnis</div>
+                      <div className="text-[16px] font-semibold">{result || <span className="font-normal text-muted">noch nichts eingetragen</span>}</div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="kicker-muted">Ergebnis</div>
-                    <div className="text-[16px] font-semibold">{result || <span className="font-normal text-muted">noch nichts eingetragen</span>}</div>
-                  </div>
+                  {screenshotUrl && (
+                    <div className="mt-3">
+                      <div className="kicker-muted">Herzfrequenz</div>
+                      <a href={screenshotUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block" aria-label="Screenshot in voller Größe öffnen">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL */}
+                        <img
+                          src={screenshotUrl}
+                          alt={`Herzfrequenzverlauf ${athlete.full_name}`}
+                          className="block max-h-[320px] w-auto max-w-full"
+                          style={{ border: "1px solid var(--dc-divider)", background: "#fff" }}
+                        />
+                      </a>
+                    </div>
+                  )}
                 </div>
               );
             })}

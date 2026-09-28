@@ -118,6 +118,8 @@ export type Database = {
           done: boolean
           id: string
           note: string | null
+          screenshot_path: string | null
+          screenshot_uploaded_at: string | null
           training_plan_item_id: string
           updated_at: string
         }
@@ -127,6 +129,8 @@ export type Database = {
           done?: boolean
           id?: string
           note?: string | null
+          screenshot_path?: string | null
+          screenshot_uploaded_at?: string | null
           training_plan_item_id: string
           updated_at?: string
         }
@@ -136,6 +140,8 @@ export type Database = {
           done?: boolean
           id?: string
           note?: string | null
+          screenshot_path?: string | null
+          screenshot_uploaded_at?: string | null
           training_plan_item_id?: string
           updated_at?: string
         }
@@ -1050,6 +1056,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      expired_cardio_screenshots: {
+        Args: { max_age: string }
+        Returns: string[]
+      }
       replace_training_plan_items: {
         Args: { p_items: Json; p_plan_id: string }
         Returns: {

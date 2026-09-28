@@ -11,6 +11,7 @@ import {
 import { saveSessionRpeAction } from "@/lib/actions/sessions";
 import { addSessionExerciseAction } from "@/lib/actions/session-exercises";
 import { upsertFeedbackAction } from "@/lib/actions/feedback";
+import { CardioScreenshotField } from "@/components/athlete/cardio-screenshot-field";
 import type { BadgeAward } from "@/lib/badges";
 
 type SetType = "aufwaermsatz" | "arbeitssatz";
@@ -57,6 +58,8 @@ export type SessionCardio = {
   // The athlete's own entered outcome (e.g. "7 Runden"), stored as
   // athlete_feedback.actual_value for this plan item.
   result: string;
+  // Signed URL of the uploaded heart-rate screenshot, if any.
+  screenshotUrl: string | null;
 };
 
 export type SessionKarateRow = {
@@ -162,6 +165,7 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
 }
 
 export function WorkoutSession({
+  athleteId,
   planId,
   planDate,
   planTitle,
@@ -177,6 +181,7 @@ export function WorkoutSession({
   canAddExercises = false,
   exerciseLibrary = [],
 }: {
+  athleteId: string;
   planId: string;
   planDate: string;
   planTitle: string;
@@ -551,17 +556,22 @@ export function WorkoutSession({
 
         {editMode && (isAthletik ? (
           <>
-            <div className="mt-3.5 flex items-baseline justify-between text-[13px]">
-              <span>
-                {totals.done} von {totals.total} Sätzen
-              </span>
-              <span style={{ color: "var(--dc-muted)" }}>
-                {totals.tonnage > 0 ? `${totals.tonnage.toLocaleString("de-DE")} ${totals.tonnageUnit}` : "—"}
-              </span>
-            </div>
-            <div className="mt-2 h-[3px]" style={{ background: "color-mix(in srgb, var(--dc-text) 12%, transparent)" }}>
-              <div className="h-[3px]" style={{ background: "var(--dc-accent)", width: progressWidth }} />
-            </div>
+            {/* A cardio-only plan has no sets to count. */}
+            {exercises.length > 0 && (
+              <>
+                <div className="mt-3.5 flex items-baseline justify-between text-[13px]">
+                  <span>
+                    {totals.done} von {totals.total} Sätzen
+                  </span>
+                  <span style={{ color: "var(--dc-muted)" }}>
+                    {totals.tonnage > 0 ? `${totals.tonnage.toLocaleString("de-DE")} ${totals.tonnageUnit}` : "—"}
+                  </span>
+                </div>
+                <div className="mt-2 h-[3px]" style={{ background: "color-mix(in srgb, var(--dc-text) 12%, transparent)" }}>
+                  <div className="h-[3px]" style={{ background: "var(--dc-accent)", width: progressWidth }} />
+                </div>
+              </>
+            )}
 
             {restRemaining > 0 && (
               <div
@@ -832,6 +842,7 @@ export function WorkoutSession({
                       </button>
                     </div>
                   </div>
+                  <CardioScreenshotField athleteId={athleteId} itemId={c.itemId} initialUrl={c.screenshotUrl} />
                 </div>
               );
             })}

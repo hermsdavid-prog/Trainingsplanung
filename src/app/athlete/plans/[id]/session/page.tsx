@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateLabel } from "@/lib/date";
+import { signCardioScreenshots } from "@/lib/cardio-screenshots";
 import {
   WorkoutSession,
   type SessionExercise,
@@ -161,11 +162,18 @@ export default async function AthleteWorkoutSessionPage({
   const { data: cardioFeedback } = cardioIds.length
     ? await supabase
         .from("athlete_feedback")
-        .select("training_plan_item_id, actual_value")
+        .select("training_plan_item_id, actual_value, screenshot_path")
         .eq("athlete_id", user.id)
         .in("training_plan_item_id", cardioIds)
     : { data: [] };
   const cardioResultByItem = new Map((cardioFeedback ?? []).map((f) => [f.training_plan_item_id, f.actual_value ?? ""]));
+  const screenshotUrls = await signCardioScreenshots(
+    supabase,
+    (cardioFeedback ?? []).map((f) => f.screenshot_path).filter((p): p is string => !!p)
+  );
+  const screenshotUrlByItem = new Map(
+    (cardioFeedback ?? []).map((f) => [f.training_plan_item_id, f.screenshot_path ? (screenshotUrls.get(f.screenshot_path) ?? null) : null])
+  );
 
   const cardio: SessionCardio[] = cardioItems.map((item) => ({
     itemId: item.id,
@@ -176,6 +184,7 @@ export default async function AthleteWorkoutSessionPage({
     off: item.heart_rate_off ?? "",
     note: item.notes ?? "",
     result: cardioResultByItem.get(item.id) ?? "",
+    screenshotUrl: screenshotUrlByItem.get(item.id) ?? null,
   }));
 
   const karateRows: SessionKarateRow[] = roundItems.map((item) => ({
@@ -216,6 +225,7 @@ export default async function AthleteWorkoutSessionPage({
       // leaving stale client state like editMode ("Training abgeschlossen")
       // from the PREVIOUS plan visible on a training that was never done.
       key={plan.id}
+      athleteId={user.id}
       planId={plan.id}
       planDate={plan.date}
       planTitle={plan.title}
