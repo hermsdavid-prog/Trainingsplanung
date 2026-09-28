@@ -71,3 +71,47 @@ export async function changePasswordAction(
 
   redirect("/");
 }
+
+// Voluntary password change from within the app (as opposed to the forced
+// first-login flow above) — re-verifies the current password via
+// signInWithPassword before allowing the update, since the user is already
+// authenticated and Supabase's updateUser() doesn't ask for it itself.
+export async function updatePasswordAction(
+  currentPassword: string,
+  password: string,
+  passwordConfirm: string
+): Promise<ActionResult> {
+  if (!currentPassword) {
+    return { error: "Bitte aktuelles Passwort eingeben." };
+  }
+  if (password.length < 8) {
+    return { error: "Das neue Passwort muss mindestens 8 Zeichen lang sein." };
+  }
+  if (password !== passwordConfirm) {
+    return { error: "Die neuen Passwörter stimmen nicht überein." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !user.email) {
+    return { error: "Nicht angemeldet." };
+  }
+
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (verifyError) {
+    return { error: "Aktuelles Passwort ist falsch." };
+  }
+
+  const { error: updateError } = await supabase.auth.updateUser({ password });
+  if (updateError) {
+    return { error: "Passwort konnte nicht geändert werden. Bitte erneut versuchen." };
+  }
+
+  return {};
+}

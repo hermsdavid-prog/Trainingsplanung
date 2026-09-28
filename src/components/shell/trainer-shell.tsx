@@ -97,6 +97,9 @@ export function TrainerShell({
             <NavLinks pathname={pathname} typeParam={typeParam} />
           </div>
           <div className="mt-auto flex flex-col gap-2 pt-6">
+            <Link href="/trainer/settings" className="btn btn-ghost btn-block">
+              Passwort ändern
+            </Link>
             <form action={logoutAction}>
               <button type="submit" className="btn btn-secondary btn-block">
                 Abmelden
@@ -156,6 +159,9 @@ export function TrainerShell({
                 <NavLinks pathname={pathname} typeParam={typeParam} onNavigate={() => setNavOpen(false)} />
               </div>
               <div className="mt-auto flex flex-col gap-2 pt-6">
+                <Link href="/trainer/settings" className="btn btn-ghost btn-block" onClick={() => setNavOpen(false)}>
+                  Passwort ändern
+                </Link>
                 <form action={logoutAction}>
                   <button type="submit" className="btn btn-secondary btn-block">
                     Abmelden

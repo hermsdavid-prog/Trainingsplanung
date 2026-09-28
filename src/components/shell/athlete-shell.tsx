@@ -34,6 +34,9 @@ export function AthleteShell({
           <Link href="/athlete/health" className="btn btn-ghost" aria-label="Gesundheit">
             Gesundheit
           </Link>
+          <Link href="/athlete/settings" className="btn btn-ghost" aria-label="Konto">
+            Konto
+          </Link>
           <form action={logoutAction}>
             <button type="submit" className="btn btn-ghost">
               Abmelden
