@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { weeklyOccurrences } from "@/lib/date";
+import { weeklyOccurrences, shiftDateISO } from "@/lib/date";
 import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
 import type { Database } from "@/lib/supabase/types";
 
@@ -244,10 +244,93 @@ export async function createOwnPlanAction(
 // editor (rahmendaten + rows) saves in one action. category_label is fixed
 // at creation time (implied by the Athletik/Karate nav entry point that was
 // used to create the plan) and isn't editable here.
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+// Date span a Mesozyklus covers: [start, endExclusive).
+async function mesocycleRange(supabase: Supabase, mesocycleId: string) {
+  const { data } = await supabase
+    .from("training_mesocycles")
+    .select("start_date, weeks")
+    .eq("id", mesocycleId)
+    .maybeSingle();
+  if (!data) return null;
+  return { start: data.start_date, endExclusive: shiftDateISO(data.start_date, data.weeks * 7) };
+}
+
+// The Mesozyklus a fresh copy should inherit from its source: the same one,
+// as long as the copy stays in the same group/athlete scope and its date
+// still falls inside that Mesozyklus — otherwise none.
+async function inheritedMesocycleId(
+  supabase: Supabase,
+  sourceMesocycleId: string | null,
+  targetDate: string
+): Promise<string | null> {
+  if (!sourceMesocycleId) return null;
+  const range = await mesocycleRange(supabase, sourceMesocycleId);
+  if (!range) return null;
+  return targetDate >= range.start && targetDate < range.endExclusive ? sourceMesocycleId : null;
+}
+
+// "Copies" of a plan are what the Athletik/Karate list already folds into
+// one row: the same weekly series, or an ad-hoc copy (Plan kopieren, drag
+// to copy, Ganzen Tag kopieren) with the same title for the same group or
+// athlete. When one of them is (re)assigned to a Mesozyklus, the others
+// follow — but only copies that are unassigned or were in the plan's
+// previous Mesozyklus (a copy deliberately placed in another block is left
+// alone), and only those dated inside the new Mesozyklus.
+async function propagateMesocycleToCopies(
+  supabase: Supabase,
+  plan: {
+    id: string;
+    series_id: string | null;
+    title: string;
+    category_label: string;
+    scope_type: string;
+    group_id: string | null;
+    athlete_id: string | null;
+    mesocycle_id: string | null;
+  },
+  newMesocycleId: string | null
+): Promise<number> {
+  const cols = "id, date, mesocycle_id";
+  let adhoc = supabase
+    .from("training_plans")
+    .select(cols)
+    .neq("id", plan.id)
+    .eq("title", plan.title)
+    .eq("category_label", plan.category_label)
+    .eq("scope_type", plan.scope_type as PlanScope);
+  adhoc = plan.group_id ? adhoc.eq("group_id", plan.group_id) : adhoc.is("group_id", null);
+  adhoc = plan.athlete_id ? adhoc.eq("athlete_id", plan.athlete_id) : adhoc.is("athlete_id", null);
+
+  const [{ data: adhocRows }, { data: seriesRows }] = await Promise.all([
+    adhoc,
+    plan.series_id
+      ? supabase.from("training_plans").select(cols).neq("id", plan.id).eq("series_id", plan.series_id)
+      : Promise.resolve({ data: [] as { id: string; date: string; mesocycle_id: string | null }[] }),
+  ]);
+
+  const candidates = new Map<string, { id: string; date: string; mesocycle_id: string | null }>();
+  for (const row of [...(adhocRows ?? []), ...(seriesRows ?? [])]) candidates.set(row.id, row);
+
+  const range = newMesocycleId ? await mesocycleRange(supabase, newMesocycleId) : null;
+  if (newMesocycleId && !range) return 0;
+
+  const ids = [...candidates.values()]
+    .filter((c) => c.mesocycle_id === null || c.mesocycle_id === plan.mesocycle_id)
+    .filter((c) => c.mesocycle_id !== newMesocycleId)
+    .filter((c) => !range || (c.date >= range.start && c.date < range.endExclusive))
+    .map((c) => c.id);
+  if (ids.length === 0) return 0;
+
+  const { error } = await supabase.from("training_plans").update({ mesocycle_id: newMesocycleId }).in("id", ids);
+  return error ? 0 : ids.length;
+}
+
 export async function updatePlanMetaAction(
   planId: string,
   meta: { title: string; date: string; time: string; mesocycleId?: string | null }
-): Promise<ActionResult> {
+): Promise<ActionResult & { propagated?: number }> {
   const { supabase } = await requirePlanEditAccess(planId);
 
   const title = meta.title.trim();
@@ -261,12 +344,25 @@ export async function updatePlanMetaAction(
     return { error: "Bitte ein Datum angeben." };
   }
 
+  // Read the plan as it was before this save: copies are matched on the
+  // old title, and "previous Mesozyklus" decides which copies may follow.
+  const { data: before } = await supabase
+    .from("training_plans")
+    .select("id, series_id, title, category_label, scope_type, group_id, athlete_id, mesocycle_id")
+    .eq("id", planId)
+    .single();
+
   const { error } = await supabase
     .from("training_plans")
     .update({ title, date, time, ...(meta.mesocycleId !== undefined ? { mesocycle_id: meta.mesocycleId } : {}) })
     .eq("id", planId);
 
   if (error) return { error: "Änderungen konnten nicht gespeichert werden." };
+
+  let propagated = 0;
+  if (before && meta.mesocycleId !== undefined && meta.mesocycleId !== before.mesocycle_id) {
+    propagated = await propagateMesocycleToCopies(supabase, before, meta.mesocycleId);
+  }
 
   revalidatePath(`/trainer/plans/${planId}/edit`);
   revalidatePath("/trainer/plans");
@@ -275,7 +371,8 @@ export async function updatePlanMetaAction(
   revalidatePath("/trainer/calendar");
   revalidatePath("/athlete/calendar");
   revalidatePath("/trainer/mesocycles");
-  return {};
+  revalidatePath("/athlete/mesocycles");
+  return { propagated };
 }
 
 type PlanItemInput = {
@@ -543,11 +640,12 @@ export async function duplicatePlanToDateAction(
 
   const { data: sourcePlan } = await supabase
     .from("training_plans")
-    .select("title, category_label, time, scope_type, group_id, athlete_id")
+    .select("title, category_label, time, scope_type, group_id, athlete_id, mesocycle_id")
     .eq("id", planId)
     .single();
 
   if (!sourcePlan) return { error: "Ursprungsplan nicht gefunden." };
+  const mesocycleId = await inheritedMesocycleId(supabase, sourcePlan.mesocycle_id, newDate);
 
   const { data: sourceItems } = await supabase
     .from("training_plan_items")
@@ -567,6 +665,7 @@ export async function duplicatePlanToDateAction(
       scope_type: sourcePlan.scope_type,
       group_id: sourcePlan.group_id,
       athlete_id: sourcePlan.athlete_id,
+      mesocycle_id: mesocycleId,
       created_by: userId,
     })
     .select("id")
@@ -625,7 +724,7 @@ export async function duplicateDayToDateAction(
 
   const { data: sourcePlans } = await supabase
     .from("training_plans")
-    .select("id, title, category_label, time, scope_type, group_id, athlete_id")
+    .select("id, title, category_label, time, scope_type, group_id, athlete_id, mesocycle_id")
     .eq("date", sourceDate);
 
   if (!sourcePlans || sourcePlans.length === 0) {
@@ -652,6 +751,7 @@ export async function duplicateDayToDateAction(
         scope_type: sourcePlan.scope_type,
         group_id: sourcePlan.group_id,
         athlete_id: sourcePlan.athlete_id,
+        mesocycle_id: await inheritedMesocycleId(supabase, sourcePlan.mesocycle_id, targetDate),
         created_by: userId,
       })
       .select("id")
@@ -725,11 +825,18 @@ export async function copyPlanAction(
 
   const { data: sourcePlan } = await supabase
     .from("training_plans")
-    .select("title, category_label, time")
+    .select("title, category_label, time, scope_type, group_id, athlete_id, mesocycle_id")
     .eq("id", sourcePlanId)
     .single();
 
   if (!sourcePlan) return { error: "Ursprungsplan nicht gefunden." };
+
+  // A Mesozyklus belongs to one group or athlete, so the copy only keeps it
+  // when it goes to that same group/athlete (and lands inside its dates).
+  const sameTarget =
+    scopeType === sourcePlan.scope_type &&
+    (scopeType === "group" ? groupId === sourcePlan.group_id : athleteId === sourcePlan.athlete_id);
+  const mesocycleId = sameTarget ? await inheritedMesocycleId(supabase, sourcePlan.mesocycle_id, date) : null;
 
   const { data: sourceItems } = await supabase
     .from("training_plan_items")
@@ -749,6 +856,7 @@ export async function copyPlanAction(
       scope_type: scopeType,
       group_id: scopeType === "group" ? groupId : null,
       athlete_id: scopeType === "athlete" ? athleteId : null,
+      mesocycle_id: mesocycleId,
       created_by: userId,
     })
     .select("id")

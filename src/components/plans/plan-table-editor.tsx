@@ -283,7 +283,12 @@ export function PlanTableEditor({
         });
       }
 
-      toast.success("Plan gespeichert.");
+      const propagated = metaResult.propagated ?? 0;
+      toast.success(
+        propagated > 0
+          ? `Plan gespeichert. ${propagated} ${propagated === 1 ? "Kopie wurde" : "Kopien wurden"} ebenfalls dem Mesozyklus zugeordnet.`
+          : "Plan gespeichert."
+      );
     });
   }
 
