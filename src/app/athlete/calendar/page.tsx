@@ -189,11 +189,11 @@ export default async function AthleteCalendarPage({
             <div className="mb-2.5 w-full p-3.5" style={{ background: "var(--dc-surface)", borderLeft: `2px solid ${item.tone}` }}>
               <div className="flex items-baseline justify-between gap-2.5">
                 <span className="text-[17px] leading-[1.2]">{item.title}</span>
-                <span className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
                   {item.time}
                 </span>
               </div>
-              <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+              <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
                 {item.meta}
               </div>
             </div>

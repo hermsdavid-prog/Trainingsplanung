@@ -50,8 +50,8 @@ export function DeleteUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <button type="button" className="btn btn-ghost" onClick={() => handleOpenChange(true)}>
-        löschen
+      <button type="button" className="btn btn-ghost btn-danger" onClick={() => handleOpenChange(true)}>
+        Löschen
       </button>
       <DialogPortal>
         <DialogOverlay />

@@ -57,7 +57,7 @@ export function ProposedEventsWidget({ events }: { events: ProposedEvent[] }) {
           >
             <div className="min-w-0">
               <div className="text-[15px]">{e.title}</div>
-              <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+              <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
                 {formatDateShort(e.date)} · {e.groupName} · vorgeschlagen von {e.proposedBy}
               </div>
               {e.description && (

@@ -494,7 +494,7 @@ export function WorkoutSession({
               </span>
               <div>
                 <div className="text-[16px]">Training abgeschlossen</div>
-                <div className="mt-0.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                <div className="mt-0.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
                   Belastungsempfinden: {rpeValue ?? "—"} / 10
                   {isAthletik && totals.done > 0
                     ? ` · ${totals.done} ${totals.done === 1 ? "Satz" : "Sätze"} dokumentiert`
@@ -514,7 +514,7 @@ export function WorkoutSession({
               <span>
                 {totals.done} von {totals.total} Sätzen
               </span>
-              <span style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+              <span style={{ color: "var(--dc-muted)" }}>
                 {totals.tonnage > 0 ? `${totals.tonnage.toLocaleString("de-DE")} ${totals.tonnageUnit}` : "—"}
               </span>
             </div>
@@ -550,7 +550,7 @@ export function WorkoutSession({
                     i
                   </button>
                 </div>
-                <div className="mt-1 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+                <div className="mt-1 text-[13px]" style={{ color: "var(--dc-muted)" }}>
                   {activeExercise.spec}
                   {activeExercise.restLabel ? ` · Pause ${activeExercise.restLabel}` : ""}
                   {activeExercise.note ? ` · ${activeExercise.note}` : ""}
@@ -561,7 +561,7 @@ export function WorkoutSession({
                   style={{
                     gridTemplateColumns: "64px 1fr 1fr 52px 38px 30px",
                     letterSpacing: ".09em",
-                    color: "color-mix(in srgb, var(--dc-text) 55%, transparent)",
+                    color: "var(--dc-muted)",
                     borderBottom: "1px solid var(--dc-divider)",
                   }}
                 >
@@ -589,7 +589,7 @@ export function WorkoutSession({
                       >
                         <span
                           className="text-xs leading-tight"
-                          style={{ color: s.confirmed ? "var(--dc-accent-700)" : "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}
+                          style={{ color: s.confirmed ? "var(--dc-accent-700)" : "var(--dc-muted)" }}
                         >
                           {label}
                         </span>
@@ -673,11 +673,11 @@ export function WorkoutSession({
                         >
                           <div className="flex items-baseline justify-between gap-2.5">
                             <span className="text-[16px]">{e.name}</span>
-                            <span className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                            <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
                               {done}/{Math.max(Number(e.sets) || 1, rows.length)}
                             </span>
                           </div>
-                          <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                          <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
                             {e.spec}
                             {e.restLabel ? ` · Pause ${e.restLabel}` : ""}
                           </div>
@@ -725,7 +725,7 @@ export function WorkoutSession({
               <div key={c.itemId} className="mt-6.5 p-3.5" style={{ background: "var(--dc-surface)", marginTop: 26 }}>
                 <div className="kicker-accent-2">Cardio</div>
                 <div className="mt-1.5 text-base">{c.name}{c.spec ? ` — ${c.spec}` : ""}</div>
-                <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
                   {c.on && `On ${c.on} Belastung`}
                   {c.off && ` · Off ${c.off} Pause`}
                   {c.note && ` · ${c.note}`}
@@ -735,7 +735,7 @@ export function WorkoutSession({
           </>
         ) : (
           <div className="mt-3.5">
-            <div className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+            <div className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
               {karateRows.length} {karateRows.length === 1 ? "Übung" : "Übungen"}
             </div>
             <div className="mt-5 flex flex-col gap-3">
@@ -744,7 +744,7 @@ export function WorkoutSession({
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="min-w-0">
                       <div className="text-[17px] leading-[1.25]">{row.name}</div>
-                      <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                      <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
                         {row.valLabel}
                         {row.rounds ? ` · ${row.rounds} ${row.rounds === 1 ? "Runde" : "Runden"}` : ""}
                         {row.restLabel ? ` · Pause ${row.restLabel}` : ""}
@@ -782,7 +782,7 @@ export function WorkoutSession({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-baseline justify-between">
-              <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+              <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
                 {pad.field === "reps" ? "Wiederholungen" : "Gewicht"}
               </span>
               <button type="button" className="btn btn-ghost" onClick={() => setPad(null)}>
@@ -791,12 +791,12 @@ export function WorkoutSession({
             </div>
             <div className="mt-1.5 flex items-baseline gap-2">
               <span className="text-[44px] leading-none">{pad.buffer || "0"}</span>
-              <span className="text-base" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+              <span className="text-base" style={{ color: "var(--dc-muted)" }}>
                 {pad.unit}
               </span>
             </div>
             {pad.suggestion && (
-              <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+              <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
                 Letztes Training: {pad.suggestion} {pad.unit}
               </div>
             )}
@@ -830,7 +830,7 @@ export function WorkoutSession({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-baseline justify-between">
-              <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+              <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
                 RIR — Wiederholungen bis zum Muskelversagen übrig
               </span>
               <button type="button" className="btn btn-ghost" onClick={() => setRirPad(null)}>
@@ -869,7 +869,7 @@ export function WorkoutSession({
                 ✕
               </button>
             </div>
-            <div className="mt-2 text-[13px] leading-[1.5]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+            <div className="mt-2 text-[13px] leading-[1.5]" style={{ color: "var(--dc-muted)" }}>
               Belastungsempfinden für die ganze Einheit — {RPE_WORDS[rpeValue ?? 5]}.
             </div>
             <div className="mt-3.5 grid grid-cols-5 gap-2">
@@ -889,7 +889,7 @@ export function WorkoutSession({
                 </button>
               ))}
             </div>
-            <div className="mt-2 flex justify-between text-[11px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+            <div className="mt-2 flex justify-between text-[11px]" style={{ color: "var(--dc-muted)" }}>
               <span>1 · sehr leicht</span>
               <span>10 · maximal</span>
             </div>
@@ -942,7 +942,7 @@ export function WorkoutSession({
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm leading-[1.5]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                    <p className="text-sm leading-[1.5]" style={{ color: "var(--dc-muted)" }}>
                       {fallbackNote || "Noch keine Anweisung vom Trainer hinterlegt."}
                     </p>
                   )}

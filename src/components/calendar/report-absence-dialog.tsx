@@ -59,7 +59,7 @@ export function ReportAbsenceDialog({ defaultDate }: { defaultDate: string }) {
       {open && (
         <div className="mt-3 max-w-[500px] p-5" style={{ background: "var(--dc-surface)" }}>
           <div className="kicker-muted">Abwesenheit melden</div>
-          <p className="mt-1.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+          <p className="mt-1.5 text-xs" style={{ color: "var(--dc-muted)" }}>
             Erscheint im Kalender aller deiner Gruppen und Athleten.
           </p>
 

@@ -33,7 +33,7 @@ export function OwnPlanFlow({ templates }: { templates: PlanTemplateSummary[] })
       <div>
         <div className="kicker">Schritt 1 von 2</div>
         <h2 className="mt-2.5 text-[27px] leading-[1.08]">Vorlage wählen</h2>
-        <p className="mt-2.5 text-sm leading-[1.55]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+        <p className="mt-2.5 text-sm leading-[1.55]" style={{ color: "var(--dc-muted)" }}>
           Optional — du kannst auch leer starten und die Übungstabelle im nächsten Schritt selbst füllen.
         </p>
         <div className="mt-6">
@@ -44,7 +44,7 @@ export function OwnPlanFlow({ templates }: { templates: PlanTemplateSummary[] })
                 leer starten
               </span>
             </div>
-            <div className="mt-0.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+            <div className="mt-0.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
               Übungstabelle bleibt zunächst leer, du füllst sie im nächsten Schritt selbst.
             </div>
           </button>
@@ -60,7 +60,7 @@ export function OwnPlanFlow({ templates }: { templates: PlanTemplateSummary[] })
                 </div>
               </div>
               {t.usage_note && (
-                <div className="mt-0.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                <div className="mt-0.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
                   {t.usage_note}
                 </div>
               )}
@@ -83,7 +83,7 @@ export function OwnPlanFlow({ templates }: { templates: PlanTemplateSummary[] })
       </button>
       <div className="kicker mt-3.5">Schritt 2 von 2</div>
       <h2 className="mt-2.5 text-[27px] leading-[1.08]">Rahmendaten</h2>
-      <p className="mt-2.5 text-sm leading-[1.55]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+      <p className="mt-2.5 text-sm leading-[1.55]" style={{ color: "var(--dc-muted)" }}>
         Lege die Rahmendaten fest — die Übungstabelle folgt im nächsten Schritt. Dein Trainer
         kann dieses Training einsehen.
       </p>

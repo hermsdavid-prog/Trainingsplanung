@@ -10,7 +10,6 @@ import {
   ensureExerciseAction,
 } from "@/lib/actions/plans";
 import { upsertExerciseInstructionsAction } from "@/lib/actions/exercise-instructions";
-import { formatDateShort } from "@/lib/date";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, CopyIcon, GripVerticalIcon } from "lucide-react";
 
@@ -386,7 +385,7 @@ export function PlanTableEditor({
               }}
             />
             {subtitle && (
-              <p className="mt-2.5 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+              <p className="mt-2.5 text-sm" style={{ color: "var(--dc-muted)" }}>
                 {subtitle}
               </p>
             )}
@@ -413,7 +412,7 @@ export function PlanTableEditor({
 
         <div className="mt-5.5 flex flex-wrap items-start gap-6" style={{ marginTop: 22 }}>
           <div className="field" style={{ width: 170, margin: 0 }}>
-            <label htmlFor="plan-date">Datum{date ? ` · ${formatDateShort(date)}` : ""}</label>
+            <label htmlFor="plan-date">Datum</label>
             <input
               id="plan-date"
               type="date"
@@ -433,7 +432,7 @@ export function PlanTableEditor({
             />
           </div>
           {mesocycles && (
-            <div className="field" style={{ width: 220, margin: 0 }}>
+            <div className="field" style={{ width: 260, maxWidth: "100%", margin: 0 }}>
               <label htmlFor="plan-mesocycle">Mesozyklus</label>
               <select
                 id="plan-mesocycle"
@@ -505,7 +504,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-24"
+                        className="input w-28"
                         value={row.rest_time}
                         onChange={(e) => updateRow(index, "rest_time", e.target.value)}
                         placeholder="z. B. 60 Sek."

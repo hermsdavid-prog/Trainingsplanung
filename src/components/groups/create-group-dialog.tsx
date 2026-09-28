@@ -45,7 +45,7 @@ export function CreateGroupDialog() {
         <DialogContent showCloseButton={false} className="dc-dialog max-w-[480px]">
           <form action={handleSubmit} className="flex flex-col">
             <div className="kicker-muted">Neue Gruppe anlegen</div>
-            <p className="mt-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+            <p className="mt-2 text-[13px]" style={{ color: "var(--dc-muted)" }}>
               Z. B. Karate-Kata, Karate-Kumite, Einzellauf, Paarlauf, Eistanz.
             </p>
             <div className="field mt-4">

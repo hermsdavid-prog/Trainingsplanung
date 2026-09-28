@@ -45,7 +45,7 @@ export function ProposeEventDialog({
         <DialogContent showCloseButton={false} className="dc-dialog max-w-[460px]">
           <form action={handleSubmit} className="flex flex-col">
             <div className="kicker-muted">Termin vorschlagen</div>
-            <p className="mt-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+            <p className="mt-2 text-[13px]" style={{ color: "var(--dc-muted)" }}>
               Dein Trainer sieht den Vorschlag und kann ihn bestätigen.
             </p>
 

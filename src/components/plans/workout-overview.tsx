@@ -73,7 +73,7 @@ export function WorkoutOverview({
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="min-w-0">
                         <div className="text-[16px] leading-[1.25]">{ex.name}</div>
-                        <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                        <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
                           {ex.spec || "—"}
                           {ex.sets ? ` · ${ex.sets} Sätze` : ""}
                           {ex.restLabel ? ` · Pause ${ex.restLabel}` : ""}
@@ -106,7 +106,7 @@ export function WorkoutOverview({
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="min-w-0">
                         <div className="text-[16px] leading-[1.25]">{c.name}{c.spec ? ` — ${c.spec}` : ""}</div>
-                        <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                        <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
                           {c.on && `On ${c.on} Belastung`}
                           {c.off && ` · Off ${c.off} Pause`}
                           {c.restLabel && ` · Pause ${c.restLabel}`}
@@ -145,7 +145,7 @@ export function WorkoutOverview({
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="min-w-0">
                       <div className="text-[16px] leading-[1.25]">{row.name}</div>
-                      <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                      <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
                         {row.valLabel || "—"}
                         {row.rounds ? ` · ${row.rounds} Runden` : ""}
                         {row.restLabel ? ` · Pause ${row.restLabel}` : ""}

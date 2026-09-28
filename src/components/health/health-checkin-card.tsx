@@ -54,7 +54,7 @@ export function HealthCheckinCard({ date }: { date: string }) {
           </button>
         ))}
       </div>
-      <div className="mt-2 flex justify-between text-[11px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+      <div className="mt-2 flex justify-between text-[11px]" style={{ color: "var(--dc-muted)" }}>
         <span>1 · erschöpft</span>
         <span>10 · topfit</span>
       </div>

@@ -61,7 +61,7 @@ export default async function AdminUsersPage() {
       <div className="flex items-start justify-between gap-5">
         <div>
           <h2 className="text-[34px] leading-[1.05]">Nutzer</h2>
-          <p className="mt-2.5 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+          <p className="mt-2.5 text-sm" style={{ color: "var(--dc-muted)" }}>
             {(profiles ?? []).length} Accounts · {mustChangeCount} warten auf das erste Login
           </p>
         </div>
@@ -97,7 +97,7 @@ export default async function AdminUsersPage() {
             ))}
             {(!profiles || profiles.length === 0) && (
               <tr>
-                <td colSpan={4} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                <td colSpan={4} className="text-center" style={{ color: "var(--dc-muted)" }}>
                   Noch keine Nutzer angelegt.
                 </td>
               </tr>
@@ -137,14 +137,14 @@ export default async function AdminUsersPage() {
                   <td>
                     <span className={`tag ${row.state.tagClass}`}>{row.state.label}</span>
                   </td>
-                  <td className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                  <td className="text-sm" style={{ color: "var(--dc-muted)" }}>
                     {row.date}
                   </td>
                 </tr>
               ))}
               {consentRows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                  <td colSpan={4} className="text-center" style={{ color: "var(--dc-muted)" }}>
                     Noch keine Trainer oder Athleten angelegt.
                   </td>
                 </tr>

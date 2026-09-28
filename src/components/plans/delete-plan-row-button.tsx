@@ -25,12 +25,12 @@ export function DeletePlanRowButton({ planId, title }: { planId: string; title: 
   return (
     <button
       type="button"
-      className="btn btn-ghost"
+      className="btn btn-ghost btn-danger"
       onClick={handleDelete}
       disabled={isPending}
       aria-label="Plan löschen"
     >
-      löschen
+      Löschen
     </button>
   );
 }

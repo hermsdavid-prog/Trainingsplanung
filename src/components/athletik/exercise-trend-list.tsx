@@ -28,7 +28,7 @@ export function ExerciseTrendList({
                     ? "var(--dc-accent-700)"
                     : isDown
                       ? "var(--dc-accent-2-700)"
-                      : "color-mix(in srgb, var(--dc-text) 55%, transparent)",
+                      : "var(--dc-muted)",
                 }}
               >
                 {trend.latestValue}

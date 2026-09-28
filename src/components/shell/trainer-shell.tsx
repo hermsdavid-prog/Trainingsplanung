@@ -5,17 +5,32 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
+import {
+  LayoutDashboard,
+  Dumbbell,
+  Swords,
+  CalendarDays,
+  Users,
+  UserRound,
+  Layers,
+  FileText,
+  Download,
+  Menu,
+  X,
+} from "lucide-react";
 
 const NAV = [
-  { href: "/trainer", label: "Übersicht", match: (p: string) => p === "/trainer" },
+  { href: "/trainer", label: "Übersicht", Icon: LayoutDashboard, match: (p: string) => p === "/trainer" },
   {
     href: "/trainer/plans?type=Athletik",
     label: "Athletik",
+    Icon: Dumbbell,
     match: (p: string, sp: string) => (p === "/trainer/plans" || p === "/trainer/plans/new") && sp === "Athletik",
   },
   {
     href: "/trainer/plans?type=Sportartspezifisch",
     label: "Karate",
+    Icon: Swords,
     // Sportartspezifisch is the default category when the plans page has no
     // ?type= param (see PLAN_TYPES[0] in src/lib/plan-type.ts), so treat a
     // missing param the same as an explicit match here. Only the list and
@@ -24,12 +39,12 @@ const NAV = [
     // plan.
     match: (p: string, sp: string) => (p === "/trainer/plans" || p === "/trainer/plans/new") && sp !== "Athletik",
   },
-  { href: "/trainer/calendar", label: "Kalender", match: (p: string) => p.startsWith("/trainer/calendar") },
-  { href: "/trainer/groups", label: "Gruppen", match: (p: string) => p.startsWith("/trainer/groups") },
-  { href: "/trainer/athletes", label: "Athleten", match: (p: string) => p.startsWith("/trainer/athletes") },
-  { href: "/trainer/mesocycles", label: "Mesozyklen", match: (p: string) => p.startsWith("/trainer/mesocycles") },
-  { href: "/trainer/report", label: "Wochenbericht", match: (p: string) => p.startsWith("/trainer/report") },
-  { href: "/trainer/export", label: "Export", match: (p: string) => p.startsWith("/trainer/export") },
+  { href: "/trainer/calendar", label: "Kalender", Icon: CalendarDays, match: (p: string) => p.startsWith("/trainer/calendar") },
+  { href: "/trainer/groups", label: "Gruppen", Icon: Users, match: (p: string) => p.startsWith("/trainer/groups") },
+  { href: "/trainer/athletes", label: "Athleten", Icon: UserRound, match: (p: string) => p.startsWith("/trainer/athletes") },
+  { href: "/trainer/mesocycles", label: "Mesozyklen", Icon: Layers, match: (p: string) => p.startsWith("/trainer/mesocycles") },
+  { href: "/trainer/report", label: "Wochenbericht", Icon: FileText, match: (p: string) => p.startsWith("/trainer/report") },
+  { href: "/trainer/export", label: "Export", Icon: Download, match: (p: string) => p.startsWith("/trainer/export") },
 ];
 
 function NavLinks({
@@ -50,12 +65,15 @@ function NavLinks({
             key={item.href}
             href={item.href}
             onClick={onNavigate}
-            className="navbtn"
+            className="navbtn flex items-center gap-2.5"
+            aria-current={active ? "page" : undefined}
             style={{
-              background: active ? "var(--dc-accent)" : "transparent",
-              color: active ? "var(--dc-bg)" : "var(--dc-text)",
+              background: active ? "var(--dc-accent)" : undefined,
+              color: active ? "#fff" : "var(--dc-text)",
+              fontWeight: active ? 600 : 400,
             }}
           >
+            <item.Icon className="size-[17px] flex-none" strokeWidth={active ? 2 : 1.6} aria-hidden />
             {item.label}
           </Link>
         );
@@ -96,7 +114,7 @@ export function TrainerShell({
             <div className="font-heading text-[17px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
               Trainingsplanung
             </div>
-            <div className="mt-0.5 text-[11px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+            <div className="mt-0.5 text-[11px]" style={{ color: "var(--dc-muted)" }}>
               {fullName} · Trainer
             </div>
             <div className="mt-7">
@@ -117,17 +135,17 @@ export function TrainerShell({
 
         {/* Mobile top bar */}
         <div
-          className="no-print flex lg:hidden items-center gap-3 px-4 py-2.5"
-          style={{ borderBottom: "1px solid var(--dc-divider)" }}
+          className="no-print sticky top-0 z-30 flex lg:hidden items-center gap-2 px-2 py-1"
+          style={{ borderBottom: "1px solid var(--dc-divider)", background: "var(--dc-surface)" }}
         >
           <button
             type="button"
             onClick={() => setNavOpen(true)}
             aria-label="Menü öffnen"
-            className="flex size-11 flex-none items-center justify-center text-[22px]"
-            style={{ background: "transparent", border: 0, color: "var(--dc-text)" }}
+            className="btn btn-icon flex-none"
+            style={{ color: "var(--dc-text)" }}
           >
-            ⋮
+            <Menu className="size-[22px]" strokeWidth={1.75} aria-hidden />
           </button>
           <span className="text-[17px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
             {current}
@@ -137,8 +155,8 @@ export function TrainerShell({
         {navOpen && (
           <div className="fixed inset-0 z-40 flex lg:hidden">
             <div
-              className="flex w-[258px] flex-none flex-col p-5"
-              style={{ background: "var(--dc-bg)", boxShadow: "var(--dc-shadow-lg)" }}
+              className="flex w-[272px] flex-none flex-col overflow-y-auto p-5"
+              style={{ background: "var(--dc-surface)", boxShadow: "var(--dc-shadow-lg)" }}
             >
               <div className="flex items-start justify-between gap-2.5">
                 <div>
@@ -147,7 +165,7 @@ export function TrainerShell({
                   </div>
                   <div
                     className="mt-0.5 text-[11px]"
-                    style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}
+                    style={{ color: "var(--dc-muted)" }}
                   >
                     {fullName} · Trainer
                   </div>
@@ -156,10 +174,10 @@ export function TrainerShell({
                   type="button"
                   onClick={() => setNavOpen(false)}
                   aria-label="Menü schließen"
-                  className="-mt-1.5 -mr-1.5 flex size-8 flex-none items-center justify-center text-[16px]"
-                  style={{ background: "transparent", border: 0, color: "color-mix(in srgb, var(--dc-text) 50%, transparent)" }}
+                  className="btn btn-icon -mt-2 -mr-2 flex-none"
+                  style={{ color: "var(--dc-muted)" }}
                 >
-                  ✕
+                  <X className="size-5" aria-hidden />
                 </button>
               </div>
               <div className="mt-5">

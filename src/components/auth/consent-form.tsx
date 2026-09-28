@@ -61,7 +61,7 @@ export function ConsentForm({
           </span>
           <span
             className="mt-1 block text-xs leading-[1.5]"
-            style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+            style={{ color: "var(--dc-muted)" }}
           >
             Trainingsdaten, Rollen, Gruppen — Art. 6 Abs. 1 lit. b und f DSGVO.
           </span>
@@ -94,7 +94,7 @@ export function ConsentForm({
             </span>
             <span
               className="mt-1 block text-xs leading-[1.5]"
-              style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+              style={{ color: "var(--dc-muted)" }}
             >
               HRV, Ruhe-Herzfrequenz und Wohlbefinden für die Trainer deiner Gruppe — Art. 9 Abs. 2
               lit. a DSGVO. Freiwillig, jederzeit widerrufbar.

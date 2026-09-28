@@ -103,7 +103,7 @@ export default async function TrainerAthletePlanPage({
           <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">
             {athlete.full_name}
           </h2>
-          <div className="mt-3 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+          <div className="mt-3 text-sm" style={{ color: "var(--dc-muted)" }}>
             {done} von {total} Sätzen dokumentiert
             {tonnage > 0 ? ` · ${tonnage.toLocaleString("de-DE")} ${tonnageUnit}` : ""}
           </div>
@@ -127,7 +127,7 @@ export default async function TrainerAthletePlanPage({
                   <h3 className="m-0 text-[19px]">{ex.exercise_name}</h3>
                   {ex.reps_or_duration && <span className="tag tag-neutral">{ex.reps_or_duration}</span>}
                 </div>
-                <span className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
                   {ex.sets.length} {ex.sets.length === 1 ? "Satz" : "Sätze"}
                 </span>
               </div>
@@ -136,7 +136,7 @@ export default async function TrainerAthletePlanPage({
                 style={{
                   gridTemplateColumns: "90px 1fr 1fr 1fr",
                   letterSpacing: ".09em",
-                  color: "color-mix(in srgb, var(--dc-text) 55%, transparent)",
+                  color: "var(--dc-muted)",
                   borderBottom: "1px solid var(--dc-divider)",
                 }}
               >
@@ -156,7 +156,7 @@ export default async function TrainerAthletePlanPage({
                   const tone =
                     s.type === "arbeitssatz"
                       ? "var(--dc-text)"
-                      : "color-mix(in srgb, var(--dc-text) 60%, transparent)";
+                      : "var(--dc-muted)";
                   return (
                     <div
                       key={si}
@@ -166,7 +166,7 @@ export default async function TrainerAthletePlanPage({
                         borderBottom: "1px solid color-mix(in srgb, var(--dc-text) 8%, transparent)",
                       }}
                     >
-                      <span className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                      <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
                         {label}
                       </span>
                       <span className="text-[15px]" style={{ color: tone }}>

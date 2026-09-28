@@ -82,7 +82,7 @@ export function NewPlanFlow({
                 leer starten
               </span>
             </div>
-            <div className="mt-0.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+            <div className="mt-0.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
               Übungstabelle bleibt zunächst leer, du füllst sie im nächsten Schritt selbst.
             </div>
           </button>
@@ -100,7 +100,7 @@ export function NewPlanFlow({
                   </span>
                 </div>
                 {t.usage_note && (
-                  <div className="mt-0.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                  <div className="mt-0.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
                     {t.usage_note}
                   </div>
                 )}
@@ -131,7 +131,7 @@ export function NewPlanFlow({
       </button>
       <div className={`${kickerClass} mt-3.5`}>Neues {categoryName}-Training · Schritt 2 von 2</div>
       <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Rahmendaten</h2>
-      <p className="mt-2.5 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+      <p className="mt-2.5 text-sm" style={{ color: "var(--dc-muted)" }}>
         Lege die Rahmendaten fest — die Übungstabelle folgt im nächsten Schritt.
       </p>
       <div className="mt-6 max-w-[520px]">

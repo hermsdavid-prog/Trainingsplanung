@@ -295,7 +295,7 @@ export function CalendarGrid({
                     color:
                       berlinMark.type === "feiertag"
                         ? "var(--dc-accent-2-700)"
-                        : "color-mix(in srgb, var(--dc-text) 55%, transparent)",
+                        : "var(--dc-muted)",
                   }}
                 >
                   {berlinMark.label}
@@ -329,7 +329,7 @@ export function CalendarGrid({
 
       <div
         className="mt-3 flex flex-wrap gap-3.5 text-[11px]"
-        style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+        style={{ color: "var(--dc-muted)" }}
       >
         <span className="flex items-center gap-1.5">
           <span style={{ width: 10, height: 3, background: "var(--dc-accent)" }} />
@@ -378,7 +378,7 @@ export function CalendarGrid({
                 {selectedItems.length === 0 && (
                   <p
                     className="mt-3 text-[13px] leading-[1.5]"
-                    style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                    style={{ color: "var(--dc-muted)" }}
                   >
                     Für diesen Tag ist nichts geplant.
                   </p>
@@ -401,7 +401,7 @@ export function CalendarGrid({
                               {item.subtitle && (
                                 <div
                                   className="mt-0.5 truncate text-xs"
-                                  style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                                  style={{ color: "var(--dc-muted)" }}
                                 >
                                   {item.subtitle}
                                 </div>
@@ -442,7 +442,7 @@ export function CalendarGrid({
                               {item.subtitle && (
                                 <div
                                   className="mt-0.5 truncate text-xs"
-                                  style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}
+                                  style={{ color: "var(--dc-muted)" }}
                                 >
                                   {item.subtitle}
                                 </div>

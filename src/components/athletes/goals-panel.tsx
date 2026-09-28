@@ -28,7 +28,7 @@ export function GoalsPanel({ groups, athleteId }: { groups: MesocycleGoalGroup[]
       >
         <span className="text-[15px]">
           Meine Ziele{" "}
-          <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+          <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
             · {totalCount} {totalCount === 1 ? "Ziel" : "Ziele"}
           </span>
         </span>

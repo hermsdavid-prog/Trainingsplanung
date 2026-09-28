@@ -12,7 +12,7 @@ export default async function TrainerExportPage() {
     <div>
       <div className="kicker">Export</div>
       <h2 className="mt-1.5 text-[27px] leading-[1.08]">Daten exportieren</h2>
-      <p className="mt-2.5 max-w-[560px] text-sm leading-[1.6]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+      <p className="mt-2.5 max-w-[560px] text-sm leading-[1.6]" style={{ color: "var(--dc-muted)" }}>
         Excel-Datei mit Trainingsplänen, Ergebnissen, Gesundheitswerten und Trainingszielen der ausgewählten Gruppe
         (oder aller Athleten) im gewählten Zeitraum. Trainingsziele sind nicht an den Zeitraum gebunden — es werden
         immer die aktuellen Ziele exportiert.

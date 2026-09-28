@@ -13,8 +13,8 @@ import {
 } from "@/lib/date";
 
 describe("formatDateShort", () => {
-  it("formats an ISO date as dd/mm/yyyy", () => {
-    expect(formatDateShort("2026-08-24")).toBe("24/08/2026");
+  it("formats an ISO date as dd.mm.yyyy (German convention)", () => {
+    expect(formatDateShort("2026-08-24")).toBe("24.08.2026");
   });
 });
 

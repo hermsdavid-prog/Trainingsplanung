@@ -286,7 +286,7 @@ export function GroupManager({
                       style={{
                         color: isHead
                           ? "var(--dc-accent-700)"
-                          : "color-mix(in srgb, var(--dc-text) 55%, transparent)",
+                          : "var(--dc-muted)",
                       }}
                     >
                       {isHead ? "Haupttrainer" : "Co-Trainer"}
@@ -350,7 +350,7 @@ export function GroupManager({
             </>
           )}
           {!canManageTeam && (
-            <p className="mt-3 text-[13px] leading-[1.6]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+            <p className="mt-3 text-[13px] leading-[1.6]" style={{ color: "var(--dc-muted)" }}>
               Nur der Haupttrainer darf Gruppe und Team ändern.
             </p>
           )}
@@ -412,7 +412,7 @@ export function GroupManager({
             </div>
           )}
 
-          <p className="mt-5 text-[13px] leading-[1.6]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+          <p className="mt-5 text-[13px] leading-[1.6]" style={{ color: "var(--dc-muted)" }}>
             Alle Trainer der Gruppe sehen alle Daten. Der Haupttrainer darf zusätzlich Gruppe und
             Team ändern.
           </p>

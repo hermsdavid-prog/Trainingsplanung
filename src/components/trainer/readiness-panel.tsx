@@ -19,7 +19,9 @@ export type ReadinessRow = {
 // reading); the header summary line already surfaces that count either way.
 export function ReadinessPanel({ rows }: { rows: ReadinessRow[] }) {
   const redCount = rows.filter((r) => r.level === "red").length;
-  const [open, setOpen] = useState(redCount > 0);
+  // Open straight away when it fits on screen anyway (small groups) or when
+  // something needs attention; only a long roster starts collapsed.
+  const [open, setOpen] = useState(redCount > 0 || (rows.length > 0 && rows.length <= 8));
   const router = useRouter();
 
   return (
@@ -59,7 +61,7 @@ export function ReadinessPanel({ rows }: { rows: ReadinessRow[] }) {
                     <td>
                       <span className={`tag ${row.levelTagClass}`}>{row.levelLabel}</span>
                     </td>
-                    <td className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                    <td className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
                       {row.todayLabel}
                     </td>
                   </tr>

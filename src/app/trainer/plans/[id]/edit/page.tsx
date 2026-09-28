@@ -167,7 +167,7 @@ export default async function EditPlanPage({
                 <span className="tag tag-neutral">Serie · {seriesCount} Termine</span>
               )}
             </div>
-            <p className="mt-2 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+            <p className="mt-2 text-sm" style={{ color: "var(--dc-muted)" }}>
               Für: {targetLabel ?? "—"} ({plan.scope_type === "group" ? "Gruppe" : "Einzelplan"})
             </p>
             <p className="mt-1 text-xs text-muted">

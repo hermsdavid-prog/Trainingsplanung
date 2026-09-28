@@ -137,7 +137,7 @@ export default async function AthletePlanPage({
         <div>
           <div className={isAthletik ? "kicker" : "kicker-accent-2"}>{isAthletik ? "Athletik" : "Karate"}</div>
           <h2 className="mt-1.5 text-[27px] leading-[1.08]">{plan.title}</h2>
-          <p className="mt-1 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+          <p className="mt-1 text-[13px]" style={{ color: "var(--dc-muted)" }}>
             {formatDateShort(plan.date)}
             {plan.time ? ` · ${plan.time}` : ""} ·{" "}
             {plan.scope_type === "group"

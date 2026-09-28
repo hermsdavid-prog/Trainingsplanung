@@ -121,13 +121,13 @@ export function CalendarFilters({
               style={{ padding: "8px 10px", fontFamily: "var(--dc-font-body)", fontSize: "13px", lineHeight: 1.3, background: "transparent", border: 0, cursor: "pointer", color: "var(--dc-text)" }}
             >
               {h.label}
-              <span className="block text-[11px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+              <span className="block text-[11px]" style={{ color: "var(--dc-muted)" }}>
                 {h.meta}
               </span>
             </button>
           ))}
           {hits.length === 0 && (
-            <div className="text-xs" style={{ padding: "8px 10px", color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+            <div className="text-xs" style={{ padding: "8px 10px", color: "var(--dc-muted)" }}>
               Nichts gefunden.
             </div>
           )}

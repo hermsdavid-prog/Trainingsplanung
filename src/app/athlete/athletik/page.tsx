@@ -84,7 +84,7 @@ export default async function AthleteAthletikPage({
                   {best}
                   {resultUnit ? ` ${resultUnit}` : ""}
                 </span>
-                <span className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                <span className="text-sm" style={{ color: "var(--dc-muted)" }}>
                   bester Wert
                 </span>
               </div>
@@ -93,7 +93,7 @@ export default async function AthleteAthletikPage({
                   <span className="text-[22px] leading-none font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
                     {bestOneRm} {resultUnit}
                   </span>
-                  <span className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+                  <span className="text-sm" style={{ color: "var(--dc-muted)" }}>
                     geschätztes 1RM
                   </span>
                 </div>

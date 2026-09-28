@@ -162,7 +162,7 @@ export function CreateEventDialog({
             </div>
           </div>
 
-          <div className="mt-4 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+          <div className="mt-4 text-xs" style={{ color: "var(--dc-muted)" }}>
             Für wen — Mehrfachauswahl möglich
           </div>
           <div className="mt-2 flex flex-wrap gap-2">

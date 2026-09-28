@@ -18,15 +18,15 @@ export default function LoginPage() {
       style={{ background: "var(--dc-neutral-200)" }}
     >
       <div
-        className="grid w-full max-w-[920px] grid-cols-1 lg:grid-cols-2"
-        style={{ background: "var(--dc-bg)", boxShadow: "var(--dc-shadow-md)", minHeight: 520 }}
+        className="grid w-full max-w-[920px] grid-cols-1 overflow-hidden lg:grid-cols-2"
+        style={{ background: "var(--dc-surface)", boxShadow: "var(--dc-shadow-md)", minHeight: 520 }}
       >
         <div className="flex flex-col justify-center p-6 sm:p-10">
           <div className="kicker">Anmelden</div>
           <h2 className="mt-2.5 text-[28px] leading-[1.06] sm:text-[34px] sm:leading-[1.05]">
             Willkommen zurück
           </h2>
-          <p className="mt-2.5 text-sm leading-[1.6]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+          <p className="mt-2.5 text-sm leading-[1.6]" style={{ color: "var(--dc-muted)" }}>
             Die Rolle steht am Konto — Athleten landen im Training, Trainer im Arbeitsplatz,
             Admins in der Nutzerverwaltung.
           </p>
@@ -35,18 +35,23 @@ export default function LoginPage() {
           </div>
         </div>
         <div
-          className="flex flex-col justify-center gap-[18px] p-6 sm:p-10"
-          style={{ background: "var(--dc-surface)" }}
+          className="flex flex-col justify-end gap-4 p-6 sm:p-10"
+          style={{ background: "var(--dc-accent-800)", color: "#fff" }}
         >
-          <div className="kicker-muted">Ohne Einladung kein Zugang</div>
-          <p className="text-[16px] leading-[1.6]">
-            Accounts legt ausschließlich der Admin an — mit Rolle, Name und E-Mail. Es gibt keine
-            Selbstregistrierung.
+          <div
+            className="text-[30px] leading-[1.05] font-semibold sm:text-[38px]"
+            style={{ fontFamily: "var(--dc-font-heading)" }}
+          >
+            Trainings&shy;planung
+          </div>
+          <p className="max-w-[34ch] text-[15px] leading-[1.6]" style={{ color: "color-mix(in srgb, #fff 85%, transparent)" }}>
+            Pläne, Mesozyklen und Trainingsbereitschaft für Karate und Athletik — an einem Ort.
           </p>
-          <p className="text-[13px] leading-[1.5]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
-            Beim ersten Login wird das vom Admin vergebene Einmal-Passwort durch ein persönliches
+          <div className="mt-2 border-t pt-4 text-[13px] leading-[1.55]" style={{ borderColor: "color-mix(in srgb, #fff 25%, transparent)", color: "color-mix(in srgb, #fff 78%, transparent)" }}>
+            <strong className="font-semibold" style={{ color: "#fff" }}>Ohne Einladung kein Zugang.</strong> Accounts legt
+            ausschließlich der Admin an. Beim ersten Login wird das Einmal-Passwort durch ein persönliches
             Passwort ersetzt.
-          </p>
+          </div>
         </div>
       </div>
     </div>

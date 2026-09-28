@@ -29,7 +29,7 @@ export function CopyOwnPlanDialog({ planId }: { planId: string }) {
         <DialogContent showCloseButton={false} className="dc-dialog max-w-[420px]">
           <form action={formAction} className="flex flex-col">
             <div className="kicker-muted">Training kopieren</div>
-            <p className="mt-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+            <p className="mt-2 text-[13px]" style={{ color: "var(--dc-muted)" }}>
               Legt eine Kopie dieses Trainings als eigenes Training auf ein neues Datum an.
             </p>
             <input type="hidden" name="source_plan_id" value={planId} />

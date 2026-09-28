@@ -45,7 +45,7 @@ export function TrendChart({
       <div className="flex items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-2.5">
           {label && (
-            <span className="text-[10px] tracking-[0.12em] uppercase" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+            <span className="text-[10px] tracking-[0.12em] uppercase" style={{ color: "var(--dc-muted)" }}>
               {label}
             </span>
           )}
@@ -56,7 +56,7 @@ export function TrendChart({
           )}
         </div>
         <div className="flex items-baseline gap-2.5">
-          <span className="text-[11px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+          <span className="text-[11px]" style={{ color: "var(--dc-muted)" }}>
             {formatDateCompact(active.date)}
             {hoverIndex === null && active.date === todayDate ? " · heute" : ""}
           </span>

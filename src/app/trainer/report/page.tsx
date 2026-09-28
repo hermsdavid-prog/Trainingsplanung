@@ -321,7 +321,7 @@ export default async function TrainerReportPage({
               {k.v}
             </div>
             <div className="mt-1.5 text-[13px]">{k.l}</div>
-            <div className="mt-0.5 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+            <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
               {k.s}
             </div>
           </div>
@@ -348,7 +348,7 @@ export default async function TrainerReportPage({
                   <span className={`tag ${r.readyClass}`}>{r.ready}</span>
                 </td>
                 <td style={{ color: "color-mix(in srgb, var(--dc-text) 75%, transparent)" }}>{r.top}</td>
-                <td className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                <td className="text-xs" style={{ color: "var(--dc-muted)" }}>
                   {r.note}
                 </td>
               </tr>

@@ -35,13 +35,13 @@ export default async function AthleteHealthPage() {
     <div>
       <div className="kicker">Bereitschaft und Verläufe</div>
       <h2 className="mt-2.5 text-[27px] leading-[1.08]">Gesundheit</h2>
-      <p className="mt-2.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+      <p className="mt-2.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
         Dein Wohlbefinden, HRV und Ruheherzfrequenz der letzten 30 Tage.
       </p>
 
       <div className="mt-5 flex items-center gap-2.5">
         <span className={`tag ${LEVEL_TAG[level]}`}>{HEALTH_STATUS_LABEL[level]}</span>
-        <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+        <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
           {todayLog
             ? `Heute: Wohlbefinden ${todayLog.wellbeing ?? "—"}${
                 todayLog.hrv != null ? ` · HRV ${todayLog.hrv}` : ""

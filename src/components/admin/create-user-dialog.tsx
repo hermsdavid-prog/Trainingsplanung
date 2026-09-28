@@ -66,11 +66,11 @@ export function CreateUserDialog() {
                 weitergeben. Beim ersten Login muss es geändert werden.
               </p>
               <div className="mt-4 p-4" style={{ background: "var(--dc-bg)" }}>
-                <div className="text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                <div className="text-xs" style={{ color: "var(--dc-muted)" }}>
                   E-Mail
                 </div>
                 <div className="mt-1 font-mono text-sm">{created.email}</div>
-                <div className="mt-3 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                <div className="mt-3 text-xs" style={{ color: "var(--dc-muted)" }}>
                   Passwort
                 </div>
                 <div className="mt-1 font-mono text-lg">{created.tempPassword}</div>
@@ -82,7 +82,7 @@ export function CreateUserDialog() {
           ) : (
             <form action={handleSubmit} className="flex flex-col">
               <div className="kicker-muted">Neuen Nutzer anlegen</div>
-              <p className="mt-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+              <p className="mt-2 text-[13px]" style={{ color: "var(--dc-muted)" }}>
                 Es wird automatisch ein Einmal-Passwort generiert.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">

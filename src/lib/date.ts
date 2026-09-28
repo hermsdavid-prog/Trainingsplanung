@@ -18,10 +18,10 @@ export function isMesocycleCurrent(startDate: string, weeks: number, todayIso: s
   return todayIso >= startDate && todayIso < shiftDateISO(startDate, weeks * 7);
 }
 
-// Formats a YYYY-MM-DD calendar date as dd/mm/yyyy for compact display.
+// Formats a YYYY-MM-DD calendar date as dd.mm.yyyy (German convention).
 export function formatDateShort(dateStr: string): string {
   const [y, m, d] = dateStr.split("-");
-  return `${d}/${m}/${y}`;
+  return `${d}.${m}.${y}`;
 }
 
 // Minutes the app timezone is ahead of UTC at the given instant (handles DST).

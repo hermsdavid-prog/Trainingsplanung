@@ -278,7 +278,7 @@ export default async function TrainerCalendarPage({
               Monat →
             </Link>
           </div>
-          <p className="mt-1.5 text-[13px] leading-[1.5]" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+          <p className="mt-1.5 text-[13px] leading-[1.5]" style={{ color: "var(--dc-muted)" }}>
             Auf einen Tag klicken: alle Trainings und Termine dieses Tages ansehen und bei Bedarf ein
             neues Training anlegen. Einen Termin aus der Woche oder dem Monat darauf ziehen oder mit
             „kopieren“ auswählen und den Zieltag anklicken: der Termin wird kopiert — auch zwischen

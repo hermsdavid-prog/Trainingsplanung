@@ -45,14 +45,20 @@ function PlanRowsTable({ groups, canDelete }: { groups: PlanGroupRow[]; canDelet
               <tr key={group.key}>
                 <td style={MUTED}>{formatDateShort(plan.date)}</td>
                 <td style={MUTED}>{group.time || "—"}</td>
-                <td className="text-[15px]">{group.title}</td>
+                <td className="text-[15px]">
+                  {/* The title itself opens the plan — on a phone the row
+                      actions sit off-screen behind a horizontal scroll. */}
+                  <Link href={`/trainer/plans/${plan.id}/edit`} className="no-underline hover:underline" style={{ color: "inherit" }}>
+                    {group.title}
+                  </Link>
+                </td>
                 <td className="text-sm" style={MUTED}>
                   {group.forLabel}
                 </td>
                 <td>
                   <div className="flex items-center justify-end gap-1">
                     <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-ghost">
-                      bearbeiten
+                      Bearbeiten
                     </Link>
                     {canDelete && <DeletePlanRowButton planId={plan.id} title={group.title} />}
                   </div>

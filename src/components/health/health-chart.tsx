@@ -6,7 +6,7 @@ import { formatDateCompact } from "@/lib/date";
 
 type MetricKey = "wellbeing" | "hrv" | "resting_hr";
 
-const MUTED = { color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" };
+const MUTED = { color: "var(--dc-muted)" };
 
 // A curve alone can't be read — each mini chart also shows its latest value
 // and the span it moved in, the same way the trainer's athlete view does.

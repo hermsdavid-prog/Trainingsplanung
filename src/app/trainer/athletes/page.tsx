@@ -228,7 +228,7 @@ export default async function TrainerAthletesPage({
               <div className="mt-7 grid grid-cols-1 gap-12 lg:grid-cols-2">
                 <div className="min-w-0">
                   <div className="kicker-muted">Gesundheit</div>
-                  <p className="mt-1.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+                  <p className="mt-1.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
                     Dreißig Tage im Verlauf.
                   </p>
                   <div className="mt-4 max-w-[560px]">
@@ -306,7 +306,7 @@ export default async function TrainerAthletesPage({
 
               <div className="mt-9 max-w-[640px]">
                 <div className="kicker-muted">Hinweis an {selected.full_name}</div>
-                <p className="mt-1.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+                <p className="mt-1.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
                   Z. B. wenn die Gesundheitsdaten abweichen — der Athlet sieht das auf seiner Startseite.
                 </p>
                 <div className="mt-3">
@@ -323,7 +323,7 @@ export default async function TrainerAthletesPage({
                   </p>
                 ) : (
                   <>
-                    <p className="mt-1.5 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+                    <p className="mt-1.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
                       Worauf {selected.full_name} im jeweiligen Mesozyklus achten soll.
                     </p>
                     <div className="mt-3">

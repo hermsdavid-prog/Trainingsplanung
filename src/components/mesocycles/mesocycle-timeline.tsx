@@ -119,7 +119,7 @@ export function MesocycleTimeline({
                 borderLeft: "1px solid var(--dc-divider)",
                 paddingLeft: 4,
                 letterSpacing: "0.06em",
-                color: "color-mix(in srgb, var(--dc-text) 55%, transparent)",
+                color: "var(--dc-muted)",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",

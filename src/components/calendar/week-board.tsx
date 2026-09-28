@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { formatWeekdayShort } from "@/lib/date";
+import { formatWeekdayShort, todayISO } from "@/lib/date";
 import { getBerlinCalendarMark } from "@/lib/berlin-holidays";
 import {
   reschedulePlanAction,
@@ -60,6 +60,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
   );
 
   const dragActive = armedItem !== null || draggingItem !== null;
+  const today = todayISO();
   const dragHint = armedItem
     ? `„${armedItem.title}“ ausgewählt — bei einem Tag auf „Hierhin kopieren“ tippen, oder unten im Monatskalender auf einen Tag tippen.`
     : draggingItem
@@ -154,10 +155,16 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
   return (
     <div>
       <div
-        className="mt-5 flex items-center justify-between gap-4"
-        style={{ padding: "11px 14px", background: "var(--dc-surface)" }}
+        className="mt-4 flex items-center justify-between gap-4"
+        style={
+          dragActive
+            ? { padding: "11px 14px", background: "var(--dc-accent-100)", borderLeft: "2px solid var(--dc-accent)" }
+            : { padding: "2px 0" }
+        }
       >
-        <span className="text-[13px] leading-[1.5]">{dragHint}</span>
+        <span className={dragActive ? "text-[13px] leading-[1.5]" : "text-[12.5px] leading-[1.5]"} style={dragActive ? undefined : { color: "var(--dc-muted)" }}>
+          {dragHint}
+        </span>
         {dragActive && (
           <button type="button" className="btn btn-ghost shrink-0" onClick={cancelDrag}>
             Abbrechen
@@ -194,13 +201,19 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
               }
               onDragLeave={!isCoarsePointer ? () => setDragOverDate(null) : undefined}
               onDrop={!isCoarsePointer ? (e) => handleDrop(e, day) : undefined}
-              style={{ minWidth: 0, padding: 6, border: `1px dashed ${dropBorder}`, background: dropBg }}
+              style={{
+                minWidth: 0,
+                padding: 6,
+                border: `1px dashed ${dropBorder}`,
+                background: isOver ? dropBg : day === today ? "color-mix(in srgb, var(--dc-accent) 6%, transparent)" : "transparent",
+              }}
             >
               <div
                 className="pb-2 text-xs"
                 style={{
-                  borderBottom: "1px solid var(--dc-divider)",
-                  color: "color-mix(in srgb, var(--dc-text) 60%, transparent)",
+                  borderBottom: day === today ? "2px solid var(--dc-accent)" : "1px solid var(--dc-divider)",
+                  color: day === today ? "var(--dc-accent-700)" : "var(--dc-muted)",
+                  fontWeight: day === today ? 600 : 400,
                 }}
               >
                 {formatWeekdayShort(day)}
@@ -211,7 +224,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                       color:
                         getBerlinCalendarMark(day)!.type === "feiertag"
                           ? "var(--dc-accent-2-700)"
-                          : "color-mix(in srgb, var(--dc-text) 55%, transparent)",
+                          : "var(--dc-muted)",
                     }}
                   >
                     · {getBerlinCalendarMark(day)!.label}
@@ -233,7 +246,8 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                       style={{
                         minWidth: 0,
                         padding: "8px 10px",
-                        background: "var(--dc-bg)",
+                        background: "var(--dc-surface)",
+                        boxShadow: "var(--dc-shadow-sm)",
                         borderLeft: `2px solid ${item.tone}`,
                         cursor: isCoarsePointer ? "default" : "grab",
                         opacity: isFaded ? 0.4 : 1,
@@ -242,7 +256,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                       <div className="flex items-baseline justify-between gap-2">
                         <span
                           className="text-[11px]"
-                          style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}
+                          style={{ color: "var(--dc-muted)" }}
                         >
                           {item.time}
                         </span>
@@ -282,7 +296,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                       )}
                       <div
                         className="mt-1 text-[11px] leading-[1.3]"
-                        style={{ overflowWrap: "anywhere", color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}
+                        style={{ overflowWrap: "anywhere", color: "var(--dc-muted)" }}
                       >
                         {item.who}
                         {item.status === "proposed" && <span className="tag tag-outline ml-1.5">Vorschlag</span>}
@@ -314,6 +328,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                             className="btn btn-ghost"
                             onClick={() => handleRemove(item)}
                             aria-label="Termin entfernen"
+                            style={{ color: "var(--dc-muted)", minHeight: 32, padding: "4px 8px" }}
                           >
                             ✕
                           </button>

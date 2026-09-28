@@ -28,7 +28,7 @@ export function AdminShell({
               <span className="text-[17px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
                 Admin
               </span>
-              <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+              <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
                 {fullName}
               </span>
             </div>

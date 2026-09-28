@@ -107,7 +107,7 @@ export default async function TrainerDashboardPage() {
       <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">
         Übersicht
       </h2>
-      <p className="mt-3 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+      <p className="mt-3 text-sm" style={{ color: "var(--dc-muted)" }}>
         {(todaysPlans ?? []).length} {(todaysPlans ?? []).length === 1 ? "Einheit" : "Einheiten"} heute geplant · {checkedInCount} von {athletes.length}{" "}
         Athleten eingecheckt{redCount > 0 ? ` · ${redCount} rote Bereitschaft${redCount > 1 ? "en" : ""}` : ""}
       </p>
@@ -131,9 +131,9 @@ export default async function TrainerDashboardPage() {
               >
                 <div className="flex items-baseline justify-between gap-2.5">
                   <span className="text-[16px]">{plan.title}</span>
-                  <span className="tag tag-outline">{isAthletik ? "Athletik" : "Karate"}</span>
+                  <span className={`tag ${isAthletik ? "tag-accent" : "tag-accent-2"}`}>{isAthletik ? "Athletik" : "Karate"}</span>
                 </div>
-                <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
                   {plan.time ? `${plan.time} · ` : ""}
                   {plan.scope_type === "group"
                     ? (plan.groups?.name ?? "Gruppe")

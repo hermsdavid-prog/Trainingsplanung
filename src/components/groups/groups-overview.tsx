@@ -73,7 +73,7 @@ export async function GroupsOverview({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       {(!groups || groups.length === 0) ? (
-        <p className="mt-6 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+        <p className="mt-6 text-sm" style={{ color: "var(--dc-muted)" }}>
           Noch keine Gruppen angelegt.
         </p>
       ) : (

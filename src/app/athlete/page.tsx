@@ -189,7 +189,7 @@ export default async function AthleteTodayPage({
         checkin={
           <>
             <h2 className="mt-1.5 text-[27px] leading-[1.08]">Wie geht es dir heute?</h2>
-            <p className="mt-2 text-[13px] leading-[1.55]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+            <p className="mt-2 text-[13px] leading-[1.55]" style={{ color: "var(--dc-muted)" }}>
               Einmal eintragen — danach zeigt die Startseite nur noch dein Training.
             </p>
             <div className="mt-[22px]">
@@ -203,7 +203,7 @@ export default async function AthleteTodayPage({
 
           <div className="mt-4">
             {(!plans || plans.length === 0) && (
-              <div className="p-3.5 text-[13px] leading-[1.5]" style={{ background: "var(--dc-surface)", color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+              <div className="p-3.5 text-[13px] leading-[1.5]" style={{ background: "var(--dc-surface)", color: "var(--dc-muted)" }}>
                 Für heute ist kein Training geplant.
               </div>
             )}
@@ -220,12 +220,12 @@ export default async function AthleteTodayPage({
                     <span className="text-[17px] leading-[1.2]">{plan.title}</span>
                     <span className="flex items-center gap-1.5">
                       {completedPlanIds.has(plan.id) && <span className="tag tag-neutral">✓ Erledigt</span>}
-                      <span className="tag tag-outline">
+                      <span className={`tag ${plan.category_label?.trim().toLowerCase() === "athletik" ? "tag-accent" : "tag-accent-2"}`}>
                         {plan.category_label?.trim().toLowerCase() === "athletik" ? "Athletik" : "Karate"}
                       </span>
                     </span>
                   </div>
-                  <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                  <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
                     {plan.time ? `${plan.time} · ` : ""}
                     {plan.scope_type === "group"
                       ? `Gruppentraining · ${plan.groups?.name ?? ""}`
@@ -248,7 +248,7 @@ export default async function AthleteTodayPage({
           <div className="mt-6 p-3.5" style={{ background: "var(--dc-surface)" }}>
             <div className="flex items-center gap-2.5">
               <span className={`tag ${LEVEL_TAG[readiness.level]}`}>{HEALTH_STATUS_LABEL[readiness.level]}</span>
-              <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+              <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
                 Trainingsbereitschaft
               </span>
             </div>

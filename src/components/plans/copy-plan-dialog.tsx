@@ -34,7 +34,7 @@ export function CopyPlanDialog({
         <DialogContent showCloseButton={false} className="dc-dialog max-w-[460px]">
           <form action={formAction} className="flex flex-col">
             <div className="kicker-muted">Plan kopieren</div>
-            <p className="mt-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
+            <p className="mt-2 text-[13px]" style={{ color: "var(--dc-muted)" }}>
               Erstellt eine Kopie dieses Plans (als Entwurf) auf ein neues Datum.
             </p>
             <input type="hidden" name="source_plan_id" value={planId} />
