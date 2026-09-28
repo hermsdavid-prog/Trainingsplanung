@@ -53,8 +53,8 @@ export function GroupManager({
   const [description, setDescription] = useState(group?.description ?? "");
   const [color, setColor] = useState(group?.color ?? GROUP_COLOR_OPTIONS[0].value);
 
-  const groupTrainerIds = trainerIdsByGroup[group?.id ?? ""] ?? [];
-  const groupAthleteIds = athleteIdsByGroup[group?.id ?? ""] ?? [];
+  const groupTrainerIds = useMemo(() => trainerIdsByGroup[group?.id ?? ""] ?? [], [trainerIdsByGroup, group?.id]);
+  const groupAthleteIds = useMemo(() => athleteIdsByGroup[group?.id ?? ""] ?? [], [athleteIdsByGroup, group?.id]);
   const headTrainerId = headTrainerIdByGroup[group?.id ?? ""] ?? null;
   const canManageTeam = canManageTeamByGroup[group?.id ?? ""] ?? false;
 
@@ -264,7 +264,7 @@ export function GroupManager({
             </div>
           )}
 
-          <div className="kicker-muted mt-6">Trainer · {groupTrainerIds.length} Personen</div>
+          <div className="kicker-muted mt-6">Trainer · {groupTrainerIds.length} {groupTrainerIds.length === 1 ? "Person" : "Personen"}</div>
           <div className="mt-2">
             {groupTrainerIds.length === 0 && (
               <p className="py-2 text-sm text-muted">Noch keine Trainer zugeordnet.</p>
@@ -357,7 +357,7 @@ export function GroupManager({
         </div>
 
         <div>
-          <div className="kicker-muted">Athleten · {groupAthleteIds.length} Personen</div>
+          <div className="kicker-muted">Athleten · {groupAthleteIds.length} {groupAthleteIds.length === 1 ? "Person" : "Personen"}</div>
           <div className="mt-2">
             {groupAthleteIds.length === 0 && (
               <p className="py-2 text-sm text-muted">Noch keine Athleten zugeordnet.</p>

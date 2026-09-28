@@ -82,6 +82,7 @@ export default async function AthleteAthletikPage({
               <div className="flex items-baseline gap-2.5">
                 <span className="text-[28px] leading-none font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
                   {best}
+                  {resultUnit ? ` ${resultUnit}` : ""}
                 </span>
                 <span className="text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
                   bester Wert

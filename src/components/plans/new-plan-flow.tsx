@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CreatePlanForm } from "@/components/plans/create-plan-form";
@@ -63,10 +64,15 @@ export function NewPlanFlow({
     });
   }
 
+  const categoryName = isSportartspezifisch ? "Karate" : "Athletik";
+
   if (step === "vorlage") {
     return (
       <div>
-        <div className={kickerClass}>Schritt 1 von 2</div>
+        <Link href={`/trainer/plans?type=${encodeURIComponent(defaultCategory)}`} className="btn btn-ghost">
+          ← Zurück zu {categoryName}
+        </Link>
+        <div className={`${kickerClass} mt-3.5`}>Neues {categoryName}-Training · Schritt 1 von 2</div>
         <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Vorlage wählen</h2>
         <div className="mt-6 max-w-[700px]">
           <button type="button" className="exrow" onClick={() => pick(null)}>
@@ -123,7 +129,7 @@ export function NewPlanFlow({
       <button type="button" className="btn btn-ghost" onClick={() => setStep("vorlage")}>
         ← Zurück
       </button>
-      <div className={`${kickerClass} mt-3.5`}>Schritt 2 von 2</div>
+      <div className={`${kickerClass} mt-3.5`}>Neues {categoryName}-Training · Schritt 2 von 2</div>
       <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">Rahmendaten</h2>
       <p className="mt-2.5 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
         Lege die Rahmendaten fest — die Übungstabelle folgt im nächsten Schritt.

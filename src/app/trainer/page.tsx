@@ -28,8 +28,9 @@ export default async function TrainerDashboardPage() {
     supabase.from("group_athletes").select("group_id, athlete_id, profiles(full_name)"),
     supabase
       .from("training_plans")
-      .select("id, title, category_label, scope_type, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
-      .eq("date", today),
+      .select("id, title, time, category_label, scope_type, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
+      .eq("date", today)
+      .order("time", { nullsFirst: false }),
     supabase
       .from("events")
       .select("id, title, description, start_at, groups(name), profiles!events_athlete_id_fkey(full_name)")
@@ -107,7 +108,7 @@ export default async function TrainerDashboardPage() {
         Übersicht
       </h2>
       <p className="mt-3 text-sm" style={{ color: "color-mix(in srgb, var(--dc-text) 62%, transparent)" }}>
-        {(todaysPlans ?? []).length} Einheiten heute geplant · {checkedInCount} von {athletes.length}{" "}
+        {(todaysPlans ?? []).length} {(todaysPlans ?? []).length === 1 ? "Einheit" : "Einheiten"} heute geplant · {checkedInCount} von {athletes.length}{" "}
         Athleten eingecheckt{redCount > 0 ? ` · ${redCount} rote Bereitschaft${redCount > 1 ? "en" : ""}` : ""}
       </p>
 
@@ -115,24 +116,32 @@ export default async function TrainerDashboardPage() {
 
       {(todaysPlans ?? []).length > 0 && (
         <div className="mt-6 flex flex-col gap-2.5">
-          {(todaysPlans ?? []).map((plan) => (
-            <Link
-              key={plan.id}
-              href={`/trainer/plans/${plan.id}/edit`}
-              className="block p-3.5 no-underline"
-              style={{ background: "var(--dc-surface)", borderLeft: "2px solid var(--dc-accent)", color: "inherit" }}
-            >
-              <div className="flex items-baseline justify-between gap-2.5">
-                <span className="text-[16px]">{plan.title}</span>
-                <span className="tag tag-outline">{plan.category_label}</span>
-              </div>
-              <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
-                {plan.scope_type === "group"
-                  ? (plan.groups?.name ?? "Gruppe")
-                  : (plan.profiles?.full_name ?? "Einzeltraining")}
-              </div>
-            </Link>
-          ))}
+          {(todaysPlans ?? []).map((plan) => {
+            const isAthletik = plan.category_label?.trim().toLowerCase() === "athletik";
+            return (
+              <Link
+                key={plan.id}
+                href={`/trainer/plans/${plan.id}/edit`}
+                className="block p-3.5 no-underline"
+                style={{
+                  background: "var(--dc-surface)",
+                  borderLeft: `2px solid ${isAthletik ? "var(--dc-accent)" : "var(--dc-accent-2)"}`,
+                  color: "inherit",
+                }}
+              >
+                <div className="flex items-baseline justify-between gap-2.5">
+                  <span className="text-[16px]">{plan.title}</span>
+                  <span className="tag tag-outline">{isAthletik ? "Athletik" : "Karate"}</span>
+                </div>
+                <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                  {plan.time ? `${plan.time} · ` : ""}
+                  {plan.scope_type === "group"
+                    ? (plan.groups?.name ?? "Gruppe")
+                    : (plan.profiles?.full_name ?? "Einzeltraining")}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
 

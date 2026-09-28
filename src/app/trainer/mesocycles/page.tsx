@@ -212,9 +212,8 @@ export default async function TrainerMesocyclesPage({
         <MesocycleFilters groups={groups} athletes={athletes} selectedGroup={selectedGroupFilter} selectedAthlete={selectedAthleteFilter} />
       </div>
 
-      <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-[20px]">Mesozyklen</h3>
-        <div className="flex items-center gap-2">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <MesocycleViewToggle hrefBase={hrefBase} view={view} />
           <CreateMesocycleDialog
             groups={groups}

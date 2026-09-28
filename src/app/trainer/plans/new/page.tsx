@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NewPlanFlow, type PlanTemplateSummary } from "@/components/plans/new-plan-flow";
 import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
+import { todayISO } from "@/lib/date";
 
 export default async function NewPlanPage({
   searchParams,
@@ -28,10 +29,9 @@ export default async function NewPlanPage({
   for (const row of groupAthletes ?? []) {
     if (row.profiles?.full_name) athleteMap.set(row.athlete_id, row.profiles.full_name);
   }
-  const athletes = Array.from(athleteMap.entries()).map(([id, full_name]) => ({
-    id,
-    full_name,
-  }));
+  const athletes = Array.from(athleteMap.entries())
+    .map(([id, full_name]) => ({ id, full_name }))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   const templates: PlanTemplateSummary[] = (templateRows ?? []).map((t) => ({
     id: t.id,
@@ -47,7 +47,7 @@ export default async function NewPlanPage({
         groups={groups ?? []}
         athletes={athletes}
         defaultCategory={defaultCategory}
-        defaultDate={date}
+        defaultDate={date || todayISO()}
       />
     </div>
   );

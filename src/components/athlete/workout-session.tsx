@@ -476,7 +476,7 @@ export function WorkoutSession({
   return (
     <div className="relative">
       <Link href={backHref} className="btn btn-ghost">
-        ← Startseite
+        ← Zur Trainingsübersicht
       </Link>
 
       <div className="mt-2.5">

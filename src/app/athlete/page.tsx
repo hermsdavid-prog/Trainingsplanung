@@ -41,9 +41,9 @@ export default async function AthleteTodayPage({
     await Promise.all([
       supabase
         .from("training_plans")
-        .select("id, title, category_label, scope_type, groups(name, color)")
+        .select("id, title, time, category_label, scope_type, groups(name, color)")
         .eq("date", date)
-        .order("scope_type"),
+        .order("time", { nullsFirst: false }),
       date === today && user
         ? supabase
             .from("health_logs")
@@ -106,7 +106,7 @@ export default async function AthleteTodayPage({
     id: n.id,
     message: n.message,
     createdAt: n.created_at,
-    trainerName: n.profiles?.full_name ?? "Trainer",
+    trainerName: n.profiles?.full_name ?? "",
   }));
 
   // — Trainingsziele — same "this athlete's relevant Mesozyklen" union
@@ -216,10 +216,13 @@ export default async function AthleteTodayPage({
                     <span className="text-[17px] leading-[1.2]">{plan.title}</span>
                     <span className="flex items-center gap-1.5">
                       {completedPlanIds.has(plan.id) && <span className="tag tag-neutral">✓ Erledigt</span>}
-                      <span className="tag tag-outline">{plan.category_label}</span>
+                      <span className="tag tag-outline">
+                        {plan.category_label?.trim().toLowerCase() === "athletik" ? "Athletik" : "Karate"}
+                      </span>
                     </span>
                   </div>
                   <div className="mt-1 text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 60%, transparent)" }}>
+                    {plan.time ? `${plan.time} · ` : ""}
                     {plan.scope_type === "group"
                       ? `Gruppentraining · ${plan.groups?.name ?? ""}`
                       : "Einzeltraining für dich"}

@@ -40,7 +40,7 @@ export function CoachNotesBanner({ notes }: { notes: CoachNote[] }) {
         <div key={n.id} className="p-3.5" style={{ background: "var(--dc-accent-100)", borderLeft: "2px solid var(--dc-accent)" }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="kicker">Hinweis von {n.trainerName}</div>
+              <div className="kicker">{n.trainerName ? `Hinweis von ${n.trainerName}` : "Hinweis vom Trainer"}</div>
               <p className="mt-1 text-[14px] leading-[1.5]">{n.message}</p>
             </div>
             <div className="flex shrink-0 gap-1.5">

@@ -64,7 +64,8 @@ export async function GroupsOverview({ isAdmin }: { isAdmin: boolean }) {
       <div className="flex items-start justify-between gap-5">
         <div>
           <div className="kicker">
-            {(groups ?? []).length} Gruppen · {totalAthletes} Athleten
+            {(groups ?? []).length} {(groups ?? []).length === 1 ? "Gruppe" : "Gruppen"} · {totalAthletes}{" "}
+            {totalAthletes === 1 ? "Athlet" : "Athleten"}
           </div>
           <h2 className="mt-2.5 text-[34px] leading-[1.05]">Gruppen</h2>
         </div>

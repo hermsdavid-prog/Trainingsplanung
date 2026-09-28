@@ -105,7 +105,7 @@ export function CalendarFilters({
           }}
           onFocus={() => query && setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
-          placeholder="Buchstaben tippen, z. B. u18"
+          placeholder="Gruppe, Athlet oder Terminart suchen …"
           autoComplete="off"
         />
       </div>
@@ -133,9 +133,11 @@ export function CalendarFilters({
           )}
         </div>
       )}
-      <button type="button" className="btn btn-ghost mt-1.5" onClick={reset}>
-        Filter zurücksetzen
-      </button>
+      {activeLabel !== "keine" && (
+        <button type="button" className="btn btn-ghost mt-1.5" onClick={reset}>
+          Filter zurücksetzen
+        </button>
+      )}
     </div>
   );
 }

@@ -98,14 +98,18 @@ function MesocycleSection({ section, canDelete }: { section: PlanMesocycleSectio
         className="flex w-full items-center justify-between gap-3.5 p-[13px_16px]"
         style={{ background: "transparent", border: 0, cursor: "pointer", textAlign: "left" }}
       >
-        <div className="flex min-w-0 items-baseline gap-2.5">
-          <span className="truncate text-[15.5px]">{section.title}</span>
-          {section.isCurrent && (
-            <span className="tag tag-neutral" style={{ flex: "none" }}>
-              läuft
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex min-w-0 items-baseline gap-2.5">
+            <span className="text-[15.5px]" style={{ overflowWrap: "anywhere" }}>
+              {section.title}
             </span>
-          )}
-          <span className="flex-none text-xs" style={MUTED}>
+            {section.isCurrent && (
+              <span className="tag tag-neutral" style={{ flex: "none" }}>
+                läuft
+              </span>
+            )}
+          </div>
+          <span className="text-xs" style={MUTED}>
             {formatDateCompact(section.startDate)} –{" "}
             {formatDateCompact(shiftDateISO(section.startDate, section.weeks * 7 - 1))} · {section.weeks}{" "}
             {section.weeks === 1 ? "Woche" : "Wochen"}

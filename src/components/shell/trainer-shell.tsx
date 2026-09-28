@@ -11,16 +11,18 @@ const NAV = [
   {
     href: "/trainer/plans?type=Athletik",
     label: "Athletik",
-    match: (p: string, sp: string) => p.startsWith("/trainer/plans") && sp === "Athletik",
+    match: (p: string, sp: string) => (p === "/trainer/plans" || p === "/trainer/plans/new") && sp === "Athletik",
   },
   {
     href: "/trainer/plans?type=Sportartspezifisch",
     label: "Karate",
     // Sportartspezifisch is the default category when the plans page has no
     // ?type= param (see PLAN_TYPES[0] in src/lib/plan-type.ts), so treat a
-    // missing param the same as an explicit match here.
-    match: (p: string, sp: string) =>
-      p.startsWith("/trainer/plans") && sp !== "Athletik",
+    // missing param the same as an explicit match here. Only the list and
+    // "new" pages carry ?type= — a single plan's edit/workout page doesn't,
+    // so matching those here would wrongly light up Karate for an Athletik
+    // plan.
+    match: (p: string, sp: string) => (p === "/trainer/plans" || p === "/trainer/plans/new") && sp !== "Athletik",
   },
   { href: "/trainer/calendar", label: "Kalender", match: (p: string) => p.startsWith("/trainer/calendar") },
   { href: "/trainer/groups", label: "Gruppen", match: (p: string) => p.startsWith("/trainer/groups") },
@@ -64,18 +66,18 @@ function NavLinks({
 
 export function TrainerShell({
   fullName,
-  role,
   children,
 }: {
   fullName: string;
-  role: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [navOpen, setNavOpen] = useState(false);
   const typeParam = searchParams.get("type") ?? "";
-  const current = NAV.find((n) => n.match(pathname, typeParam))?.label ?? "Übersicht";
+  const current =
+    NAV.find((n) => n.match(pathname, typeParam))?.label ??
+    (pathname.startsWith("/trainer/plans") ? "Training" : pathname.startsWith("/trainer/settings") ? "Konto" : "Übersicht");
 
   return (
     <div className="min-h-screen" style={{ background: "var(--dc-neutral-200)" }}>
@@ -85,27 +87,31 @@ export function TrainerShell({
       >
         {/* Desktop sidebar */}
         <aside
-          className="no-print hidden lg:flex lg:w-[222px] flex-none flex-col p-[26px_22px]"
+          className="no-print hidden lg:block lg:w-[222px] flex-none"
           style={{ background: "var(--dc-surface)" }}
         >
-          <div className="font-heading text-[17px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
-            Trainingsplanung
-          </div>
-          <div className="mt-0.5 text-[11px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
-            {fullName} · Trainer
-          </div>
-          <div className="mt-7">
-            <NavLinks pathname={pathname} typeParam={typeParam} />
-          </div>
-          <div className="mt-auto flex flex-col gap-2 pt-6">
-            <Link href="/trainer/settings" className="btn btn-ghost btn-block">
-              Passwort ändern
-            </Link>
-            <form action={logoutAction}>
-              <button type="submit" className="btn btn-secondary btn-block">
-                Abmelden
-              </button>
-            </form>
+          {/* Sticky inner column so the navigation stays reachable while a
+              long page (calendar, plan editor) scrolls underneath. */}
+          <div className="sticky top-0 flex max-h-screen flex-col overflow-y-auto p-[26px_22px]" style={{ minHeight: "min(100vh, 100%)" }}>
+            <div className="font-heading text-[17px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
+              Trainingsplanung
+            </div>
+            <div className="mt-0.5 text-[11px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+              {fullName} · Trainer
+            </div>
+            <div className="mt-7">
+              <NavLinks pathname={pathname} typeParam={typeParam} />
+            </div>
+            <div className="mt-6 flex flex-col gap-2">
+              <Link href="/trainer/settings" className="btn btn-ghost btn-block">
+                Passwort ändern
+              </Link>
+              <form action={logoutAction}>
+                <button type="submit" className="btn btn-secondary btn-block">
+                  Abmelden
+                </button>
+              </form>
+            </div>
           </div>
         </aside>
 

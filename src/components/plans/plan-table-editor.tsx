@@ -364,8 +364,10 @@ export function PlanTableEditor({
             ← Zurück
           </Link>
         )}
-        <div className="flex flex-col items-start justify-between gap-4 lg:flex-row">
-          <div style={{ minWidth: 0, flex: 1 }}>
+        {/* flex-wrap (not a fixed lg:flex-row) so a long action row wraps
+            below the title instead of squeezing it into a one-word column. */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div style={{ minWidth: "min(100%, 320px)", flex: "1 1 420px" }}>
             {kicker && <div className={kickerClass}>{kicker}</div>}
             <input
               value={title}
@@ -377,7 +379,7 @@ export function PlanTableEditor({
                 borderBottom: "1px solid var(--dc-divider)",
                 fontFamily: "var(--dc-font-heading)",
                 fontWeight: 600,
-                fontSize: 32,
+                fontSize: "clamp(22px, 6vw, 32px)",
                 lineHeight: 1.05,
                 color: "var(--dc-text)",
                 padding: "0 0 6px",
@@ -391,7 +393,7 @@ export function PlanTableEditor({
             {!isAthletik && <p className="mt-1 text-[13px] text-muted">{rundenSummary}</p>}
             {badges && <div className="mt-2 flex items-center gap-2">{badges}</div>}
           </div>
-          <div className="flex w-full flex-none flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             {headerActions}
             {allowSaveAsTemplate && (
               <button
@@ -516,6 +518,7 @@ export function PlanTableEditor({
                           className="btn btn-secondary btn-icon"
                           onClick={() => setNotesOpenIndex(index)}
                           aria-label="Hinweise"
+                          style={row.notes ? { borderColor: "var(--dc-accent)", color: "var(--dc-accent)" } : undefined}
                         >
                           <NotebookTextIcon />
                         </button>
@@ -650,6 +653,7 @@ export function PlanTableEditor({
                           className="btn btn-secondary btn-icon"
                           onClick={() => setNotesOpenIndex(index)}
                           aria-label="Hinweise"
+                          style={row.notes ? { borderColor: "var(--dc-accent)", color: "var(--dc-accent)" } : undefined}
                         >
                           <NotebookTextIcon />
                         </button>

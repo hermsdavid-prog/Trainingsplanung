@@ -49,14 +49,14 @@ export function PlanListFilters({
       <Typeahead
         key={`athlete-${selectedAthlete ?? "none"}`}
         id="plan-filter-athlete"
-        label="Sportler"
+        label="Athlet"
         items={athletes.map((a) => ({ id: a.id, label: a.full_name }))}
         selectedId={selectedAthlete}
         onSelect={(id) => apply({ athlete: id })}
         allowClear
-        clearLabel="Alle Sportler"
-        placeholder="Alle Sportler"
-        emptyMessage="Kein Sportler gefunden."
+        clearLabel="Alle Athleten"
+        placeholder="Alle Athleten"
+        emptyMessage="Kein Athlet gefunden."
       />
     </div>
   );

@@ -131,7 +131,7 @@ export default async function TrainerPlansPage({
       <div className="flex items-start justify-between gap-5">
         <div>
           <div className={isKarate ? "kicker-accent-2" : "kicker"}>
-            {isKarate ? "Sportartspezifisch" : "Alle Gruppen"}
+            Trainingspläne
           </div>
           <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">
             {isKarate ? "Karate" : "Athletik"}

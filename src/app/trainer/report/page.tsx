@@ -255,8 +255,8 @@ export default async function TrainerReportPage({
   const kpis = [
     {
       v: String(thisWeek.plans.length),
-      l: "Einheiten geplant",
-      s: `${athletikCount} Athletik · ${sportCount} Sportartspezifisch`,
+      l: thisWeek.plans.length === 1 ? "Einheit geplant" : "Einheiten geplant",
+      s: `${athletikCount} Athletik · ${sportCount} Karate`,
     },
     {
       v: `${pct} %`,

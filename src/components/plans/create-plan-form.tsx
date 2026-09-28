@@ -23,10 +23,28 @@ export function CreatePlanForm({
   const [state, formAction, isPending] = useActionState(createPlanAction, initialState);
   const [scopeType, setScopeType] = useState<"group" | "athlete">("group");
   const [repeats, setRepeats] = useState(false);
+  const [clientError, setClientError] = useState<string | null>(null);
   const isSportartspezifisch = defaultCategory === "Sportartspezifisch";
 
+  // React resets every uncontrolled field after a form action returns, so a
+  // server-side "bitte eine Gruppe wählen" error would also wipe the title
+  // and date the trainer just typed. Catch the missing target here instead,
+  // before anything is submitted.
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    const data = new FormData(e.currentTarget);
+    const targets = data.getAll(scopeType === "group" ? "group_ids" : "athlete_ids");
+    if (targets.length === 0) {
+      e.preventDefault();
+      setClientError(scopeType === "group" ? "Bitte mindestens eine Gruppe auswählen." : "Bitte mindestens einen Athleten auswählen.");
+      return;
+    }
+    setClientError(null);
+  }
+
+  const error = clientError ?? state.error;
+
   return (
-    <form action={formAction} className="flex flex-col">
+    <form action={formAction} onSubmit={handleSubmit} className="flex flex-col">
       {templateId && <input type="hidden" name="template_id" value={templateId} />}
       {defaultCategory && <input type="hidden" name="category_label" value={defaultCategory} />}
 
@@ -111,12 +129,12 @@ export function CreatePlanForm({
       {scopeType === "group" ? (
         <div className="mt-3.5">
           <span className="mb-1.5 block text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 70%, transparent)" }}>
-            Gruppe{groups.length > 1 ? "n" : ""} — Mehrfachauswahl möglich
+            {groups.length > 1 ? "Gruppen — Mehrfachauswahl möglich" : "Gruppe"}
           </span>
           <div className="flex flex-col gap-1.5">
             {groups.map((g) => (
               <label key={g.id} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="group_ids" value={g.id} />
+                <input type="checkbox" name="group_ids" value={g.id} defaultChecked={groups.length === 1} />
                 {g.name}
               </label>
             ))}
@@ -130,7 +148,7 @@ export function CreatePlanForm({
       ) : (
         <div className="mt-3.5">
           <span className="mb-1.5 block text-xs" style={{ color: "color-mix(in srgb, var(--dc-text) 70%, transparent)" }}>
-            Athlet{athletes.length > 1 ? "en" : ""} — Mehrfachauswahl möglich
+            {athletes.length > 1 ? "Athleten — Mehrfachauswahl möglich" : "Athlet"}
           </span>
           <div className="flex max-h-52 flex-col gap-1.5 overflow-y-auto">
             {athletes.map((a) => (
@@ -146,9 +164,9 @@ export function CreatePlanForm({
         </div>
       )}
 
-      {state.error && (
+      {error && (
         <div className="mt-3 text-[13px]" style={{ color: "var(--dc-accent-2-700)" }}>
-          {state.error}
+          {error}
         </div>
       )}
 

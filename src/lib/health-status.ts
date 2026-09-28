@@ -11,7 +11,10 @@ export const HEALTH_STATUS_LABEL: Record<HealthStatusLevel, string> = {
   green: "Unauffällig",
   yellow: "Leichte Abweichung",
   red: "Deutliche Abweichung",
-  none: "Keine Daten",
+  // "none" means no check-in today (or too little history to compare
+  // against) — not that there's no data at all, so don't say "Keine Daten"
+  // right next to a chart full of earlier values.
+  none: "Heute keine Bewertung",
 };
 
 export const HEALTH_STATUS_DOT: Record<HealthStatusLevel, string> = {

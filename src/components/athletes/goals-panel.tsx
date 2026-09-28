@@ -18,20 +18,25 @@ export function GoalsPanel({ groups, athleteId }: { groups: MesocycleGoalGroup[]
   if (groups.length === 0) return null;
 
   return (
-    <div className="mt-6">
+    <div className="mt-4 mb-6" style={{ background: "var(--dc-surface)" }}>
       <button
         type="button"
-        className="kicker-muted flex w-full items-center justify-between gap-2"
-        style={{ background: "transparent", border: 0, cursor: "pointer", padding: 0, textAlign: "left" }}
+        className="flex w-full items-center justify-between gap-2 px-3.5 py-3"
+        style={{ background: "transparent", border: 0, cursor: "pointer", textAlign: "left", color: "var(--dc-text)" }}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span>Ziele ({totalCount})</span>
-        <span>{open ? "▴" : "▾"}</span>
+        <span className="text-[15px]">
+          Meine Ziele{" "}
+          <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
+            · {totalCount} {totalCount === 1 ? "Ziel" : "Ziele"}
+          </span>
+        </span>
+        <span style={{ color: "var(--dc-accent-700)" }}>{open ? "▴" : "▾"}</span>
       </button>
 
       {open && (
-        <div className="mt-3 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 px-3.5 pb-3.5">
           {groups.map((g) => (
             <GoalToggleList
               key={g.mesocycleId}

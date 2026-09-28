@@ -66,7 +66,7 @@ export default async function TrainerCalendarPage({
 
   let plansQuery = supabase
     .from("training_plans")
-    .select("id, title, date, time, scope_type, group_id, athlete_id, groups(name, color)")
+    .select("id, title, date, time, category_label, scope_type, group_id, athlete_id, groups(name, color)")
     .gte("date", rangeStart)
     .lte("date", rangeEnd);
   if (params.group) plansQuery = plansQuery.eq("group_id", params.group);
@@ -125,7 +125,7 @@ export default async function TrainerCalendarPage({
           who,
           time: plan.time ?? "",
           tone: color,
-          typeLabel: "Training",
+          typeLabel: plan.category_label?.trim().toLowerCase() === "athletik" ? "Athletik" : "Karate",
         },
       ];
     }
@@ -203,6 +203,14 @@ export default async function TrainerCalendarPage({
       weekEventWhoSetByKey.set(weekKey, new Set([who]));
       weekItemsByDate[date] = [...(weekItemsByDate[date] ?? []), item];
     }
+  }
+
+  // Plans and events are appended in query order, so a 19:00 training could
+  // otherwise sit above a 17:00 one — order each day chronologically, all-day
+  // entries first and entries without a time last.
+  const timeSortKey = (t: string) => (t === "Ganztägig" ? "00:00" : t || "99:99");
+  for (const date of Object.keys(weekItemsByDate)) {
+    weekItemsByDate[date].sort((a, b) => timeSortKey(a.time).localeCompare(timeSortKey(b.time)));
   }
 
   const activeParams = { group: params.group, athlete: params.athlete, type: params.type };

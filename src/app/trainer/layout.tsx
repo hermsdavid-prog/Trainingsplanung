@@ -11,7 +11,7 @@ export default async function TrainerLayout({
   if (profile.role !== "trainer") redirect("/");
 
   return (
-    <TrainerShell role={profile.role} fullName={profile.full_name}>
+    <TrainerShell fullName={profile.full_name}>
       {children}
     </TrainerShell>
   );
