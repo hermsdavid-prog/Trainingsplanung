@@ -57,6 +57,7 @@ export type SessionCardio = {
 
 export type SessionKarateRow = {
   itemId: string;
+  exerciseId: string | null;
   name: string;
   desc: string;
   note: string;
@@ -903,7 +904,8 @@ export function WorkoutSession({
         (() => {
           const ex = exercises.find((e) => e.itemId === instrItemId);
           const row = karateRows.find((r) => r.itemId === instrItemId);
-          const instr = ex?.exerciseId ? instructionsByExercise[ex.exerciseId] : undefined;
+          const instrExerciseId = ex?.exerciseId ?? row?.exerciseId;
+          const instr = instrExerciseId ? instructionsByExercise[instrExerciseId] : undefined;
           const title = ex?.name ?? row?.name ?? "";
           const steps = instr?.steps ?? [];
           const fallbackNote = ex?.note ?? row?.note ?? row?.desc ?? "";

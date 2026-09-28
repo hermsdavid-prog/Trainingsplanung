@@ -169,6 +169,7 @@ export default async function AthleteWorkoutSessionPage({
 
   const karateRows: SessionKarateRow[] = roundItems.map((item) => ({
     itemId: item.id,
+    exerciseId: item.exercise_id,
     name: item.exercise_name,
     desc: item.description ?? "",
     note: item.notes ?? "",
