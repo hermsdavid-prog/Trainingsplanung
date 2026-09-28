@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { todayISO, shiftDateISO, formatDateLabel } from "@/lib/date";
+import { todayISO, shiftDateISO, formatDateLabel, isMesocycleCurrent } from "@/lib/date";
 import { HealthCheckinCard } from "@/components/health/health-checkin-card";
 import { CheckinGate } from "@/components/health/checkin-gate";
 import {
@@ -110,8 +110,10 @@ export default async function AthleteTodayPage({
   }));
 
   // — Trainingsziele — same "this athlete's relevant Mesozyklen" union
-  // query as /athlete/mesocycles, just trimmed to id+title since the
-  // Startseite panel only needs the goal list, not dates/progress.
+  // query as /athlete/mesocycles, narrowed to the ones running today: the
+  // Startseite is about what to focus on now, and an athlete may only add
+  // own goals to a running Mesozyklus anyway. Past cycles' goals stay
+  // readable on /athlete/mesocycles.
   const { data: goalGroupRows } = user
     ? await supabase.from("group_athletes").select("group_id").eq("athlete_id", user.id)
     : { data: [] };
@@ -122,18 +124,20 @@ export default async function AthleteTodayPage({
         goalGroupIds.length
           ? supabase
               .from("training_mesocycles")
-              .select("id, title")
+              .select("id, title, start_date, weeks")
               .in("group_id", goalGroupIds)
               .order("start_date", { ascending: false })
           : Promise.resolve({ data: [] }),
         supabase
           .from("training_mesocycles")
-          .select("id, title")
+          .select("id, title, start_date, weeks")
           .eq("athlete_id", user.id)
           .order("start_date", { ascending: false }),
       ])
     : [{ data: [] }, { data: [] }];
-  const relevantMesocycles = [...(groupMesoRows ?? []), ...(ownMesoRows ?? [])];
+  const relevantMesocycles = [...(groupMesoRows ?? []), ...(ownMesoRows ?? [])].filter((m) =>
+    isMesocycleCurrent(m.start_date, m.weeks, today)
+  );
 
   const relevantMesoIds = relevantMesocycles.map((m) => m.id);
   const { data: mesoGoalRows } = user && relevantMesoIds.length

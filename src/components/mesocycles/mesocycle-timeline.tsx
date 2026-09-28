@@ -245,6 +245,7 @@ export function MesocycleTimeline({
                         goals={openMesocycle.goals ?? []}
                         mesocycleId={openMesocycle.id}
                         athleteId={viewerAthleteId}
+                        canAdd={elapsed >= 0 && elapsed < totalDays}
                       />
                     )}
 

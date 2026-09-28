@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { todayISO, shiftDateISO, formatDateCompact } from "@/lib/date";
+import { todayISO, shiftDateISO, formatDateCompact, isMesocycleCurrent } from "@/lib/date";
 import { MesocycleCarousel } from "@/components/mesocycles/mesocycle-carousel";
 import { MesocycleTimeline } from "@/components/mesocycles/mesocycle-timeline";
 import { MesocycleViewToggle } from "@/components/mesocycles/view-toggle";
@@ -58,7 +58,12 @@ function MesocycleProgressCard({
         <div className="h-[3px]" style={{ background: "var(--dc-accent)", width: `${progressPct}%` }} />
       </div>
 
-      <GoalToggleList goals={goals} mesocycleId={m.id} athleteId={athleteId} />
+      <GoalToggleList
+        goals={goals}
+        mesocycleId={m.id}
+        athleteId={athleteId}
+        canAdd={isMesocycleCurrent(m.start_date, m.weeks, todayIso)}
+      />
 
       {plans.length > 0 && (
         <div className="mt-3 flex flex-col gap-1 border-t pt-3" style={{ borderColor: "var(--dc-divider)" }}>

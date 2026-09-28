@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/actions/plans";
+import { todayISO, isMesocycleCurrent } from "@/lib/date";
 
 // Per-athlete Trainingsziele for a Mesozyklus — even for a group-scoped
 // Mesozyklus, each athlete in that group gets their own distinct goals
@@ -23,6 +24,20 @@ export async function createMesocycleGoalAction(input: {
 
   const text = input.text.trim();
   if (!text) return { error: "Bitte ein Ziel eingeben." };
+
+  // An athlete adding their own goal: only for the Mesozyklus running today.
+  // Trainers can still prepare goals for upcoming cycles. The same rule is
+  // enforced by mesocycle_goals_insert RLS; this gives a readable message.
+  if (input.athleteId === user.id) {
+    const { data: meso } = await supabase
+      .from("training_mesocycles")
+      .select("start_date, weeks")
+      .eq("id", input.mesocycleId)
+      .maybeSingle();
+    if (!meso || !isMesocycleCurrent(meso.start_date, meso.weeks, todayISO())) {
+      return { error: "Eigene Ziele kannst du nur für den laufenden Mesozyklus eintragen." };
+    }
+  }
 
   const { count } = await supabase
     .from("mesocycle_goals")

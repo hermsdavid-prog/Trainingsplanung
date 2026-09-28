@@ -12,6 +12,12 @@ export function shiftDateISO(dateStr: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+// Whether todayIso falls inside a Mesozyklus that starts on startDate and
+// runs for `weeks` full weeks (end exclusive).
+export function isMesocycleCurrent(startDate: string, weeks: number, todayIso: string): boolean {
+  return todayIso >= startDate && todayIso < shiftDateISO(startDate, weeks * 7);
+}
+
 // Formats a YYYY-MM-DD calendar date as dd/mm/yyyy for compact display.
 export function formatDateShort(dateStr: string): string {
   const [y, m, d] = dateStr.split("-");

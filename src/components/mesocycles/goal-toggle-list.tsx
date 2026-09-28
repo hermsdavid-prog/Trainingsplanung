@@ -20,6 +20,7 @@ export function GoalToggleList({
   mesocycleId,
   athleteId,
   heading = "Trainingsziele",
+  canAdd = true,
 }: {
   goals: MesocycleGoal[];
   mesocycleId: string;
@@ -28,6 +29,9 @@ export function GoalToggleList({
   // one "Trainingsziele" heading (see GoalsPanel) can label each instance
   // by Mesozyklus name instead of repeating the generic heading.
   heading?: string;
+  // Own goals may only be added while the Mesozyklus is running — a past or
+  // upcoming one shows its goals read-only (checkbox still works).
+  canAdd?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -61,7 +65,9 @@ export function GoalToggleList({
   return (
     <div className="mt-3 flex flex-col gap-1.5 border-t pt-3" style={{ borderColor: "var(--dc-divider)" }}>
       <div className="kicker-muted">{heading}</div>
-      {goals.length === 0 && !adding && <p className="text-xs text-muted">Noch keine Ziele.</p>}
+      {goals.length === 0 && !adding && (
+        <p className="text-xs text-muted">{canAdd ? "Noch keine Ziele." : "Keine Ziele für diesen Mesozyklus."}</p>
+      )}
       {goals.map((g) => (
         <div key={g.id} className="flex items-center gap-2 text-[13px]" style={{ opacity: g.achievedAt ? 0.6 : 1 }}>
           <label className="flex min-w-0 flex-1 items-center gap-2">
@@ -89,7 +95,7 @@ export function GoalToggleList({
         </div>
       ))}
 
-      {adding ? (
+      {!canAdd ? null : adding ? (
         <div className="mt-1 flex gap-2">
           <input
             className="input flex-1"

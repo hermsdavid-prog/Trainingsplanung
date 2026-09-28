@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PlanListFilters } from "@/components/plans/plan-list-filters";
 import { PlanMesocycleGroups, type PlanGroupRow, type PlanMesocycleSection } from "@/components/plans/plan-mesocycle-groups";
-import { todayISO, shiftDateISO } from "@/lib/date";
+import { todayISO, isMesocycleCurrent } from "@/lib/date";
 import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
 
 type PlanGroup = PlanGroupRow & {
@@ -110,7 +110,7 @@ export default async function TrainerPlansPage({
   const today = todayISO();
   const sections: PlanMesocycleSection[] = (mesocycleRows ?? [])
     .map((m) => {
-      const isCurrent = today >= m.start_date && today < shiftDateISO(m.start_date, m.weeks * 7);
+      const isCurrent = isMesocycleCurrent(m.start_date, m.weeks, today);
       return {
         mesocycleId: m.id,
         title: m.title,
