@@ -35,7 +35,7 @@ export default async function AthleteWorkoutSessionPage({
     supabase
       .from("training_plan_items")
       .select(
-        "id, position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, notes, round_rest, heart_rate_on, heart_rate_off, description"
+        "id, position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, notes, round_rest, heart_rate_on, heart_rate_off, description, link_url"
       )
       .eq("training_plan_id", id)
       .order("position"),
@@ -170,7 +170,9 @@ export default async function AthleteWorkoutSessionPage({
   const karateRows: SessionKarateRow[] = roundItems.map((item) => ({
     itemId: item.id,
     name: item.exercise_name,
-    desc: item.description ?? item.notes ?? "",
+    desc: item.description ?? "",
+    note: item.notes ?? "",
+    linkUrl: item.link_url ?? "",
     rounds: Number(item.sets) || 3,
     restLabel: item.round_rest ?? item.rest_time ?? "",
     valLabel: item.reps_or_duration ?? "",

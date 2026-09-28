@@ -59,6 +59,8 @@ export type SessionKarateRow = {
   itemId: string;
   name: string;
   desc: string;
+  note: string;
+  linkUrl: string;
   rounds: number;
   restLabel: string;
   valLabel: string;
@@ -904,7 +906,9 @@ export function WorkoutSession({
           const instr = ex?.exerciseId ? instructionsByExercise[ex.exerciseId] : undefined;
           const title = ex?.name ?? row?.name ?? "";
           const steps = instr?.steps ?? [];
-          const fallbackNote = ex?.note ?? row?.desc ?? "";
+          const fallbackNote = ex?.note ?? row?.note ?? row?.desc ?? "";
+          const linkUrl = instr?.video_url ?? row?.linkUrl ?? "";
+          const linkLabel = instr?.video_url ? instr.video_label || "Video ansehen" : "Link öffnen";
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "color-mix(in srgb, #201e1d 50%, transparent)" }} onClick={() => setInstrItemId(null)}>
               <div
@@ -941,16 +945,16 @@ export function WorkoutSession({
                     </p>
                   )}
                 </div>
-                {instr?.video_url && (
+                {linkUrl && (
                   <a
-                    href={instr.video_url}
+                    href={linkUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-4 flex items-center justify-between gap-3 p-3.5 no-underline"
                     style={{ background: "var(--dc-surface)", borderLeft: "2px solid var(--dc-accent)" }}
                   >
                     <span className="text-sm" style={{ color: "var(--dc-text)" }}>
-                      {instr.video_label || "Video ansehen"}
+                      {linkLabel}
                     </span>
                     <span className="text-[17px]" style={{ color: "var(--dc-accent-700)" }}>▸</span>
                   </a>
