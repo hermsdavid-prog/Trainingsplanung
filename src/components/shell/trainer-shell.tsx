@@ -27,6 +27,7 @@ const NAV = [
   { href: "/trainer/athletes", label: "Athleten", match: (p: string) => p.startsWith("/trainer/athletes") },
   { href: "/trainer/mesocycles", label: "Mesozyklen", match: (p: string) => p.startsWith("/trainer/mesocycles") },
   { href: "/trainer/report", label: "Wochenbericht", match: (p: string) => p.startsWith("/trainer/report") },
+  { href: "/trainer/export", label: "Export", match: (p: string) => p.startsWith("/trainer/export") },
 ];
 
 function NavLinks({
