@@ -1,20 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { DeletePlanRowButton } from "@/components/plans/delete-plan-row-button";
-import { PlanOccurrenceDropdown } from "@/components/plans/plan-occurrence-dropdown";
 import { PlanListFilters } from "@/components/plans/plan-list-filters";
-import { formatDateShort } from "@/lib/date";
+import { PlanMesocycleGroups, type PlanGroupRow, type PlanMesocycleSection } from "@/components/plans/plan-mesocycle-groups";
+import { todayISO, shiftDateISO } from "@/lib/date";
 import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
 
-const MUTED = { color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" };
-
-type PlanGroup = {
-  key: string;
-  title: string;
-  time: string | null;
+type PlanGroup = PlanGroupRow & {
   scopeType: string;
-  forLabel: string;
-  occurrences: { id: string; date: string; created_by: string | null }[];
+  mesocycleId: string | null;
 };
 
 export default async function TrainerPlansPage({
@@ -33,7 +26,7 @@ export default async function TrainerPlansPage({
   let plansQuery = supabase
     .from("training_plans")
     .select(
-      "id, title, category_label, date, time, scope_type, created_by, group_id, athlete_id, series_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)"
+      "id, title, category_label, date, time, scope_type, created_by, group_id, athlete_id, series_id, mesocycle_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)"
     )
     .eq("category_label", category);
   if (groupFilter) plansQuery = plansQuery.eq("group_id", groupFilter);
@@ -84,6 +77,10 @@ export default async function TrainerPlansPage({
         time: plan.time,
         scopeType: plan.scope_type,
         forLabel,
+        // A series is created in one batch against one Mesozyklus, so every
+        // occurrence under this key shares the same mesocycle_id — the
+        // first one seen is as good as any.
+        mesocycleId: plan.mesocycle_id,
         occurrences: [occurrence],
       });
     }
@@ -98,6 +95,36 @@ export default async function TrainerPlansPage({
     const bLatest = b.occurrences[b.occurrences.length - 1].date;
     return aLatest < bLatest ? 1 : aLatest > bLatest ? -1 : 0;
   });
+
+  // Group by Mesozyklus so the list reads as a handful of collapsible blocks
+  // instead of one long chronological table — only Mesozyklen that actually
+  // have a training in this category show up here (unlike the dedicated
+  // Mesozyklen tab, which lists every one regardless of content). Trainings
+  // with no mesocycle_id land in a permanent "Ohne Mesozyklus" bucket rather
+  // than disappearing among the others.
+  const mesocycleIds = Array.from(new Set(groups.map((g) => g.mesocycleId).filter((id): id is string => !!id)));
+  const { data: mesocycleRows } = mesocycleIds.length
+    ? await supabase.from("training_mesocycles").select("id, title, start_date, weeks").in("id", mesocycleIds)
+    : { data: [] };
+
+  const today = todayISO();
+  const sections: PlanMesocycleSection[] = (mesocycleRows ?? [])
+    .map((m) => {
+      const isCurrent = today >= m.start_date && today < shiftDateISO(m.start_date, m.weeks * 7);
+      return {
+        mesocycleId: m.id,
+        title: m.title,
+        startDate: m.start_date,
+        weeks: m.weeks,
+        isCurrent,
+        groups: groups.filter((g) => g.mesocycleId === m.id),
+      };
+    })
+    .sort((a, b) => {
+      if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
+      return a.startDate < b.startDate ? 1 : a.startDate > b.startDate ? -1 : 0;
+    });
+  const unassignedGroups = groups.filter((g) => !g.mesocycleId);
 
   return (
     <div>
@@ -119,77 +146,18 @@ export default async function TrainerPlansPage({
         <PlanListFilters groups={allGroups ?? []} athletes={athletes} selectedGroup={groupFilter} selectedAthlete={athleteFilter} />
       </div>
 
-      <div className="mt-5 overflow-x-auto">
-        <table className="table" style={{ minWidth: 560 }}>
-          <thead>
-            <tr>
-              <th>Datum</th>
-              <th>Zeit</th>
-              <th>Titel</th>
-              <th>Für</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((group) => {
-              if (group.occurrences.length === 1) {
-                const plan = group.occurrences[0];
-                // The list query is already RLS-scoped to plans this trainer
-                // can see (their own groups, plus those groups' athletes'
-                // own trainings) — any trainer/admin viewing a row here may
-                // also delete it, matching requirePlanEditAccess.
-                const canDelete = profile?.role === "admin" || profile?.role === "trainer";
-                return (
-                  <tr key={group.key}>
-                    <td style={MUTED}>{formatDateShort(plan.date)}</td>
-                    <td style={MUTED}>{group.time || "—"}</td>
-                    <td className="text-[15px]">{group.title}</td>
-                    <td className="text-sm" style={MUTED}>
-                      {group.forLabel}
-                    </td>
-                    <td>
-                      <div className="flex items-center justify-end gap-1">
-                        <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-ghost">
-                          bearbeiten
-                        </Link>
-                        {canDelete && <DeletePlanRowButton planId={plan.id} title={group.title} />}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              }
-              return (
-                <tr key={group.key}>
-                  <td colSpan={2}>
-                    <PlanOccurrenceDropdown occurrences={group.occurrences} />
-                  </td>
-                  <td className="text-[15px]">
-                    {group.title}
-                    {group.time && (
-                      <div className="mt-0.5 text-xs" style={MUTED}>
-                        {group.time}
-                      </div>
-                    )}
-                  </td>
-                  <td className="text-sm" style={MUTED}>
-                    {group.forLabel}
-                  </td>
-                  <td></td>
-                </tr>
-              );
-            })}
-            {groups.length === 0 && (
-              <tr>
-                <td colSpan={5} className="text-center" style={{ color: "color-mix(in srgb, var(--dc-text) 55%, transparent)" }}>
-                  {groupFilter || athleteFilter
-                    ? "Keine Trainingspläne für diese Auswahl."
-                    : "Noch keine Trainingspläne angelegt."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <PlanMesocycleGroups
+        sections={sections}
+        unassigned={unassignedGroups}
+        // The list query is already RLS-scoped to plans this trainer can see
+        // (their own groups, plus those groups' athletes' own trainings) —
+        // any trainer/admin viewing a row here may also delete it, matching
+        // requirePlanEditAccess.
+        canDelete={profile?.role === "admin" || profile?.role === "trainer"}
+        emptyMessage={
+          groupFilter || athleteFilter ? "Keine Trainingspläne für diese Auswahl." : "Noch keine Trainingspläne angelegt."
+        }
+      />
     </div>
   );
 }
