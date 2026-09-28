@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatDateCompact } from "@/lib/date";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { GoalToggleList, type MesocycleGoal } from "@/components/mesocycles/goal-toggle-list";
+import { EditMesocycleDialog } from "@/components/mesocycles/edit-mesocycle-dialog";
 
 const DAY_PX = 7;
 const ROW_HEIGHT = 40;
@@ -207,11 +208,26 @@ export function MesocycleTimeline({
                       : `Woche ${Math.floor(elapsed / 7) + 1} von ${openMesocycle.weeks}`;
                 return (
                   <div className="min-w-0">
-                    <div className="kicker-muted">{openMesocycle.title}</div>
-                    <div className="mt-1 text-xs text-muted">
-                      {formatDateCompact(openMesocycle.start_date)} –{" "}
-                      {formatDateCompact(addDays(openMesocycle.start_date, openMesocycle.weeks * 7 - 1))} ·{" "}
-                      {openMesocycle.weeks} {openMesocycle.weeks === 1 ? "Woche" : "Wochen"}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="kicker-muted">{openMesocycle.title}</div>
+                        <div className="mt-1 text-xs text-muted">
+                          {formatDateCompact(openMesocycle.start_date)} –{" "}
+                          {formatDateCompact(addDays(openMesocycle.start_date, openMesocycle.weeks * 7 - 1))} ·{" "}
+                          {openMesocycle.weeks} {openMesocycle.weeks === 1 ? "Woche" : "Wochen"}
+                        </div>
+                      </div>
+                      {planLinkRole === "trainer" && (
+                        <EditMesocycleDialog
+                          mesocycle={{
+                            id: openMesocycle.id,
+                            title: openMesocycle.title,
+                            description: openMesocycle.description,
+                            start_date: openMesocycle.start_date,
+                            weeks: openMesocycle.weeks,
+                          }}
+                        />
+                      )}
                     </div>
                     {openMesocycle.description && (
                       <p className="mt-2 text-[13px] leading-[1.5]">{openMesocycle.description}</p>
