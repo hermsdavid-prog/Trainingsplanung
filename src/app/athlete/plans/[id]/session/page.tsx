@@ -157,6 +157,16 @@ export default async function AthleteWorkoutSessionPage({
     initialSets: (item.exercise_id ? resultsByExercise.get(item.exercise_id) : undefined) ?? [],
   }));
 
+  const cardioIds = cardioItems.map((i) => i.id);
+  const { data: cardioFeedback } = cardioIds.length
+    ? await supabase
+        .from("athlete_feedback")
+        .select("training_plan_item_id, actual_value")
+        .eq("athlete_id", user.id)
+        .in("training_plan_item_id", cardioIds)
+    : { data: [] };
+  const cardioResultByItem = new Map((cardioFeedback ?? []).map((f) => [f.training_plan_item_id, f.actual_value ?? ""]));
+
   const cardio: SessionCardio[] = cardioItems.map((item) => ({
     itemId: item.id,
     name: item.exercise_name,
@@ -165,6 +175,7 @@ export default async function AthleteWorkoutSessionPage({
     on: item.heart_rate_on ?? "",
     off: item.heart_rate_off ?? "",
     note: item.notes ?? "",
+    result: cardioResultByItem.get(item.id) ?? "",
   }));
 
   const karateRows: SessionKarateRow[] = roundItems.map((item) => ({

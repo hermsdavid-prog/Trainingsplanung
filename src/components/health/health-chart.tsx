@@ -3,6 +3,7 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { HealthLog } from "@/lib/health-status";
 import { formatDateCompact } from "@/lib/date";
+import { ChartTooltip, CHART_CURSOR } from "@/components/charts/chart-tooltip";
 
 type MetricKey = "wellbeing" | "hrv" | "resting_hr";
 
@@ -58,19 +59,19 @@ function MiniChart({
               <XAxis dataKey="date" hide />
               <YAxis hide domain={domain ?? ["auto", "auto"]} />
               <Tooltip
-                labelFormatter={(value) => formatDateCompact(String(value))}
-                formatter={(value) => [`${value}${unit ? ` ${unit}` : ""}`, label]}
-                contentStyle={{ fontSize: 12, padding: "4px 8px", borderRadius: 2 }}
+                content={<ChartTooltip unit={unit} name={label} />}
+                cursor={CHART_CURSOR}
+                wrapperStyle={{ outline: "none", zIndex: 10 }}
               />
               <Area
                 type="monotone"
                 dataKey={dataKey}
-                stroke="#0088b0"
-                strokeWidth={1.25}
-                fill="#e9f8ff"
-                dot={false}
+                stroke="var(--dc-accent)"
+                strokeWidth={1.5}
+                fill="var(--dc-accent-100)"
+                dot={{ r: 2, fill: "var(--dc-accent)", strokeWidth: 0 }}
                 connectNulls
-                activeDot={{ r: 4, stroke: "#f3f2f2", strokeWidth: 1.5 }}
+                activeDot={{ r: 5, stroke: "#fff", strokeWidth: 2, fill: "var(--dc-accent)" }}
               />
             </AreaChart>
           </ResponsiveContainer>

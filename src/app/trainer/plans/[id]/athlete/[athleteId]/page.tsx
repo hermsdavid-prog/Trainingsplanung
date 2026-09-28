@@ -28,7 +28,7 @@ export default async function TrainerAthletePlanPage({
     supabase.from("profiles").select("full_name").eq("id", athleteId).single(),
     supabase
       .from("training_plan_items")
-      .select("exercise_name, exercise_id, section, reps_or_duration, sets")
+      .select("id, exercise_name, exercise_id, section, reps_or_duration, sets, heart_rate_on, heart_rate_off")
       .eq("training_plan_id", id)
       .order("position"),
     supabase
@@ -42,6 +42,18 @@ export default async function TrainerAthletePlanPage({
   if (!plan || !athlete) notFound();
 
   const kraftItems = (items ?? []).filter((i) => i.section === "kraft" && i.exercise_id);
+  const cardioItems = (items ?? []).filter((i) => i.section === "cardio");
+  const { data: cardioFeedback } = cardioItems.length
+    ? await supabase
+        .from("athlete_feedback")
+        .select("training_plan_item_id, actual_value")
+        .eq("athlete_id", athleteId)
+        .in(
+          "training_plan_item_id",
+          cardioItems.map((i) => i.id)
+        )
+    : { data: [] };
+  const cardioResultByItem = new Map((cardioFeedback ?? []).map((f) => [f.training_plan_item_id, f.actual_value ?? ""]));
   const exerciseIds = Array.from(new Set(kraftItems.map((i) => i.exercise_id as string)));
 
   const { data: results } = exerciseIds.length
@@ -116,8 +128,43 @@ export default async function TrainerAthletePlanPage({
         </Link>
       </div>
 
+      {cardioItems.length > 0 && (
+        <div className="mt-7 max-w-[900px]">
+          <div className="kicker-accent-2">Cardio</div>
+          <div className="mt-2 flex flex-col gap-2">
+            {cardioItems.map((c) => {
+              const result = cardioResultByItem.get(c.id);
+              return (
+                <div
+                  key={c.id}
+                  className="flex flex-wrap items-baseline justify-between gap-3 p-3.5"
+                  style={{ background: "var(--dc-surface)", border: "1px solid var(--dc-divider)" }}
+                >
+                  <div className="min-w-0">
+                    <div className="text-[16px]">
+                      {c.exercise_name}
+                      {c.reps_or_duration ? <span style={{ color: "var(--dc-muted)" }}> — {c.reps_or_duration}</span> : null}
+                    </div>
+                    {(c.heart_rate_on || c.heart_rate_off) && (
+                      <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
+                        {c.heart_rate_on && `On ${c.heart_rate_on}`}
+                        {c.heart_rate_off && ` · Off ${c.heart_rate_off}`}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className="kicker-muted">Ergebnis</div>
+                    <div className="text-[16px] font-semibold">{result || <span className="font-normal text-muted">noch nichts eingetragen</span>}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {exercises.length === 0 ? (
-        <p className="mt-8 text-sm text-muted">Für diesen Plan liegen keine Kraftübungen vor.</p>
+        cardioItems.length === 0 && <p className="mt-8 text-sm text-muted">Für diesen Plan liegen keine Kraftübungen vor.</p>
       ) : (
         <div className="mt-7 max-w-[900px]">
           {exercises.map((ex, i) => (

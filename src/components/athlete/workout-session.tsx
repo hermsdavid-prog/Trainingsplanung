@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/exercise-results";
 import { saveSessionRpeAction } from "@/lib/actions/sessions";
 import { addSessionExerciseAction } from "@/lib/actions/session-exercises";
+import { upsertFeedbackAction } from "@/lib/actions/feedback";
 import type { BadgeAward } from "@/lib/badges";
 
 type SetType = "aufwaermsatz" | "arbeitssatz";
@@ -53,6 +54,9 @@ export type SessionCardio = {
   on: string;
   off: string;
   note: string;
+  // The athlete's own entered outcome (e.g. "7 Runden"), stored as
+  // athlete_feedback.actual_value for this plan item.
+  result: string;
 };
 
 export type SessionKarateRow = {
@@ -83,6 +87,11 @@ function notifyNewBadges(badges: BadgeAward[] | undefined) {
     toast.success(`${badge.icon} ${badge.title}`, { description: badge.description });
   }
 }
+
+// Set row columns: label · reps · weight · RIR · ✓ · ✕. Sized for a 375px
+// phone so "Aufwärmsatz" (number on its own line) and "100 kg" both fit
+// without truncation.
+const SET_GRID = "76px 46px minmax(0,1fr) 38px 40px 24px";
 
 const SET_TYPE_LABEL: Record<SetType, string> = {
   aufwaermsatz: "Aufwärmsatz",
@@ -201,7 +210,42 @@ export function WorkoutSession({
     return map;
   });
 
-  const [activeItemId, setActiveItemId] = useState<string>(initialExercises[0]?.itemId ?? "");
+  // Exercises stay in plan order and expand in place (several may be open)
+  // — tapping one used to move it to the top of the page, which made the
+  // list jump under the athlete's finger.
+  const [openIds, setOpenIds] = useState<Set<string>>(
+    () => new Set(initialExercises[0] ? [initialExercises[0].itemId] : [])
+  );
+  function toggleOpen(itemId: string) {
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  const [cardioResults, setCardioResults] = useState<Record<string, string>>(() =>
+    Object.fromEntries(cardio.map((c) => [c.itemId, c.result]))
+  );
+  const [savedCardioResults, setSavedCardioResults] = useState<Record<string, string>>(() =>
+    Object.fromEntries(cardio.map((c) => [c.itemId, c.result]))
+  );
+  const [savingCardioId, setSavingCardioId] = useState<string | null>(null);
+
+  async function saveCardioResult(itemId: string) {
+    const value = (cardioResults[itemId] ?? "").trim();
+    if (value === (savedCardioResults[itemId] ?? "")) return;
+    setSavingCardioId(itemId);
+    const result = await upsertFeedbackAction(itemId, { actual_value: value });
+    setSavingCardioId(null);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setSavedCardioResults((prev) => ({ ...prev, [itemId]: value }));
+    toast.success("Ergebnis gespeichert.");
+  }
 
   const [addExerciseName, setAddExerciseName] = useState("");
   const [isAddingExercise, setIsAddingExercise] = useState(false);
@@ -230,7 +274,7 @@ export function WorkoutSession({
     };
     setExercises((prev) => [...prev, newExercise]);
     setSetsByItem((prev) => ({ ...prev, [newExercise.itemId]: buildInitialSets(newExercise) }));
-    setActiveItemId(newExercise.itemId);
+    setOpenIds((prev) => new Set(prev).add(newExercise.itemId));
     setAddExerciseName("");
     toast.success(`${newExercise.name} hinzugefügt.`);
   }
@@ -276,9 +320,6 @@ export function WorkoutSession({
   const [rpeValue, setRpeValue] = useState<number | null>(initialRpe);
   const [isSavingRpe, setIsSavingRpe] = useState(false);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
-
-  const activeExercise = exercises.find((e) => e.itemId === activeItemId) ?? exercises[0];
-  const activeSets = activeExercise ? setsByItem[activeExercise.itemId] ?? [] : [];
 
   const totals = useMemo(() => {
     let total = 0;
@@ -536,157 +577,179 @@ export function WorkoutSession({
               </div>
             )}
 
-            {activeExercise && (
-              <>
-                <div className="mt-5.5 flex items-center gap-2.5" style={{ marginTop: 22 }}>
-                  <h3 className="m-0 text-[21px]">{activeExercise.name}</h3>
-                  <button
-                    type="button"
-                    onClick={() => setInstrItemId(activeExercise.itemId)}
-                    aria-label="Anweisung anzeigen"
-                    className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[15px]"
-                    style={{ border: "1px solid var(--dc-accent)", color: "var(--dc-accent-700)" }}
-                  >
-                    i
-                  </button>
-                </div>
-                <div className="mt-1 text-[13px]" style={{ color: "var(--dc-muted)" }}>
-                  {activeExercise.spec}
-                  {activeExercise.restLabel ? ` · Pause ${activeExercise.restLabel}` : ""}
-                  {activeExercise.note ? ` · ${activeExercise.note}` : ""}
-                </div>
-
-                <div
-                  className="mt-4 grid gap-2 pb-1.5 text-[10px] uppercase"
-                  style={{
-                    gridTemplateColumns: "64px 1fr 1fr 52px 38px 30px",
-                    letterSpacing: ".09em",
-                    color: "var(--dc-muted)",
-                    borderBottom: "1px solid var(--dc-divider)",
-                  }}
-                >
-                  <span>Satz</span>
-                  <span>Wdh.</span>
-                  <span>Gewicht</span>
-                  <span>RIR</span>
-                  <span />
-                  <span />
-                </div>
-                {(() => {
-                  const typeCounts: Partial<Record<SetType, number>> = {};
-                  return activeSets.map((s) => {
-                    typeCounts[s.type] = (typeCounts[s.type] ?? 0) + 1;
-                    const label = `${SET_TYPE_LABEL[s.type]} ${typeCounts[s.type]}`;
-                    const pending = pendingKey === s.key;
-                    return (
-                      <div
-                        key={s.key}
-                        className="grid items-center gap-2 py-2.5"
-                        style={{
-                          gridTemplateColumns: "64px 1fr 1fr 52px 38px 30px",
-                          borderBottom: "1px solid color-mix(in srgb, var(--dc-text) 8%, transparent)",
-                        }}
+            <div className="mt-5 flex flex-col gap-2.5">
+              {exercises.map((ex) => {
+                const rows = setsByItem[ex.itemId] ?? [];
+                const done = rows.filter((r) => r.confirmed).length;
+                const planned = Math.max(Number(ex.sets) || 1, rows.length);
+                const isOpen = openIds.has(ex.itemId);
+                const complete = done > 0 && done >= planned;
+                return (
+                  <div key={ex.itemId} style={{ background: "var(--dc-surface)", border: "1px solid var(--dc-divider)" }}>
+                    <div className="flex items-stretch">
+                      <button
+                        type="button"
+                        onClick={() => toggleOpen(ex.itemId)}
+                        aria-expanded={isOpen}
+                        className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3.5 py-3 text-left"
+                        style={{ background: "transparent", border: 0, cursor: "pointer", color: "var(--dc-text)" }}
+                      >
+                        <span className="min-w-0">
+                          <span
+                            className="block text-[17px] font-semibold leading-tight"
+                            style={{ fontFamily: "var(--dc-font-heading)" }}
+                          >
+                            {ex.name}
+                          </span>
+                          <span className="mt-0.5 block text-[13px]" style={{ color: "var(--dc-muted)" }}>
+                            {ex.spec}
+                            {ex.restLabel ? ` · Pause ${ex.restLabel}` : ""}
+                          </span>
+                        </span>
+                        <span className="flex flex-none items-center gap-2.5">
+                          <span
+                            className="text-[13px] tabular-nums"
+                            style={{ color: complete ? "#0f8a5f" : "var(--dc-muted)", fontWeight: complete ? 600 : 400 }}
+                          >
+                            {complete ? "✓ " : ""}
+                            {done}/{planned}
+                          </span>
+                          <span aria-hidden style={{ color: "var(--dc-accent-700)" }}>
+                            {isOpen ? "▴" : "▾"}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInstrItemId(ex.itemId)}
+                        aria-label={`Anweisung zu ${ex.name} anzeigen`}
+                        className="flex w-11 flex-none items-center justify-center text-[15px]"
+                        style={{ background: "transparent", border: 0, borderLeft: "1px solid var(--dc-divider)", color: "var(--dc-accent-700)", cursor: "pointer" }}
                       >
                         <span
-                          className="text-xs leading-tight"
-                          style={{ color: s.confirmed ? "var(--dc-accent-700)" : "var(--dc-muted)" }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full"
+                          style={{ border: "1px solid var(--dc-accent)" }}
                         >
-                          {label}
+                          i
                         </span>
-                        <button
-                          type="button"
-                          className="tapv text-left text-[19px]"
-                          onClick={() => openPad(activeExercise.itemId, s.key, "reps", s.reps, "Wdh.")}
-                        >
-                          {s.reps || "—"}
-                        </button>
-                        <button
-                          type="button"
-                          className="tapv text-left text-[19px]"
-                          onClick={() => openPad(activeExercise.itemId, s.key, "weight", s.weight, activeExercise.unit || "kg")}
-                        >
-                          {s.weight ? `${s.weight} ${activeExercise.unit || "kg"}` : "—"}
-                        </button>
-                        {s.type === "arbeitssatz" && s.confirmed ? (
-                          <button
-                            type="button"
-                            className="tapv text-left text-[15px]"
-                            onClick={() => setRirPad({ itemId: activeExercise.itemId, setKey: s.key })}
-                          >
-                            {s.rir || "—"}
-                          </button>
-                        ) : (
-                          <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 30%, transparent)" }}>
-                            —
-                          </span>
+                      </button>
+                    </div>
+
+                    {isOpen && (
+                      <div className="border-t px-2.5 pb-3.5" style={{ borderColor: "var(--dc-divider)" }}>
+                        {ex.note && (
+                          <p className="mt-2.5 text-[13px]" style={{ color: "var(--dc-muted)" }}>
+                            {ex.note}
+                          </p>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => confirmSet(activeExercise, s)}
-                          disabled={pending}
-                          aria-label="Satz übernehmen"
-                          className="flex h-[38px] w-[38px] items-center justify-center rounded-sm text-[17px]"
+                        <div
+                          className="mt-3 grid gap-1 pb-1.5 text-[10.5px] font-semibold uppercase"
                           style={{
-                            border: `1px solid ${s.confirmed ? "#10b981" : "var(--dc-divider)"}`,
-                            background: s.confirmed ? "#10b981" : "transparent",
-                            color: s.confirmed ? "var(--dc-bg)" : "var(--dc-text)",
+                            gridTemplateColumns: SET_GRID,
+                            letterSpacing: ".07em",
+                            color: "var(--dc-muted)",
+                            borderBottom: "1px solid var(--dc-divider)",
                           }}
                         >
-                          ✓
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeSet(activeExercise, s)}
-                          disabled={pending}
-                          aria-label="Satz entfernen"
-                          className="h-[38px] w-[30px] text-[15px]"
-                          style={{ color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}
-                        >
-                          ✕
-                        </button>
+                          <span>Satz</span>
+                          <span>Wdh.</span>
+                          <span>Gewicht</span>
+                          <span>RIR</span>
+                          <span />
+                          <span />
+                        </div>
+                        {(() => {
+                          const typeCounts: Partial<Record<SetType, number>> = {};
+                          return rows.map((s) => {
+                            typeCounts[s.type] = (typeCounts[s.type] ?? 0) + 1;
+                            const pending = pendingKey === s.key;
+                            return (
+                              <div
+                                key={s.key}
+                                className="grid items-center gap-1 py-2"
+                                style={{
+                                  gridTemplateColumns: SET_GRID,
+                                  borderBottom: "1px solid color-mix(in srgb, var(--dc-text) 8%, transparent)",
+                                }}
+                              >
+                                <span
+                                  className="text-[12.5px] leading-tight"
+                                  style={{ color: s.confirmed ? "var(--dc-accent-700)" : "var(--dc-muted)" }}
+                                >
+                                  {SET_TYPE_LABEL[s.type]}
+                                  <span className="block tabular-nums">{typeCounts[s.type]}</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  className="tapv text-[17px]"
+                                  onClick={() => openPad(ex.itemId, s.key, "reps", s.reps, "Wdh.")}
+                                >
+                                  {s.reps || "—"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="tapv text-[17px]"
+                                  style={{ whiteSpace: "nowrap" }}
+                                  onClick={() => openPad(ex.itemId, s.key, "weight", s.weight, ex.unit || "kg")}
+                                >
+                                  {s.weight ? `${s.weight} ${ex.unit || "kg"}` : "—"}
+                                </button>
+                                {s.type === "arbeitssatz" && s.confirmed ? (
+                                  <button
+                                    type="button"
+                                    className="tapv text-[15px]"
+                                    onClick={() => setRirPad({ itemId: ex.itemId, setKey: s.key })}
+                                  >
+                                    {s.rir || "—"}
+                                  </button>
+                                ) : (
+                                  <span className="pl-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 30%, transparent)" }}>
+                                    —
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => confirmSet(ex, s)}
+                                  disabled={pending}
+                                  aria-label="Satz übernehmen"
+                                  className="flex h-10 w-10 items-center justify-center rounded-sm text-[17px]"
+                                  style={{
+                                    border: `1px solid ${s.confirmed ? "#10b981" : "var(--dc-divider)"}`,
+                                    background: s.confirmed ? "#10b981" : "transparent",
+                                    color: s.confirmed ? "#fff" : "var(--dc-text)",
+                                  }}
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeSet(ex, s)}
+                                  disabled={pending}
+                                  aria-label="Satz entfernen"
+                                  className="h-10 w-6 text-[15px]"
+                                  style={{ color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            );
+                          });
+                        })()}
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "aufwaermsatz")}>
+                            + Aufwärmsatz
+                          </button>
+                          <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "arbeitssatz")}>
+                            + Arbeitssatz
+                          </button>
+                        </div>
                       </div>
-                    );
-                  });
-                })()}
-
-                <div className="mt-3.5 flex gap-2">
-                  <button type="button" className="btn btn-secondary" onClick={() => addSet(activeExercise.itemId, "aufwaermsatz")}>
-                    + Aufwärmsatz
-                  </button>
-                  <button type="button" className="btn btn-secondary" onClick={() => addSet(activeExercise.itemId, "arbeitssatz")}>
-                    + Arbeitssatz
-                  </button>
-                </div>
-
-                <div className="mt-6 flex flex-col">
-                  {exercises
-                    .filter((e) => e.itemId !== activeExercise.itemId)
-                    .map((e) => {
-                      const rows = setsByItem[e.itemId] ?? [];
-                      const done = rows.filter((r) => r.confirmed).length;
-                      return (
-                        <button
-                          key={e.itemId}
-                          type="button"
-                          className="exrow"
-                          onClick={() => setActiveItemId(e.itemId)}
-                        >
-                          <div className="flex items-baseline justify-between gap-2.5">
-                            <span className="text-[16px]">{e.name}</span>
-                            <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
-                              {done}/{Math.max(Number(e.sets) || 1, rows.length)}
-                            </span>
-                          </div>
-                          <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
-                            {e.spec}
-                            {e.restLabel ? ` · Pause ${e.restLabel}` : ""}
-                          </div>
-                        </button>
-                      );
-                    })}
-                </div>
-              </>
-            )}
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
             {canAddExercises && (
               <div className="mt-6.5" style={{ marginTop: 26 }}>
@@ -721,17 +784,57 @@ export function WorkoutSession({
               </div>
             )}
 
-            {cardio.map((c) => (
-              <div key={c.itemId} className="mt-6.5 p-3.5" style={{ background: "var(--dc-surface)", marginTop: 26 }}>
-                <div className="kicker-accent-2">Cardio</div>
-                <div className="mt-1.5 text-base">{c.name}{c.spec ? ` — ${c.spec}` : ""}</div>
-                <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
-                  {c.on && `On ${c.on} Belastung`}
-                  {c.off && ` · Off ${c.off} Pause`}
-                  {c.note && ` · ${c.note}`}
+            {cardio.map((c) => {
+              const value = cardioResults[c.itemId] ?? "";
+              const dirty = value.trim() !== (savedCardioResults[c.itemId] ?? "");
+              return (
+                <div
+                  key={c.itemId}
+                  className="p-3.5"
+                  style={{ background: "var(--dc-surface)", border: "1px solid var(--dc-divider)", marginTop: 26 }}
+                >
+                  <div className="kicker-accent-2">Cardio</div>
+                  <div className="mt-1.5 text-[17px] font-semibold leading-tight" style={{ fontFamily: "var(--dc-font-heading)" }}>
+                    {c.name}
+                    {c.spec ? <span className="font-normal"> — {c.spec}</span> : null}
+                  </div>
+                  {(c.on || c.off || c.note) && (
+                    <div className="mt-1 text-[13px]" style={{ color: "var(--dc-muted)" }}>
+                      {c.on && `On ${c.on} Belastung`}
+                      {c.off && ` · Off ${c.off} Pause`}
+                      {c.note && ` · ${c.note}`}
+                    </div>
+                  )}
+                  <div className="field mt-3" style={{ margin: 0, marginTop: 12 }}>
+                    <label htmlFor={`cardio-result-${c.itemId}`}>Ergebnis</label>
+                    <div className="flex gap-2">
+                      <input
+                        id={`cardio-result-${c.itemId}`}
+                        className="input flex-1"
+                        value={value}
+                        onChange={(e) => setCardioResults((prev) => ({ ...prev, [c.itemId]: e.target.value }))}
+                        onBlur={() => saveCardioResult(c.itemId)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            saveCardioResult(c.itemId);
+                          }
+                        }}
+                        placeholder="z. B. 7 Runden, 5,2 km, 18:40 min"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-secondary flex-none"
+                        disabled={!dirty || savingCardioId === c.itemId}
+                        onClick={() => saveCardioResult(c.itemId)}
+                      >
+                        {savingCardioId === c.itemId ? "…" : !dirty && value.trim() ? "✓ Gespeichert" : "Speichern"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </>
         ) : (
           <div className="mt-3.5">

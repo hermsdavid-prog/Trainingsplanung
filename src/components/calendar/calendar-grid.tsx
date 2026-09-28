@@ -230,13 +230,17 @@ export function CalendarGrid({
             ? copyMode
               ? "var(--dc-accent-2)"
               : "var(--dc-accent)"
-            : "var(--dc-divider)";
+            : isToday
+              ? "var(--dc-accent)"
+              : "var(--dc-divider)";
           const berlinMark = getBerlinCalendarMark(day);
           const bg = isDragOver
             ? copyMode
               ? "color-mix(in srgb, var(--dc-accent-2) 8%, transparent)"
               : "color-mix(in srgb, var(--dc-accent) 8%, transparent)"
-            : berlinMark?.type === "feiertag" && inMonth
+            : isToday
+              ? "color-mix(in srgb, var(--dc-accent) 8%, var(--dc-surface))"
+              : berlinMark?.type === "feiertag" && inMonth
               ? "color-mix(in srgb, var(--dc-accent-2) 6%, var(--dc-surface))"
               : berlinMark?.type === "ferien" && inMonth
                 ? "color-mix(in srgb, var(--dc-neutral-400) 12%, var(--dc-surface))"
@@ -273,16 +277,29 @@ export function CalendarGrid({
                 cursor: "pointer",
                 background: bg,
                 border: `1px solid ${border}`,
+                // Same accent frame as the week board's "today" column — an
+                // inset shadow thickens it to 2px without shifting the grid.
+                boxShadow: isToday && !isDragOver ? "inset 0 0 0 1px var(--dc-accent)" : undefined,
                 color: fg,
               }}
               title={berlinMark ? berlinMark.label : undefined}
+              aria-current={isToday ? "date" : undefined}
             >
-              <span className="flex w-full items-baseline justify-between gap-1">
-                <span className="text-xs">{Number(day.slice(8, 10))}</span>
+              <span className="flex w-full items-center justify-between gap-1">
+                {isToday ? (
+                  <span
+                    className="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold tabular-nums"
+                    style={{ background: "var(--dc-accent)", color: "#fff" }}
+                  >
+                    {Number(day.slice(8, 10))}
+                  </span>
+                ) : (
+                  <span className="text-xs">{Number(day.slice(8, 10))}</span>
+                )}
                 {isToday && (
                   <span
-                    className="text-[8px] uppercase"
-                    style={{ letterSpacing: "0.06em", color: "var(--dc-accent)" }}
+                    className="truncate text-[9px] font-semibold uppercase max-sm:hidden"
+                    style={{ letterSpacing: "0.06em", color: "var(--dc-accent-700)" }}
                   >
                     Heute
                   </span>

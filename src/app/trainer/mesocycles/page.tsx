@@ -190,7 +190,7 @@ export default async function TrainerMesocyclesPage({
 
   const allIds = [...(groupMesocycleRows ?? []).map((m) => m.id), ...(athleteMesocycleRows ?? []).map((m) => m.id)];
   const { data: planRows } = allIds.length
-    ? await supabase.from("training_plans").select("id, title, date, mesocycle_id").in("mesocycle_id", allIds).order("date")
+    ? await supabase.from("training_plans").select("id, title, date, mesocycle_id").in("mesocycle_id", allIds).order("date", { ascending: false })
     : { data: [] };
   const plansByMesocycle = new Map<string, Plan[]>();
   for (const p of planRows ?? []) {

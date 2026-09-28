@@ -88,11 +88,12 @@ export default async function TrainerPlansPage({
 
   const groups = Array.from(groupsByKey.values());
   for (const group of groups) {
-    group.occurrences.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    // Newest first everywhere — including the "N Termine" dropdown.
+    group.occurrences.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }
   groups.sort((a, b) => {
-    const aLatest = a.occurrences[a.occurrences.length - 1].date;
-    const bLatest = b.occurrences[b.occurrences.length - 1].date;
+    const aLatest = a.occurrences[0].date;
+    const bLatest = b.occurrences[0].date;
     return aLatest < bLatest ? 1 : aLatest > bLatest ? -1 : 0;
   });
 
@@ -120,10 +121,9 @@ export default async function TrainerPlansPage({
         groups: groups.filter((g) => g.mesocycleId === m.id),
       };
     })
-    .sort((a, b) => {
-      if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
-      return a.startDate < b.startDate ? 1 : a.startDate > b.startDate ? -1 : 0;
-    });
+    // Strictly newest → oldest by start date; the running one is still
+    // opened by default (see PlanMesocycleGroups), just not pulled out of order.
+    .sort((a, b) => (a.startDate < b.startDate ? 1 : a.startDate > b.startDate ? -1 : 0));
   const unassignedGroups = groups.filter((g) => !g.mesocycleId);
 
   return (

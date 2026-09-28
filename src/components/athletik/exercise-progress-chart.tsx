@@ -1,7 +1,8 @@
 "use client";
 
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { formatDateCompact, formatDateShort } from "@/lib/date";
+import { formatDateCompact } from "@/lib/date";
+import { ChartTooltip, CHART_CURSOR } from "@/components/charts/chart-tooltip";
 
 type Point = { date: string; value: number; unit: string | null };
 
@@ -18,17 +19,18 @@ export function ExerciseProgressChart({ data }: { data: Point[] }) {
         />
         <YAxis tick={{ fontSize: 11, fill: "color-mix(in srgb, #201e1d 55%, transparent)" }} domain={["auto", "auto"]} width={44} />
         <Tooltip
-          labelFormatter={(value) => formatDateShort(String(value))}
-          formatter={(value) => [`${value}${unit ? ` ${unit}` : ""}`, "Ergebnis"]}
-          contentStyle={{ fontSize: 12, borderRadius: 2 }}
+          content={<ChartTooltip unit={unit} />}
+          cursor={CHART_CURSOR}
+          wrapperStyle={{ outline: "none", zIndex: 10 }}
         />
         <Area
           type="monotone"
           dataKey="value"
-          stroke="#0088b0"
-          strokeWidth={1.25}
-          fill="#e9f8ff"
-          dot={{ r: 3, fill: "#0088b0" }}
+          stroke="var(--dc-accent)"
+          strokeWidth={1.5}
+          fill="var(--dc-accent-100)"
+          dot={{ r: 3, fill: "var(--dc-accent)", strokeWidth: 0 }}
+          activeDot={{ r: 5.5, stroke: "#fff", strokeWidth: 2, fill: "var(--dc-accent)" }}
           connectNulls
         />
       </AreaChart>

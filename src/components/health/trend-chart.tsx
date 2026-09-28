@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { formatDateCompact } from "@/lib/date";
+import { ChartTooltip, CHART_CURSOR } from "@/components/charts/chart-tooltip";
 
 export type TrendPoint = { date: string; value: number };
 
@@ -77,22 +78,31 @@ export function TrendChart({
               }
             }}
             onMouseLeave={() => setHoverIndex(null)}
+            // Same live header on a phone: follow the finger while it moves
+            // across the chart, fall back to the latest value on release.
+            onTouchMove={(state) => {
+              if (state?.isTooltipActive && typeof state.activeTooltipIndex === "number") {
+                setHoverIndex(state.activeTooltipIndex);
+              }
+            }}
+            onTouchEnd={() => setHoverIndex(null)}
           >
             <XAxis dataKey="date" hide />
             <YAxis hide domain={domain ?? ["auto", "auto"]} />
             <Tooltip
-              cursor={{ stroke: "var(--dc-accent)", strokeDasharray: "3 3" }}
-              content={() => null}
+              cursor={CHART_CURSOR}
+              content={<ChartTooltip unit={unit} name={label} />}
+              wrapperStyle={{ outline: "none", zIndex: 10 }}
             />
             <Area
               type="monotone"
               dataKey="value"
               stroke="var(--dc-accent)"
-              strokeWidth={1.25}
+              strokeWidth={1.5}
               fill="var(--dc-accent-100)"
-              dot={false}
+              dot={{ r: 2, fill: "var(--dc-accent)", strokeWidth: 0 }}
               connectNulls
-              activeDot={{ r: 4.5, stroke: "var(--dc-bg)", strokeWidth: 1.5, fill: "var(--dc-accent)" }}
+              activeDot={{ r: 5, stroke: "#fff", strokeWidth: 2, fill: "var(--dc-accent)" }}
             />
           </AreaChart>
         </ResponsiveContainer>
