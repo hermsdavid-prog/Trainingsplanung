@@ -56,6 +56,14 @@ const EMPTY_ROW: Omit<Row, "section"> = {
 
 const EXERCISE_LIST_ID = "exercise-library-options";
 
+// Monday-first, matching repeatPlanWeeklyAction's weekday index (Mo = 0).
+const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const WEEKDAY_NAMES = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+
+function weekdayOfDate(date: string) {
+  return (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+}
+
 const SPRUNG_VORSCHLAEGE = "CMJ Sprunghöhe, Standweitsprung, 20-m-Sprint";
 
 export function PlanTableEditor({
@@ -96,7 +104,7 @@ export function PlanTableEditor({
   // Lets this plan be assigned to one of the Mesozyklen it may belong to
   // (see mesocycleOptionsForPlan) — the trainer's editor and the athlete's
   // own-plan editor both pass it; omitted, the assignment is left untouched.
-  mesocycles?: { id: string; title: string }[];
+  mesocycles?: { id: string; title: string; endDate: string }[];
   initialMesocycleId?: string | null;
   // Trainer editor: "Wöchentlich wiederholen" after the fact — on save, adds
   // weekly copies of this training up to the chosen date (repeatPlanWeeklyAction).
@@ -117,6 +125,12 @@ export function PlanTableEditor({
   const [mesocycleId, setMesocycleId] = useState(initialMesocycleId ?? "");
   const [repeatWeekly, setRepeatWeekly] = useState(false);
   const [repeatUntil, setRepeatUntil] = useState("");
+  // null → follows the plan's own weekday until the trainer picks one.
+  const [repeatWeekday, setRepeatWeekday] = useState<number | null>(null);
+  const [untilMode, setUntilMode] = useState<"meso" | "date">("meso");
+  const selectedMesocycle = mesocycles?.find((m) => m.id === mesocycleId) ?? null;
+  const effectiveWeekday = repeatWeekday ?? (date ? weekdayOfDate(date) : 0);
+  const effectiveUntil = selectedMesocycle && untilMode === "meso" ? selectedMesocycle.endDate : repeatUntil;
   const router = useRouter();
   const [notesOpenIndex, setNotesOpenIndex] = useState<number | null>(null);
   const [linkOpenIndex, setLinkOpenIndex] = useState<number | null>(null);
@@ -259,8 +273,12 @@ export function PlanTableEditor({
   // buttons.
   function handleAssign() {
     const wantsRepeat = allowWeeklyRepeat && repeatWeekly;
-    if (wantsRepeat && (!repeatUntil || repeatUntil <= date)) {
-      toast.error("Bitte ein „Wiederholen bis“-Datum nach dem Trainingsdatum wählen.");
+    if (wantsRepeat && (!effectiveUntil || effectiveUntil <= date)) {
+      toast.error(
+        selectedMesocycle && untilMode === "meso"
+          ? "Der Mesozyklus endet vor oder an diesem Termin — es gibt keine Woche zum Wiederholen."
+          : "Bitte ein „Wiederholen bis“-Datum nach dem Trainingsdatum wählen."
+      );
       return;
     }
     startTransition(async () => {
@@ -305,7 +323,7 @@ export function PlanTableEditor({
       // this plan's current exercise table.
       let repeatNote = "";
       if (wantsRepeat) {
-        const repeatResult = await repeatPlanWeeklyAction(planId, repeatUntil);
+        const repeatResult = await repeatPlanWeeklyAction(planId, effectiveUntil, effectiveWeekday);
         if (repeatResult.error) {
           toast.error(repeatResult.error);
           return;
@@ -313,10 +331,11 @@ export function PlanTableEditor({
         const created = repeatResult.created ?? 0;
         repeatNote =
           created > 0
-            ? ` ${created} ${created === 1 ? "weiterer Termin" : "weitere Termine"} bis ${formatDateShort(repeatUntil)} angelegt.`
+            ? ` ${created} ${created === 1 ? "weiterer Termin" : "weitere Termine"} (jeweils ${WEEKDAY_NAMES[effectiveWeekday].toLowerCase()}s) bis ${formatDateShort(effectiveUntil)} angelegt.`
             : " Bis zu diesem Datum gibt es schon jede Woche einen Termin.";
         setRepeatWeekly(false);
         setRepeatUntil("");
+        setRepeatWeekday(null);
         router.refresh();
       }
 
@@ -496,10 +515,19 @@ export function PlanTableEditor({
         </div>
 
         {allowWeeklyRepeat && (
-          <div className="mt-4">
+          <div
+            className="mt-4 max-w-[640px]"
+            style={selectedMesocycle ? { padding: "12px 14px", background: "var(--dc-accent-100)" } : undefined}
+          >
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={repeatWeekly} onChange={(e) => setRepeatWeekly(e.target.checked)} />
-              Wöchentlich wiederholen
+              {selectedMesocycle ? (
+                <span>
+                  <strong>Jede Woche wiederholen</strong> — bis zum Ende des Mesozyklus
+                </span>
+              ) : (
+                "Wöchentlich wiederholen"
+              )}
             </label>
             {seriesLastDate && !repeatWeekly && (
               <p className="mt-1 text-xs text-muted">
@@ -507,23 +535,81 @@ export function PlanTableEditor({
               </p>
             )}
             {repeatWeekly && (
-              <div className="field mt-2.5" style={{ width: 200, maxWidth: "100%", margin: 0, marginTop: 10 }}>
-                <label htmlFor="plan-repeat-until">Wiederholen bis</label>
-                <input
-                  id="plan-repeat-until"
-                  type="date"
-                  className="input"
-                  min={date || undefined}
-                  value={repeatUntil}
-                  onChange={(e) => setRepeatUntil(e.target.value)}
-                />
-              </div>
-            )}
-            {repeatWeekly && (
-              <p className="mt-1.5 max-w-[560px] text-xs text-muted">
-                Beim Speichern wird ab diesem Termin jede Woche bis zum gewählten Datum eine Kopie mit denselben Übungen
-                angelegt. Wochen, in denen die Serie schon einen Termin hat, bleiben unverändert.
-              </p>
+              <>
+                <div className="mt-3 text-xs font-semibold" style={{ color: "var(--dc-muted)" }}>
+                  An welchem Wochentag?
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Wochentag">
+                  {WEEKDAY_LABELS.map((label, i) => (
+                    <button
+                      key={label}
+                      type="button"
+                      role="radio"
+                      aria-checked={effectiveWeekday === i}
+                      onClick={() => setRepeatWeekday(i)}
+                      className="h-10 min-w-11 px-2 text-sm"
+                      style={{
+                        border: `1px solid ${effectiveWeekday === i ? "var(--dc-accent)" : "var(--dc-divider)"}`,
+                        background: effectiveWeekday === i ? "var(--dc-accent)" : "var(--dc-surface)",
+                        color: effectiveWeekday === i ? "#fff" : "var(--dc-text)",
+                        fontWeight: effectiveWeekday === i ? 600 : 400,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-2">
+                  {selectedMesocycle && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="repeat-until-mode"
+                        checked={untilMode === "meso"}
+                        onChange={() => setUntilMode("meso")}
+                      />
+                      bis Ende des Mesozyklus ({formatDateShort(selectedMesocycle.endDate)})
+                    </label>
+                  )}
+                  {selectedMesocycle && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="repeat-until-mode"
+                        checked={untilMode === "date"}
+                        onChange={() => setUntilMode("date")}
+                      />
+                      bis Datum
+                    </label>
+                  )}
+                  {(!selectedMesocycle || untilMode === "date") && (
+                    <div className="field" style={{ width: 200, maxWidth: "100%", margin: 0 }}>
+                      {!selectedMesocycle && <label htmlFor="plan-repeat-until">Wiederholen bis</label>}
+                      <input
+                        id="plan-repeat-until"
+                        type="date"
+                        className="input"
+                        aria-label="Wiederholen bis"
+                        min={date || undefined}
+                        value={repeatUntil}
+                        onChange={(e) => setRepeatUntil(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <p className="mt-2.5 text-xs leading-[1.5] text-muted">
+                  Beim Speichern entsteht ab nächster Woche jeden {WEEKDAY_NAMES[effectiveWeekday]} ein eigener Termin mit
+                  denselben Übungen
+                  {date && effectiveWeekday !== weekdayOfDate(date)
+                    ? ` — dieser Termin selbst bleibt am ${formatDateShort(date)}`
+                    : ""}
+                  . Muss ein Training mal an einem anderen Tag stattfinden, verschiebst du nur diesen einen Termin (im
+                  Kalender ziehen oder hier im Termin das Datum ändern). Wochen, in denen die Serie schon einen Termin hat
+                  — auch einen verschobenen —, bleiben beim Verlängern unberührt.
+                </p>
+              </>
             )}
           </div>
         )}

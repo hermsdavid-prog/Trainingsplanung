@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { formatDateCompact, shiftDateISO } from "@/lib/date";
 
-export type MesocycleOption = { id: string; title: string };
+// endDate: last day of the block (inclusive) — the default "Wiederholen bis".
+export type MesocycleOption = { id: string; title: string; endDate: string };
 
 // The Mesozyklen a training may be assigned to: a group training only to
 // its group's; an Einzeltraining to the athlete's personal ones AND to
@@ -21,7 +22,11 @@ export async function mesocycleOptionsForPlan(
       .select(cols)
       .eq("group_id", plan.group_id)
       .order("start_date", { ascending: false });
-    return (data ?? []).map((m) => ({ id: m.id, title: `${m.title} (${rangeLabel(m.start_date, m.weeks)})` }));
+    return (data ?? []).map((m) => ({
+      id: m.id,
+      title: `${m.title} (${rangeLabel(m.start_date, m.weeks)})`,
+      endDate: endDateOf(m.start_date, m.weeks),
+    }));
   }
 
   if (plan.scope_type === "athlete" && plan.athlete_id) {
@@ -38,12 +43,17 @@ export async function mesocycleOptionsForPlan(
     return (data ?? []).map((m) => ({
       id: m.id,
       title: `${m.title} (${rangeLabel(m.start_date, m.weeks)}) · ${m.group_id ? (m.groups?.name ?? "Gruppe") : "persönlich"}`,
+      endDate: endDateOf(m.start_date, m.weeks),
     }));
   }
 
   return [];
 }
 
+function endDateOf(startDate: string, weeks: number) {
+  return shiftDateISO(startDate, weeks * 7 - 1);
+}
+
 function rangeLabel(startDate: string, weeks: number) {
-  return `${formatDateCompact(startDate)}–${formatDateCompact(shiftDateISO(startDate, weeks * 7 - 1))}`;
+  return `${formatDateCompact(startDate)}–${formatDateCompact(endDateOf(startDate, weeks))}`;
 }

@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { weeklyOccurrences, shiftDateISO } from "@/lib/date";
+import { weeklyOccurrences, shiftDateISO, getWeekStart } from "@/lib/date";
 import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
 import { mesocycleOptionsForPlan } from "@/lib/mesocycle-options";
 import type { Database } from "@/lib/supabase/types";
@@ -623,17 +623,22 @@ export async function savePlanItemsAction(
 }
 
 // "Wöchentlich wiederholen" for an already existing training: adds a copy
-// for every week from this plan's date up to `until` — same title, time,
-// group/athlete and exercise table — so a training created as a one-off can
-// still become a weekly series later (the create form's repeat option only
-// applied at creation time). All copies share the plan's series_id (one is
-// assigned if it had none), so the Athletik/Karate list folds them into
-// one row and later exercise edits reach still-empty occurrences. Weeks
-// that already have an occurrence of this series are skipped, and each
-// copy keeps the Mesozyklus only if its date falls inside it.
+// on the chosen weekday (Mo = 0 … So = 6; default: the plan's own) of every
+// following week up to `until` — typically the end of its Mesozyklus — with
+// the same title, time, group/athlete and exercise table. All copies share
+// the plan's series_id (one is assigned if it had none), so the list folds
+// them into one row and later exercise edits reach still-empty occurrences.
+//
+// Each occurrence is its own training, so a single week can be moved to
+// another day (calendar drag, or the date field) without touching the rest.
+// Deduplication is therefore per WEEK, not per date: a week that already
+// has an occurrence of this series — even one moved to a different day —
+// gets no second one, so repeating/extending again never re-creates a
+// moved session. Each copy keeps the Mesozyklus only if it falls inside it.
 export async function repeatPlanWeeklyAction(
   planId: string,
-  until: string
+  until: string,
+  weekday?: number
 ): Promise<ActionResult & { created?: number }> {
   const { supabase, userId } = await requirePlanEditAccess(planId);
 
@@ -655,8 +660,13 @@ export async function repeatPlanWeeklyAction(
   }
 
   const { data: seriesRows } = await supabase.from("training_plans").select("date").eq("series_id", seriesId);
-  const takenDates = new Set((seriesRows ?? []).map((r) => r.date));
-  const dates = weeklyOccurrences(plan.date, until).filter((d) => d !== plan.date && !takenDates.has(d));
+  const takenWeeks = new Set([plan.date, ...(seriesRows ?? []).map((r) => r.date)].map(getWeekStart));
+
+  const planWeekday = (new Date(`${plan.date}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const day = weekday != null && Number.isInteger(weekday) && weekday >= 0 && weekday <= 6 ? weekday : planWeekday;
+  // First occurrence: the chosen weekday in the week after the plan's own.
+  const first = shiftDateISO(getWeekStart(plan.date), 7 + day);
+  const dates = first <= until ? weeklyOccurrences(first, until).filter((d) => !takenWeeks.has(getWeekStart(d))) : [];
   if (dates.length === 0) return { created: 0 };
 
   const rows = await Promise.all(
