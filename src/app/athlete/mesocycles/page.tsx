@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { MesocyclePlanList } from "@/components/mesocycles/mesocycle-plan-list";
 import { todayISO, shiftDateISO, formatDateCompact, isMesocycleCurrent } from "@/lib/date";
 import { MesocycleCarousel } from "@/components/mesocycles/mesocycle-carousel";
 import { MesocycleTimeline } from "@/components/mesocycles/mesocycle-timeline";
@@ -13,10 +13,6 @@ function daysBetween(a: string, b: string): number {
   const [ay, am, ad] = a.split("-").map(Number);
   const [by, bm, bd] = b.split("-").map(Number);
   return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
-}
-
-function athletePlanHref(planId: string) {
-  return `/athlete/plans/${planId}`;
 }
 
 function MesocycleProgressCard({
@@ -66,18 +62,8 @@ function MesocycleProgressCard({
       />
 
       {plans.length > 0 && (
-        <div className="mt-3 flex flex-col gap-1 border-t pt-3" style={{ borderColor: "var(--dc-divider)" }}>
-          {plans.map((p) => (
-            <Link
-              key={p.id}
-              href={athletePlanHref(p.id)}
-              className="flex items-center justify-between gap-2 text-[13px] no-underline"
-              style={{ color: "inherit" }}
-            >
-              <span className="truncate">{p.title}</span>
-              <span className="flex-none text-muted">{formatDateCompact(p.date)}</span>
-            </Link>
-          ))}
+        <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--dc-divider)" }}>
+          <MesocyclePlanList plans={plans} role="athlete" />
         </div>
       )}
     </div>

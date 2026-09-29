@@ -622,6 +622,86 @@ export async function savePlanItemsAction(
   return { items: savedItems };
 }
 
+// "Wöchentlich wiederholen" for an already existing training: adds a copy
+// for every week from this plan's date up to `until` — same title, time,
+// group/athlete and exercise table — so a training created as a one-off can
+// still become a weekly series later (the create form's repeat option only
+// applied at creation time). All copies share the plan's series_id (one is
+// assigned if it had none), so the Athletik/Karate list folds them into
+// one row and later exercise edits reach still-empty occurrences. Weeks
+// that already have an occurrence of this series are skipped, and each
+// copy keeps the Mesozyklus only if its date falls inside it.
+export async function repeatPlanWeeklyAction(
+  planId: string,
+  until: string
+): Promise<ActionResult & { created?: number }> {
+  const { supabase, userId } = await requirePlanEditAccess(planId);
+
+  const { data: plan } = await supabase
+    .from("training_plans")
+    .select("id, title, category_label, date, time, scope_type, group_id, athlete_id, series_id, mesocycle_id")
+    .eq("id", planId)
+    .single();
+  if (!plan) return { error: "Plan nicht gefunden." };
+  if (!until || until <= plan.date) {
+    return { error: "Das Wiederholungsdatum muss nach dem Datum des Trainings liegen." };
+  }
+
+  let seriesId = plan.series_id;
+  if (!seriesId) {
+    seriesId = randomUUID();
+    const { error } = await supabase.from("training_plans").update({ series_id: seriesId }).eq("id", planId);
+    if (error) return { error: "Wiederholung konnte nicht angelegt werden." };
+  }
+
+  const { data: seriesRows } = await supabase.from("training_plans").select("date").eq("series_id", seriesId);
+  const takenDates = new Set((seriesRows ?? []).map((r) => r.date));
+  const dates = weeklyOccurrences(plan.date, until).filter((d) => d !== plan.date && !takenDates.has(d));
+  if (dates.length === 0) return { created: 0 };
+
+  const rows = await Promise.all(
+    dates.map(async (d) => ({
+      title: plan.title,
+      category_label: plan.category_label,
+      date: d,
+      time: plan.time,
+      scope_type: plan.scope_type,
+      group_id: plan.group_id,
+      athlete_id: plan.athlete_id,
+      series_id: seriesId,
+      mesocycle_id: await inheritedMesocycleId(supabase, plan.mesocycle_id, d),
+      created_by: userId,
+    }))
+  );
+  const { data: newPlans, error } = await supabase.from("training_plans").insert(rows).select("id");
+  if (error || !newPlans) return { error: "Wiederholung konnte nicht angelegt werden." };
+
+  const { data: sourceItems } = await supabase
+    .from("training_plan_items")
+    .select(
+      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes, description, duration_mode"
+    )
+    .eq("training_plan_id", planId)
+    .order("position");
+  if (sourceItems && sourceItems.length > 0) {
+    const { error: itemsError } = await supabase
+      .from("training_plan_items")
+      .insert(newPlans.flatMap((p) => sourceItems.map((item) => ({ ...item, training_plan_id: p.id }))));
+    if (itemsError) {
+      return { error: "Termine wurden angelegt, Übungen konnten aber nicht übertragen werden." };
+    }
+  }
+
+  revalidatePath(`/trainer/plans/${planId}/edit`);
+  revalidatePath("/trainer/plans");
+  revalidatePath("/trainer/calendar");
+  revalidatePath("/athlete/calendar");
+  revalidatePath("/athlete");
+  revalidatePath("/trainer/mesocycles");
+  revalidatePath("/athlete/mesocycles");
+  return { created: newPlans.length };
+}
+
 export async function reschedulePlanAction(
   planId: string,
   newDate: string

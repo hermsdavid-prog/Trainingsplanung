@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { formatDateCompact } from "@/lib/date";
+import { MesocyclePlanList } from "@/components/mesocycles/mesocycle-plan-list";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { GoalToggleList, type MesocycleGoal } from "@/components/mesocycles/goal-toggle-list";
 import { EditMesocycleDialog } from "@/components/mesocycles/edit-mesocycle-dialog";
@@ -55,12 +55,6 @@ function addDays(dateStr: string, n: number): string {
 // Startdatum..+Wochen) across the months the selected scope's cycles cover —
 // the "kann ich auf einen Blick sehen, welche Phase wann ist"-Ansicht.
 // Clicking a bar opens its assigned Trainingseinheiten in a dialog.
-// A plain function prop can't cross the server/client boundary (this is a
-// client component, its callers are server components), so which link
-// pattern to use is passed as data instead.
-function planHref(role: "trainer" | "athlete", planId: string): string {
-  return role === "athlete" ? `/athlete/plans/${planId}` : `/trainer/plans/${planId}/edit`;
-}
 
 export function MesocycleTimeline({
   mesocycles,
@@ -254,18 +248,8 @@ export function MesocycleTimeline({
                       {openMesocycle.plans.length === 0 ? (
                         <p className="mt-2 text-[13px] text-muted">Diesem Mesozyklus sind noch keine Trainings zugeordnet.</p>
                       ) : (
-                        <div className="mt-2 flex flex-col gap-1">
-                          {openMesocycle.plans.map((p) => (
-                            <Link
-                              key={p.id}
-                              href={planHref(planLinkRole, p.id)}
-                              className="flex items-center justify-between gap-2 text-[13px] no-underline"
-                              style={{ color: "inherit" }}
-                            >
-                              <span>{p.title}</span>
-                              <span className="text-muted">{formatDateCompact(p.date)}</span>
-                            </Link>
-                          ))}
+                        <div className="mt-2">
+                          <MesocyclePlanList plans={openMesocycle.plans} role={planLinkRole} />
                         </div>
                       )}
                     </div>

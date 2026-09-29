@@ -100,12 +100,18 @@ export default async function EditPlanPage({
           .maybeSingle()
       : { data: null };
 
-  const { count: seriesCount } = plan.series_id
-    ? await supabase
-        .from("training_plans")
-        .select("id", { count: "exact", head: true })
-        .eq("series_id", plan.series_id)
-    : { count: null };
+  const [{ count: seriesCount }, { data: seriesLast }] = plan.series_id
+    ? await Promise.all([
+        supabase.from("training_plans").select("id", { count: "exact", head: true }).eq("series_id", plan.series_id),
+        supabase
+          .from("training_plans")
+          .select("date")
+          .eq("series_id", plan.series_id)
+          .order("date", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ])
+    : [{ count: null }, { data: null }];
 
   // Athlete-by-athlete completion overview, shown for any group-assigned
   // plan (Athletik or Sportartspezifisch) — the RPE ("Belastungsempfinden")
@@ -205,6 +211,8 @@ export default async function EditPlanPage({
             allowSaveAsTemplate
             mesocycles={mesocycles}
             initialMesocycleId={plan.mesocycle_id}
+            allowWeeklyRepeat
+            seriesLastDate={seriesCount && seriesCount > 1 ? (seriesLast?.date ?? null) : null}
             subtitle={`Für: ${targetLabel ?? "—"} (${plan.scope_type === "group" ? "Gruppe" : "Einzelplan"})${
               plan.scope_type === "athlete" ? " · Vom Athleten selbst erstellt" : ""
             }${

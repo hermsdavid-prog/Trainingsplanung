@@ -70,6 +70,11 @@ export default async function TrainerPlansPage({
     const existing = groupsByKey.get(key);
     if (existing) {
       existing.occurrences.push(occurrence);
+      // Occurrences past the end of a Mesozyklus are left unassigned (copies
+      // only inherit a block they fall inside), so file the whole row under
+      // the block its assigned occurrences share rather than under
+      // "Ohne Mesozyklus" just because the newest date lies beyond it.
+      if (!existing.mesocycleId && plan.mesocycle_id) existing.mesocycleId = plan.mesocycle_id;
     } else {
       groupsByKey.set(key, {
         key,
@@ -77,9 +82,7 @@ export default async function TrainerPlansPage({
         time: plan.time,
         scopeType: plan.scope_type,
         forLabel,
-        // A series is created in one batch against one Mesozyklus, so every
-        // occurrence under this key shares the same mesocycle_id — the
-        // first one seen is as good as any.
+        // Filled in from a later occurrence if this one has none (see above).
         mesocycleId: plan.mesocycle_id,
         occurrences: [occurrence],
       });

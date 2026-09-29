@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { MesocyclePlanList } from "@/components/mesocycles/mesocycle-plan-list";
 import { todayISO, shiftDateISO, formatDateCompact } from "@/lib/date";
 import { MesocycleFilters } from "@/components/mesocycles/mesocycle-filters";
 import { CreateMesocycleDialog } from "@/components/mesocycles/create-mesocycle-dialog";
@@ -27,18 +27,8 @@ function MesocycleCard({ m, plans }: { m: Mesocycle; plans: Plan[] }) {
       </div>
 
       {plans.length > 0 && (
-        <div className="mt-3 flex flex-col gap-1 border-t pt-3" style={{ borderColor: "var(--dc-divider)" }}>
-          {plans.map((p) => (
-            <Link
-              key={p.id}
-              href={`/trainer/plans/${p.id}/edit`}
-              className="flex items-center justify-between gap-2 text-[13px] no-underline"
-              style={{ color: "inherit" }}
-            >
-              <span className="truncate">{p.title}</span>
-              <span className="flex-none text-muted">{formatDateCompact(p.date)}</span>
-            </Link>
-          ))}
+        <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--dc-divider)" }}>
+          <MesocyclePlanList plans={plans} role="trainer" />
         </div>
       )}
     </div>

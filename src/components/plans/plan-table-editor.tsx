@@ -2,10 +2,13 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { formatDateShort } from "@/lib/date";
 import {
   savePlanItemsAction,
   updatePlanMetaAction,
+  repeatPlanWeeklyAction,
   saveAsTemplateAction,
   ensureExerciseAction,
 } from "@/lib/actions/plans";
@@ -71,6 +74,8 @@ export function PlanTableEditor({
   allowSaveAsTemplate = false,
   mesocycles,
   initialMesocycleId = null,
+  allowWeeklyRepeat = false,
+  seriesLastDate = null,
 }: {
   planId: string;
   initialItems: Row[];
@@ -93,6 +98,11 @@ export function PlanTableEditor({
   // own-plan editor both pass it; omitted, the assignment is left untouched.
   mesocycles?: { id: string; title: string }[];
   initialMesocycleId?: string | null;
+  // Trainer editor: "Wöchentlich wiederholen" after the fact — on save, adds
+  // weekly copies of this training up to the chosen date (repeatPlanWeeklyAction).
+  allowWeeklyRepeat?: boolean;
+  // Last date of the series this plan already belongs to, for the hint.
+  seriesLastDate?: string | null;
 }) {
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
 
@@ -105,6 +115,9 @@ export function PlanTableEditor({
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(initialTime ?? "");
   const [mesocycleId, setMesocycleId] = useState(initialMesocycleId ?? "");
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
+  const [repeatUntil, setRepeatUntil] = useState("");
+  const router = useRouter();
   const [notesOpenIndex, setNotesOpenIndex] = useState<number | null>(null);
   const [linkOpenIndex, setLinkOpenIndex] = useState<number | null>(null);
   const [instrOpenIndex, setInstrOpenIndex] = useState<number | null>(null);
@@ -245,6 +258,11 @@ export function PlanTableEditor({
   // the old two separate "Rahmendaten speichern" / "Übungstabelle speichern"
   // buttons.
   function handleAssign() {
+    const wantsRepeat = allowWeeklyRepeat && repeatWeekly;
+    if (wantsRepeat && (!repeatUntil || repeatUntil <= date)) {
+      toast.error("Bitte ein „Wiederholen bis“-Datum nach dem Trainingsdatum wählen.");
+      return;
+    }
     startTransition(async () => {
       const metaResult = await updatePlanMetaAction(planId, {
         title,
@@ -283,11 +301,32 @@ export function PlanTableEditor({
         });
       }
 
+      // Weekly copies are made after the rows are saved, so every copy gets
+      // this plan's current exercise table.
+      let repeatNote = "";
+      if (wantsRepeat) {
+        const repeatResult = await repeatPlanWeeklyAction(planId, repeatUntil);
+        if (repeatResult.error) {
+          toast.error(repeatResult.error);
+          return;
+        }
+        const created = repeatResult.created ?? 0;
+        repeatNote =
+          created > 0
+            ? ` ${created} ${created === 1 ? "weiterer Termin" : "weitere Termine"} bis ${formatDateShort(repeatUntil)} angelegt.`
+            : " Bis zu diesem Datum gibt es schon jede Woche einen Termin.";
+        setRepeatWeekly(false);
+        setRepeatUntil("");
+        router.refresh();
+      }
+
       const propagated = metaResult.propagated ?? 0;
       toast.success(
-        propagated > 0
-          ? `Plan gespeichert. ${propagated} ${propagated === 1 ? "Kopie wurde" : "Kopien wurden"} ebenfalls dem Mesozyklus zugeordnet.`
-          : "Plan gespeichert."
+        `Plan gespeichert.${
+          propagated > 0
+            ? ` ${propagated} ${propagated === 1 ? "Kopie wurde" : "Kopien wurden"} ebenfalls dem Mesozyklus zugeordnet.`
+            : ""
+        }${repeatNote}`
       );
     });
   }
@@ -455,6 +494,39 @@ export function PlanTableEditor({
             </div>
           )}
         </div>
+
+        {allowWeeklyRepeat && (
+          <div className="mt-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={repeatWeekly} onChange={(e) => setRepeatWeekly(e.target.checked)} />
+              Wöchentlich wiederholen
+            </label>
+            {seriesLastDate && !repeatWeekly && (
+              <p className="mt-1 text-xs text-muted">
+                Gehört zu einer wöchentlichen Serie bis {formatDateShort(seriesLastDate)} — hier lässt sie sich verlängern.
+              </p>
+            )}
+            {repeatWeekly && (
+              <div className="field mt-2.5" style={{ width: 200, maxWidth: "100%", margin: 0, marginTop: 10 }}>
+                <label htmlFor="plan-repeat-until">Wiederholen bis</label>
+                <input
+                  id="plan-repeat-until"
+                  type="date"
+                  className="input"
+                  min={date || undefined}
+                  value={repeatUntil}
+                  onChange={(e) => setRepeatUntil(e.target.value)}
+                />
+              </div>
+            )}
+            {repeatWeekly && (
+              <p className="mt-1.5 max-w-[560px] text-xs text-muted">
+                Beim Speichern wird ab diesem Termin jede Woche bis zum gewählten Datum eine Kopie mit denselben Übungen
+                angelegt. Wochen, in denen die Serie schon einen Termin hat, bleiben unverändert.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {isAthletik && (
