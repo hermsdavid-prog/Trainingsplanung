@@ -624,6 +624,39 @@ export type Database = {
           },
         ]
       }
+      mesocycle_goal_prompt_skips: {
+        Row: {
+          athlete_id: string
+          mesocycle_id: string
+          skipped_at: string
+        }
+        Insert: {
+          athlete_id: string
+          mesocycle_id: string
+          skipped_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          mesocycle_id?: string
+          skipped_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mesocycle_goal_prompt_skips_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mesocycle_goal_prompt_skips_mesocycle_id_fkey"
+            columns: ["mesocycle_id"]
+            isOneToOne: false
+            referencedRelation: "training_mesocycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_change_log: {
         Row: {
           changed_at: string

@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { todayISO, shiftDateISO, formatDateLabel, isMesocycleCurrent } from "@/lib/date";
+import { todayISO, shiftDateISO, formatDateLabel, formatDateCompact, isMesocycleCurrent } from "@/lib/date";
+import { GoalKickoffPrompt, type KickoffRecap } from "@/components/mesocycles/goal-kickoff-prompt";
+
+function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+}
 import { HealthCheckinCard } from "@/components/health/health-checkin-card";
 import { CheckinGate } from "@/components/health/checkin-gate";
 import {
@@ -124,20 +131,19 @@ export default async function AthleteTodayPage({
         goalGroupIds.length
           ? supabase
               .from("training_mesocycles")
-              .select("id, title, start_date, weeks")
+              .select("id, title, start_date, weeks, groups(name)")
               .in("group_id", goalGroupIds)
               .order("start_date", { ascending: false })
           : Promise.resolve({ data: [] }),
         supabase
           .from("training_mesocycles")
-          .select("id, title, start_date, weeks")
+          .select("id, title, start_date, weeks, groups(name)")
           .eq("athlete_id", user.id)
           .order("start_date", { ascending: false }),
       ])
     : [{ data: [] }, { data: [] }];
-  const relevantMesocycles = [...(groupMesoRows ?? []), ...(ownMesoRows ?? [])].filter((m) =>
-    isMesocycleCurrent(m.start_date, m.weeks, today)
-  );
+  const allMesocycles = [...(groupMesoRows ?? []), ...(ownMesoRows ?? [])];
+  const relevantMesocycles = allMesocycles.filter((m) => isMesocycleCurrent(m.start_date, m.weeks, today));
 
   const relevantMesoIds = relevantMesocycles.map((m) => m.id);
   const { data: mesoGoalRows } = user && relevantMesoIds.length
@@ -159,6 +165,56 @@ export default async function AthleteTodayPage({
     mesocycleTitle: m.title,
     goals: goalsByMesocycle.get(m.id) ?? [],
   }));
+
+  // — Kickoff prompt — in the first week of a Mesozyklus the athlete hasn't
+  // set own goals for (and hasn't skipped), ask for 3 goals, with a
+  // positive look back at the goals of their previous block.
+  const kickoffCandidates =
+    user && date === today
+      ? relevantMesocycles
+          .filter((m) => daysBetween(m.start_date, today) < 7)
+          .filter((m) => !(goalsByMesocycle.get(m.id) ?? []).some((g) => g.ownGoal))
+      : [];
+  const { data: skipRows } = kickoffCandidates.length
+    ? await supabase
+        .from("mesocycle_goal_prompt_skips")
+        .select("mesocycle_id")
+        .in(
+          "mesocycle_id",
+          kickoffCandidates.map((m) => m.id)
+        )
+    : { data: [] };
+  const skipped = new Set((skipRows ?? []).map((r) => r.mesocycle_id));
+  const kickoff = kickoffCandidates.find((m) => !skipped.has(m.id)) ?? null;
+
+  let kickoffRecap: KickoffRecap | null = null;
+  if (kickoff && user) {
+    const earlier = allMesocycles
+      .filter((m) => m.start_date < kickoff.start_date)
+      .sort((a, b) => (a.start_date < b.start_date ? 1 : -1));
+    const { data: earlierGoals } = earlier.length
+      ? await supabase
+          .from("mesocycle_goals")
+          .select("id, mesocycle_id, text, achieved_at")
+          .eq("athlete_id", user.id)
+          .in(
+            "mesocycle_id",
+            earlier.map((m) => m.id)
+          )
+          .order("position")
+      : { data: [] };
+    // The most recent earlier block the athlete actually had goals in.
+    const previous = earlier.find((m) => (earlierGoals ?? []).some((g) => g.mesocycle_id === m.id));
+    if (previous) {
+      const goals = (earlierGoals ?? []).filter((g) => g.mesocycle_id === previous.id);
+      kickoffRecap = {
+        title: previous.title,
+        total: goals.length,
+        achieved: goals.filter((g) => g.achieved_at).length,
+        openGoals: goals.filter((g) => !g.achieved_at).map((g) => ({ id: g.id, text: g.text })),
+      };
+    }
+  }
 
   const readiness = computeHealthStatus(recentLogs ?? [], today);
   const trends = computeExerciseTrends(
@@ -183,6 +239,19 @@ export default async function AthleteTodayPage({
       <CoachNotesBanner notes={unreadNotes} />
 
       {user && <GoalsPanel groups={goalGroups} athleteId={user.id} />}
+
+      {kickoff && (
+        <GoalKickoffPrompt
+          key={kickoff.id}
+          mesocycleId={kickoff.id}
+          mesocycleTitle={kickoff.title}
+          scopeLabel={kickoff.groups?.name ?? "Persönlicher Block"}
+          rangeLabel={`${formatDateCompact(kickoff.start_date)}–${formatDateCompact(
+            shiftDateISO(kickoff.start_date, kickoff.weeks * 7 - 1)
+          )} · ${kickoff.weeks} ${kickoff.weeks === 1 ? "Woche" : "Wochen"}`}
+          recap={kickoffRecap}
+        />
+      )}
 
       <CheckinGate
         showCheckin={showCheckin}

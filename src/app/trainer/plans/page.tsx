@@ -108,7 +108,10 @@ export default async function TrainerPlansPage({
   // than disappearing among the others.
   const mesocycleIds = Array.from(new Set(groups.map((g) => g.mesocycleId).filter((id): id is string => !!id)));
   const { data: mesocycleRows } = mesocycleIds.length
-    ? await supabase.from("training_mesocycles").select("id, title, start_date, weeks").in("id", mesocycleIds)
+    ? await supabase
+        .from("training_mesocycles")
+        .select("id, title, start_date, weeks, groups(name, color), profiles!training_mesocycles_athlete_id_fkey(full_name)")
+        .in("id", mesocycleIds)
     : { data: [] };
 
   const today = todayISO();
@@ -121,11 +124,13 @@ export default async function TrainerPlansPage({
         startDate: m.start_date,
         weeks: m.weeks,
         isCurrent,
+        // Who the block belongs to, visible while the section is collapsed.
+        scopeLabel: m.groups?.name ?? (m.profiles?.full_name ? `Persönlich · ${m.profiles.full_name}` : "Persönlich"),
+        scopeColor: m.groups?.color ?? null,
         groups: groups.filter((g) => g.mesocycleId === m.id),
       };
     })
-    // Strictly newest → oldest by start date; the running one is still
-    // opened by default (see PlanMesocycleGroups), just not pulled out of order.
+    // Strictly newest → oldest by start date.
     .sort((a, b) => (a.startDate < b.startDate ? 1 : a.startDate > b.startDate ? -1 : 0));
   const unassignedGroups = groups.filter((g) => !g.mesocycleId);
 

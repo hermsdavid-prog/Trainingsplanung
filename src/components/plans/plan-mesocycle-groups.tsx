@@ -22,6 +22,9 @@ export type PlanMesocycleSection = {
   startDate: string;
   weeks: number;
   isCurrent: boolean;
+  // Group name (or "Persönlich · Athlet") and the group's colour.
+  scopeLabel: string;
+  scopeColor: string | null;
   groups: PlanGroupRow[];
 };
 
@@ -92,11 +95,19 @@ function PlanRowsTable({ groups, canDelete }: { groups: PlanGroupRow[]; canDelet
 }
 
 function MesocycleSection({ section, canDelete }: { section: PlanMesocycleSection; canDelete: boolean }) {
-  const [open, setOpen] = useState(section.isCurrent);
+  // Always starts collapsed — the headers alone (block, group, dates, count)
+  // are the overview; a tap opens the trainings.
+  const [open, setOpen] = useState(false);
   const count = section.groups.length;
 
   return (
-    <div style={{ background: "var(--dc-surface)", border: "1px solid var(--dc-divider)" }}>
+    <div
+      style={{
+        background: "var(--dc-surface)",
+        border: "1px solid var(--dc-divider)",
+        borderLeft: `3px solid ${section.scopeColor ?? "var(--dc-neutral-400)"}`,
+      }}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -115,6 +126,14 @@ function MesocycleSection({ section, canDelete }: { section: PlanMesocycleSectio
               </span>
             )}
           </div>
+          <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold">
+            <span
+              aria-hidden
+              className="inline-block size-2 flex-none rounded-full"
+              style={{ background: section.scopeColor ?? "var(--dc-neutral-400)" }}
+            />
+            <span className="truncate">{section.scopeLabel}</span>
+          </span>
           <span className="text-xs" style={MUTED}>
             {formatDateCompact(section.startDate)} –{" "}
             {formatDateCompact(shiftDateISO(section.startDate, section.weeks * 7 - 1))} · {section.weeks}{" "}
@@ -148,7 +167,8 @@ export function PlanMesocycleGroups({
   canDelete: boolean;
   emptyMessage: string;
 }) {
-  const [unassignedOpen, setUnassignedOpen] = useState(true);
+  // Collapsed like the Mesozyklen, unless it's the only section there is.
+  const [unassignedOpen, setUnassignedOpen] = useState(sections.length === 0);
 
   if (sections.length === 0 && unassigned.length === 0) {
     return <p className="mt-5 text-sm text-muted">{emptyMessage}</p>;

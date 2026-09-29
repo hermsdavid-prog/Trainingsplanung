@@ -109,6 +109,68 @@ export async function toggleMesocycleGoalAction(goalId: string, achieved: boolea
   if (error) return { error: "Ziel konnte nicht aktualisiert werden." };
 
   revalidatePath("/athlete/mesocycles");
+  revalidatePath("/athlete");
   revalidatePath("/trainer/athletes");
+  return {};
+}
+
+// "Neuer Mesozyklus — deine 3 Ziele": the athlete's kickoff goals for a
+// block that just started, saved in one go (1–3 non-empty entries).
+export async function saveKickoffGoalsAction(mesocycleId: string, texts: string[]): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+
+  const goals = texts.map((t) => t.trim()).filter(Boolean).slice(0, 3);
+  if (goals.length === 0) return { error: "Bitte mindestens ein Ziel eintragen." };
+
+  const { data: meso } = await supabase
+    .from("training_mesocycles")
+    .select("start_date, weeks")
+    .eq("id", mesocycleId)
+    .maybeSingle();
+  if (!meso || !isMesocycleCurrent(meso.start_date, meso.weeks, todayISO())) {
+    return { error: "Eigene Ziele kannst du nur für den laufenden Mesozyklus eintragen." };
+  }
+
+  const { count } = await supabase
+    .from("mesocycle_goals")
+    .select("id", { count: "exact", head: true })
+    .eq("mesocycle_id", mesocycleId)
+    .eq("athlete_id", user.id);
+
+  const { error } = await supabase.from("mesocycle_goals").insert(
+    goals.map((text, i) => ({
+      mesocycle_id: mesocycleId,
+      athlete_id: user.id,
+      text,
+      position: (count ?? 0) + i,
+      created_by: user.id,
+    }))
+  );
+  if (error) return { error: "Ziele konnten nicht gespeichert werden." };
+
+  revalidatePath("/athlete");
+  revalidatePath("/athlete/mesocycles");
+  revalidatePath("/trainer/athletes");
+  return {};
+}
+
+// "Überspringen" on the kickoff prompt — not asked again for this block.
+export async function skipKickoffGoalsAction(mesocycleId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+
+  const { error } = await supabase
+    .from("mesocycle_goal_prompt_skips")
+    .upsert({ athlete_id: user.id, mesocycle_id: mesocycleId }, { onConflict: "athlete_id,mesocycle_id" });
+  if (error) return { error: "Konnte nicht gespeichert werden." };
+
+  revalidatePath("/athlete");
   return {};
 }
