@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -12,6 +12,14 @@ import { saveSessionRpeAction } from "@/lib/actions/sessions";
 import { addSessionExerciseAction } from "@/lib/actions/session-exercises";
 import { upsertFeedbackAction } from "@/lib/actions/feedback";
 import { CardioScreenshotField } from "@/components/athlete/cardio-screenshot-field";
+import { exerciseNoteKey } from "@/lib/exercise-note-key";
+import {
+  SelfNoteReminder,
+  ExerciseNotesButton,
+  ExerciseNotesPanel,
+  type SelfNote,
+  type ExerciseNoteState,
+} from "@/components/athlete/exercise-notes";
 import type { BadgeAward } from "@/lib/badges";
 
 type SetType = "aufwaermsatz" | "arbeitssatz";
@@ -45,6 +53,13 @@ export type SessionExercise = {
   note: string;
   unit: string;
   initialSets: { setNumber: number; type: SetType; reps: string; weight: string; rir: string }[];
+} & ExerciseNoteFields;
+
+// Private reminder for next time + message to the trainer (see exercise-notes).
+type ExerciseNoteFields = {
+  noteKey: string;
+  selfNote: SelfNote | null;
+  coachNote: string;
 };
 
 export type SessionCardio = {
@@ -60,7 +75,7 @@ export type SessionCardio = {
   result: string;
   // Signed URL of the uploaded heart-rate screenshot, if any.
   screenshotUrl: string | null;
-};
+} & ExerciseNoteFields;
 
 export type SessionKarateRow = {
   itemId: string;
@@ -72,7 +87,7 @@ export type SessionKarateRow = {
   rounds: number;
   restLabel: string;
   valLabel: string;
-};
+} & ExerciseNoteFields;
 
 function parseLeadingNumber(label: string): string {
   const m = label.match(/\d+([.,]\d+)?/);
@@ -181,6 +196,7 @@ export function WorkoutSession({
   lastKnownByExercise = {},
   canAddExercises = false,
   exerciseLibrary = [],
+  allowCoachHint = true,
 }: {
   athleteId: string;
   planId: string;
@@ -200,6 +216,8 @@ export function WorkoutSession({
   lastKnownByExercise?: Record<string, { weight: string; reps: string }>;
   canAddExercises?: boolean;
   exerciseLibrary?: { id: string; name: string }[];
+  // Off when a coach trains along — there's no trainer to write to.
+  allowCoachHint?: boolean;
 }) {
   const isAthletik = categoryLabel.trim().toLowerCase() === "athletik";
   const router = useRouter();
@@ -232,6 +250,37 @@ export function WorkoutSession({
       else next.add(itemId);
       return next;
     });
+  }
+
+  const [notes, setNotes] = useState<Record<string, ExerciseNoteState>>(() =>
+    Object.fromEntries(
+      [...initialExercises, ...cardio, ...karateRows].map((x) => [x.itemId, { self: x.selfNote, coach: x.coachNote }])
+    )
+  );
+  const [notesOpenId, setNotesOpenId] = useState<string | null>(null);
+
+  // Bottom-row "✎ Notiz" button + its editor for one exercise/cardio/round.
+  function renderNotes(itemId: string, noteKey: string, leading?: ReactNode) {
+    const state = notes[itemId] ?? { self: null, coach: "" };
+    const open = notesOpenId === itemId;
+    return (
+      <>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {leading}
+          <ExerciseNotesButton state={state} open={open} onToggle={() => setNotesOpenId(open ? null : itemId)} />
+        </div>
+        <ExerciseNotesPanel
+          key={open ? "open" : "closed"}
+          itemId={itemId}
+          noteKey={noteKey}
+          state={state}
+          open={open}
+          allowCoachHint={allowCoachHint}
+          onSaved={(next) => setNotes((prev) => ({ ...prev, [itemId]: next }))}
+          onClose={() => setNotesOpenId(null)}
+        />
+      </>
+    );
   }
 
   const [cardioResults, setCardioResults] = useState<Record<string, string>>(() =>
@@ -280,6 +329,9 @@ export function WorkoutSession({
       note: "",
       unit: "kg",
       initialSets: [],
+      noteKey: exerciseNoteKey(result.item.exerciseId, result.item.name),
+      selfNote: null,
+      coachNote: "",
     };
     setExercises((prev) => [...prev, newExercise]);
     setSetsByItem((prev) => ({ ...prev, [newExercise.itemId]: buildInitialSets(newExercise) }));
@@ -656,6 +708,7 @@ export function WorkoutSession({
                             {ex.note}
                           </p>
                         )}
+                        <SelfNoteReminder note={notes[ex.itemId]?.self ?? null} />
                         <div
                           className="mt-3 grid gap-1 pb-1.5 text-[10.5px] font-semibold uppercase"
                           style={{
@@ -750,14 +803,18 @@ export function WorkoutSession({
                           });
                         })()}
 
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "aufwaermsatz")}>
-                            + Aufwärmsatz
-                          </button>
-                          <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "arbeitssatz")}>
-                            + Arbeitssatz
-                          </button>
-                        </div>
+                        {renderNotes(
+                          ex.itemId,
+                          ex.noteKey,
+                          <>
+                            <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "aufwaermsatz")}>
+                              + Aufwärmsatz
+                            </button>
+                            <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "arbeitssatz")}>
+                              + Arbeitssatz
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -819,6 +876,7 @@ export function WorkoutSession({
                       {c.note && ` · ${c.note}`}
                     </div>
                   )}
+                  <SelfNoteReminder note={notes[c.itemId]?.self ?? null} />
                   <div className="field mt-3" style={{ margin: 0, marginTop: 12 }}>
                     <label htmlFor={`cardio-result-${c.itemId}`}>Ergebnis</label>
                     <div className="flex gap-2">
@@ -847,6 +905,7 @@ export function WorkoutSession({
                     </div>
                   </div>
                   <CardioScreenshotField athleteId={athleteId} itemId={c.itemId} initialUrl={c.screenshotUrl} />
+                  {renderNotes(c.itemId, c.noteKey)}
                 </div>
               );
             })}
@@ -879,6 +938,8 @@ export function WorkoutSession({
                     </button>
                   </div>
                   {row.desc && <div className="mt-2 text-[13px] leading-[1.5]">{row.desc}</div>}
+                  <SelfNoteReminder note={notes[row.itemId]?.self ?? null} />
+                  {renderNotes(row.itemId, row.noteKey)}
                 </div>
               ))}
             </div>

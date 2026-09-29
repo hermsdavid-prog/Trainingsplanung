@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CARDIO_SCREENSHOT_BUCKET, CARDIO_SCREENSHOT_RETENTION_DAYS } from "@/lib/cardio-screenshots";
@@ -27,6 +28,56 @@ export async function upsertFeedbackAction(
 
   if (error) return { error: "Speichern fehlgeschlagen." };
   return {};
+}
+
+// The two notes an athlete can leave on an exercise during a session:
+// - selfNote: a private reminder for next time ("langsam runter"), stored
+//   per exercise (athlete_exercise_notes, athlete-only RLS) so it shows up
+//   again whenever that exercise comes back. Empty → removed.
+// - coachNote: a message to the trainer about this training's exercise
+//   ("Schmerzen im Knie"), stored on athlete_feedback.note for this plan
+//   item — trainers of the athlete's groups can read it. undefined → left
+//   untouched (a coach training along has no trainer to write to).
+export async function saveExerciseNotesAction(
+  itemId: string,
+  noteKey: string,
+  notes: { selfNote: string; coachNote?: string }
+): Promise<ActionResult & { selfUpdatedAt?: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+  if (!noteKey || noteKey.length > 200) return { error: "Ungültige Übung." };
+
+  const selfNote = notes.selfNote.trim().slice(0, 500);
+  let selfUpdatedAt: string | null = null;
+  if (selfNote) {
+    selfUpdatedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from("athlete_exercise_notes")
+      .upsert(
+        { athlete_id: user.id, exercise_key: noteKey, text: selfNote, updated_at: selfUpdatedAt },
+        { onConflict: "athlete_id,exercise_key" }
+      );
+    if (error) return { error: "Notiz konnte nicht gespeichert werden." };
+  } else {
+    await supabase.from("athlete_exercise_notes").delete().eq("athlete_id", user.id).eq("exercise_key", noteKey);
+  }
+
+  if (notes.coachNote !== undefined) {
+    const coachNote = notes.coachNote.trim().slice(0, 1000) || null;
+    const { error } = await supabase
+      .from("athlete_feedback")
+      .upsert(
+        { training_plan_item_id: itemId, athlete_id: user.id, note: coachNote },
+        { onConflict: "training_plan_item_id,athlete_id" }
+      );
+    if (error) return { error: "Hinweis an den Trainer konnte nicht gespeichert werden." };
+    revalidatePath("/trainer");
+  }
+
+  return { selfUpdatedAt };
 }
 
 // The browser uploads the (already compressed) image straight to Storage —

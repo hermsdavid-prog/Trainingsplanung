@@ -44,16 +44,23 @@ export default async function TrainerAthletePlanPage({
 
   const kraftItems = (items ?? []).filter((i) => i.section === "kraft" && i.exercise_id);
   const cardioItems = (items ?? []).filter((i) => i.section === "cardio");
-  const { data: cardioFeedback } = cardioItems.length
+  const { data: feedbackRows } = (items ?? []).length
     ? await supabase
         .from("athlete_feedback")
-        .select("training_plan_item_id, actual_value, screenshot_path")
+        .select("training_plan_item_id, actual_value, screenshot_path, note")
         .eq("athlete_id", athleteId)
         .in(
           "training_plan_item_id",
-          cardioItems.map((i) => i.id)
+          (items ?? []).map((i) => i.id)
         )
     : { data: [] };
+  const cardioIdSet = new Set(cardioItems.map((i) => i.id));
+  const cardioFeedback = (feedbackRows ?? []).filter((f) => cardioIdSet.has(f.training_plan_item_id));
+  // The athlete's "Hinweis an den Trainer" per exercise, in plan order.
+  const noteByItem = new Map((feedbackRows ?? []).filter((f) => f.note).map((f) => [f.training_plan_item_id, f.note as string]));
+  const athleteNotes = (items ?? [])
+    .filter((i) => noteByItem.has(i.id))
+    .map((i) => ({ id: i.id, exercise: i.exercise_name, note: noteByItem.get(i.id) as string }));
   const cardioResultByItem = new Map((cardioFeedback ?? []).map((f) => [f.training_plan_item_id, f.actual_value ?? ""]));
   const screenshotUrls = await signCardioScreenshots(
     supabase,
@@ -136,6 +143,19 @@ export default async function TrainerAthletePlanPage({
         </Link>
       </div>
 
+      {athleteNotes.length > 0 && (
+        <div className="mt-6 max-w-[900px] p-3.5" style={{ background: "var(--dc-accent-100)" }}>
+          <div className="kicker">💬 Hinweise von {athlete.full_name}</div>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {athleteNotes.map((n) => (
+              <li key={n.id} className="text-[14px] leading-[1.45]" style={{ overflowWrap: "anywhere" }}>
+                <strong>{n.exercise}:</strong> {n.note}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {cardioItems.length > 0 && (
         <div className="mt-7 max-w-[900px]">
           <div className="kicker-accent-2">Cardio</div>
@@ -203,6 +223,11 @@ export default async function TrainerAthletePlanPage({
                   {ex.sets.length} {ex.sets.length === 1 ? "Satz" : "Sätze"}
                 </span>
               </div>
+              {noteByItem.get(ex.id) && (
+                <p className="mt-1.5 text-[14px]" style={{ overflowWrap: "anywhere" }}>
+                  💬 {noteByItem.get(ex.id)}
+                </p>
+              )}
               <div
                 className="mt-3 grid gap-2 pb-1.5 text-[10px] uppercase"
                 style={{

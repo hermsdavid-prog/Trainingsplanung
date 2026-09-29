@@ -111,6 +111,35 @@ export type Database = {
           },
         ]
       }
+      athlete_exercise_notes: {
+        Row: {
+          athlete_id: string
+          exercise_key: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          athlete_id: string
+          exercise_key: string
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          exercise_key?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_exercise_notes_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_feedback: {
         Row: {
           actual_value: string | null

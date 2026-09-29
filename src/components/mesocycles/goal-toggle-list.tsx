@@ -69,15 +69,21 @@ export function GoalToggleList({
         <p className="text-xs text-muted">{canAdd ? "Noch keine Ziele." : "Keine Ziele für diesen Mesozyklus."}</p>
       )}
       {goals.map((g) => (
-        <div key={g.id} className="flex items-center gap-2 text-[13px]" style={{ opacity: g.achievedAt ? 0.6 : 1 }}>
-          <label className="flex min-w-0 flex-1 items-center gap-2">
+        <div key={g.id} className="flex items-start gap-2 text-[13.5px] leading-[1.45]" style={{ opacity: g.achievedAt ? 0.6 : 1 }}>
+          {/* Goals wrap onto as many lines as they need — a long goal used
+              to be cut off with "…" and couldn't be read at all. */}
+          <label className="flex min-w-0 flex-1 items-start gap-2">
             <input
               type="checkbox"
+              className="mt-[3px] flex-none"
               checked={g.achievedAt != null}
               disabled={isPending}
               onChange={(e) => toggle(g.id, e.target.checked)}
             />
-            <span className="truncate" style={{ textDecoration: g.achievedAt ? "line-through" : "none" }}>
+            <span
+              className="min-w-0 whitespace-pre-wrap"
+              style={{ overflowWrap: "anywhere", textDecoration: g.achievedAt ? "line-through" : "none" }}
+            >
               {g.text}
             </span>
           </label>
@@ -96,20 +102,25 @@ export function GoalToggleList({
       ))}
 
       {!canAdd ? null : adding ? (
-        <div className="mt-1 flex gap-2">
-          <input
-            className="input flex-1"
+        <div className="mt-1 flex flex-col gap-2">
+          <textarea
+            className="input"
+            rows={2}
+            maxLength={300}
             value={newText}
             onChange={(e) => setNewText(e.target.value)}
             placeholder="z. B. mehr auf Technik achten"
+            style={{ resize: "vertical", minHeight: 64 }}
             autoFocus
           />
-          <button type="button" className="btn btn-primary shrink-0" disabled={isPending || !newText.trim()} onClick={addGoal}>
-            Hinzufügen
-          </button>
-          <button type="button" className="btn btn-ghost shrink-0" onClick={() => setAdding(false)}>
-            Abbrechen
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-primary" disabled={isPending || !newText.trim()} onClick={addGoal}>
+              Hinzufügen
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={() => setAdding(false)}>
+              Abbrechen
+            </button>
+          </div>
         </div>
       ) : (
         <button type="button" className="btn btn-ghost mt-1 self-start" onClick={() => setAdding(true)}>

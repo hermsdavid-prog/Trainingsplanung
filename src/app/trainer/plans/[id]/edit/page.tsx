@@ -134,6 +134,18 @@ export default async function EditPlanPage({
       : { data: null };
   const rpeByAthlete = new Map((ratingRows ?? []).map((r) => [r.athlete_id, r.rpe]));
 
+  // Athletes who left a "Hinweis an den Trainer" on this training.
+  const { data: hintRows } =
+    planGroupAthletes && planGroupAthletes.length > 0
+      ? await supabase
+          .from("athlete_feedback")
+          .select("athlete_id, training_plan_items!inner(training_plan_id)")
+          .eq("training_plan_items.training_plan_id", id)
+          .not("note", "is", null)
+      : { data: null };
+  const hintCountByAthlete = new Map<string, number>();
+  for (const h of hintRows ?? []) hintCountByAthlete.set(h.athlete_id, (hintCountByAthlete.get(h.athlete_id) ?? 0) + 1);
+
   const athleteMap = new Map<string, string>();
   for (const row of groupAthletes ?? []) {
     if (row.profiles?.full_name) athleteMap.set(row.athlete_id, row.profiles.full_name);
@@ -302,7 +314,14 @@ export default async function EditPlanPage({
                     const rpe = rpeByAthlete.get(row.athlete_id);
                     return (
                       <tr key={row.athlete_id}>
-                        <td className="text-[15px]">{row.profiles?.full_name ?? "—"}</td>
+                        <td className="text-[15px]">
+                          {row.profiles?.full_name ?? "—"}
+                          {hintCountByAthlete.has(row.athlete_id) && (
+                            <span className="tag tag-accent ml-2" title="Hinweis an den Trainer">
+                              💬 {hintCountByAthlete.get(row.athlete_id)}
+                            </span>
+                          )}
+                        </td>
                         <td>
                           {rpe != null ? (
                             <span className="tag tag-neutral">{rpe} / 10</span>

@@ -31,6 +31,7 @@ export default async function TrainerWorkoutSessionPage({
         {...session}
         backHref={`/trainer/plans/${session.planId}/workout`}
         doneHref="/trainer/training"
+        allowCoachHint={false}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { formatDateLabel } from "@/lib/date";
 import { signCardioScreenshots } from "@/lib/cardio-screenshots";
+import { exerciseNoteKey } from "@/lib/exercise-note-key";
 import type { SessionExercise, SessionCardio, SessionKarateRow } from "@/components/athlete/workout-session";
 
 // Everything the live, tap-to-log session (WorkoutSession) needs for one
@@ -122,6 +123,36 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     if (r.unit) exerciseUnitByExercise.set(r.exercise_id, r.unit);
   }
 
+  // Per-item feedback (cardio result/screenshot, the note to the trainer)
+  // and the user's private per-exercise notes from earlier sessions.
+  const allItems = items ?? [];
+  const noteKeyByItem = new Map(allItems.map((i) => [i.id, exerciseNoteKey(i.exercise_id, i.exercise_name)]));
+  const [{ data: feedbackRows }, { data: selfNoteRows }] = await Promise.all([
+    allItems.length
+      ? supabase
+          .from("athlete_feedback")
+          .select("training_plan_item_id, actual_value, screenshot_path, note")
+          .eq("athlete_id", userId)
+          .in(
+            "training_plan_item_id",
+            allItems.map((i) => i.id)
+          )
+      : Promise.resolve({ data: [] }),
+    allItems.length
+      ? supabase
+          .from("athlete_exercise_notes")
+          .select("exercise_key, text, updated_at")
+          .eq("athlete_id", userId)
+          .in("exercise_key", [...new Set(noteKeyByItem.values())])
+      : Promise.resolve({ data: [] }),
+  ]);
+  const coachNoteByItem = new Map((feedbackRows ?? []).map((f) => [f.training_plan_item_id, f.note ?? ""]));
+  const selfNoteByKey = new Map((selfNoteRows ?? []).map((n) => [n.exercise_key, { text: n.text, updatedAt: n.updated_at }]));
+  const noteFields = (itemId: string) => {
+    const noteKey = noteKeyByItem.get(itemId) ?? itemId;
+    return { noteKey, selfNote: selfNoteByKey.get(noteKey) ?? null, coachNote: coachNoteByItem.get(itemId) ?? "" };
+  };
+
   const exercises: SessionExercise[] = kraftItems.map((item) => ({
     itemId: item.id,
     exerciseId: item.exercise_id,
@@ -133,16 +164,11 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     note: item.notes ?? "",
     unit: (item.exercise_id ? exerciseUnitByExercise.get(item.exercise_id) : undefined) || "kg",
     initialSets: (item.exercise_id ? resultsByExercise.get(item.exercise_id) : undefined) ?? [],
+    ...noteFields(item.id),
   }));
 
-  const cardioIds = cardioItems.map((i) => i.id);
-  const { data: cardioFeedback } = cardioIds.length
-    ? await supabase
-        .from("athlete_feedback")
-        .select("training_plan_item_id, actual_value, screenshot_path")
-        .eq("athlete_id", userId)
-        .in("training_plan_item_id", cardioIds)
-    : { data: [] };
+  const cardioIdSet = new Set(cardioItems.map((i) => i.id));
+  const cardioFeedback = (feedbackRows ?? []).filter((f) => cardioIdSet.has(f.training_plan_item_id));
   const cardioResultByItem = new Map((cardioFeedback ?? []).map((f) => [f.training_plan_item_id, f.actual_value ?? ""]));
   const screenshotUrls = await signCardioScreenshots(
     supabase,
@@ -165,6 +191,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     note: item.notes ?? "",
     result: cardioResultByItem.get(item.id) ?? "",
     screenshotUrl: screenshotUrlByItem.get(item.id) ?? null,
+    ...noteFields(item.id),
   }));
 
   const karateRows: SessionKarateRow[] = roundItems.map((item) => ({
@@ -177,6 +204,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     rounds: Number(item.sets) || 3,
     restLabel: item.round_rest ?? item.rest_time ?? "",
     valLabel: item.reps_or_duration ?? "",
+    ...noteFields(item.id),
   }));
 
   const instructionsByExercise: Record<

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { todayISO, shiftDateISO, formatDateLabel } from "@/lib/date";
+import { todayISO, shiftDateISO, formatDateLabel, formatDateShort } from "@/lib/date";
 import { ProposedEventsWidget, type ProposedEvent } from "@/components/calendar/proposed-events-widget";
 import { ReadinessPanel, type ReadinessRow } from "@/components/trainer/readiness-panel";
 import {
@@ -68,6 +68,31 @@ export default async function TrainerDashboardPage() {
         .order("date")
     : { data: [] };
 
+  // Recent "Hinweis an den Trainer" messages athletes left on an exercise
+  // during a session ("Schmerzen im Knie") — surfaced here so they're seen.
+  const { data: noteRows } = athleteIds.length
+    ? await supabase
+        .from("athlete_feedback")
+        .select("athlete_id, note, updated_at, training_plan_items(exercise_name, training_plan_id, training_plans(title, date))")
+        .in("athlete_id", athleteIds)
+        .not("note", "is", null)
+        .gte("updated_at", `${shiftDateISO(today, -14)}T00:00:00Z`)
+        .order("updated_at", { ascending: false })
+        .limit(8)
+    : { data: [] };
+  const athleteHints = (noteRows ?? [])
+    .filter((n) => n.note && n.training_plan_items)
+    .map((n) => ({
+      key: `${n.athlete_id}:${n.training_plan_items!.training_plan_id}:${n.training_plan_items!.exercise_name}`,
+      athleteId: n.athlete_id,
+      athleteName: athleteMap.get(n.athlete_id) ?? "—",
+      planId: n.training_plan_items!.training_plan_id,
+      planTitle: n.training_plan_items!.training_plans?.title ?? "",
+      planDate: n.training_plan_items!.training_plans?.date ?? "",
+      exercise: n.training_plan_items!.exercise_name,
+      note: n.note as string,
+    }));
+
   const logsByAthlete = new Map<string, HealthLog[]>();
   for (const log of logs ?? []) {
     logsByAthlete.set(log.athlete_id, [...(logsByAthlete.get(log.athlete_id) ?? []), log]);
@@ -113,6 +138,30 @@ export default async function TrainerDashboardPage() {
       </p>
 
       <ProposedEventsWidget events={proposedEvents} />
+
+      {athleteHints.length > 0 && (
+        <div className="mt-6 p-3.5" style={{ background: "var(--dc-accent-100)" }}>
+          <div className="kicker">💬 Hinweise von Athleten · 14 Tage</div>
+          <div className="mt-2 flex flex-col gap-2">
+            {athleteHints.map((h) => (
+              <Link
+                key={h.key}
+                href={`/trainer/plans/${h.planId}/athlete/${h.athleteId}`}
+                className="block no-underline"
+                style={{ color: "inherit" }}
+              >
+                <div className="text-[14px] leading-[1.45]" style={{ overflowWrap: "anywhere" }}>
+                  <strong>{h.athleteName}</strong> · {h.exercise}: {h.note}
+                </div>
+                <div className="text-xs" style={{ color: "var(--dc-muted)" }}>
+                  {h.planTitle}
+                  {h.planDate ? ` · ${formatDateShort(h.planDate)}` : ""}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {(todaysPlans ?? []).length > 0 && (
         <div className="mt-6 flex flex-col gap-2.5">

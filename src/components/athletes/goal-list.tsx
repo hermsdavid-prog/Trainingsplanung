@@ -65,36 +65,48 @@ export function GoalList({
             {(goalsByMesocycle.get(m.id) ?? []).map((g) => (
               <div
                 key={g.id}
-                className="flex items-center gap-2 p-2.5"
+                className="flex items-start gap-2 p-2.5"
                 style={{ background: "var(--dc-surface)" }}
               >
                 <input
                   type="checkbox"
+                  className="mt-[4px] flex-none"
                   checked={g.achievedAt != null}
                   disabled={isPending}
                   onChange={(e) => toggle(g.id, e.target.checked)}
                   aria-label="Als erreicht markieren"
                 />
                 {editingId === g.id ? (
-                  <>
-                    <input
-                      className="input flex-1"
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <textarea
+                      className="input"
+                      rows={3}
+                      maxLength={300}
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
+                      style={{ resize: "vertical", minHeight: 80 }}
                       autoFocus
                     />
-                    <button type="button" className="btn btn-ghost shrink-0" disabled={isPending} onClick={() => saveEdit(g.id)}>
-                      Speichern
-                    </button>
-                    <button type="button" className="btn btn-ghost shrink-0" onClick={() => setEditingId(null)}>
-                      Abbrechen
-                    </button>
-                  </>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="btn btn-primary" disabled={isPending} onClick={() => saveEdit(g.id)}>
+                        Speichern
+                      </button>
+                      <button type="button" className="btn btn-ghost" onClick={() => setEditingId(null)}>
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <>
+                    {/* Wraps instead of truncating, so a long goal is readable
+                        without opening the editor. */}
                     <span
-                      className="min-w-0 flex-1 truncate text-[14px]"
-                      style={{ textDecoration: g.achievedAt ? "line-through" : "none", opacity: g.achievedAt ? 0.6 : 1 }}
+                      className="min-w-0 flex-1 whitespace-pre-wrap text-[14px] leading-[1.45]"
+                      style={{
+                        overflowWrap: "anywhere",
+                        textDecoration: g.achievedAt ? "line-through" : "none",
+                        opacity: g.achievedAt ? 0.6 : 1,
+                      }}
                     >
                       {g.text}
                       {g.selfAuthored && (

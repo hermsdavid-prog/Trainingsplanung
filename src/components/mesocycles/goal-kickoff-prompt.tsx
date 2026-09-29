@@ -147,13 +147,15 @@ export function GoalKickoffPrompt({
             {texts.map((t, i) => (
               <div key={i} className="field" style={{ margin: 0 }}>
                 <label htmlFor={`kickoff-goal-${i}`}>Ziel {i + 1}</label>
-                <input
+                <textarea
                   id={`kickoff-goal-${i}`}
                   className="input"
+                  rows={2}
                   value={t}
-                  maxLength={140}
+                  maxLength={300}
                   placeholder={PLACEHOLDERS[i]}
                   onChange={(e) => setTexts((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                  style={{ resize: "vertical", minHeight: 60 }}
                 />
               </div>
             ))}

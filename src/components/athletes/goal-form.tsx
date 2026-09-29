@@ -45,12 +45,15 @@ export function AddGoalForm({
       </div>
       <div className="field flex-1" style={{ margin: 0 }}>
         <label htmlFor="goal-text">Ziel</label>
-        <input
+        <textarea
           id="goal-text"
           className="input"
+          rows={2}
+          maxLength={300}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="z. B. Beweglichkeit Hüfte verbessern"
+          style={{ resize: "vertical", minHeight: 64 }}
         />
       </div>
       <button type="button" className="btn btn-primary" disabled={isPending || !text.trim()} onClick={handleAdd}>
