@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { weeklyOccurrences, shiftDateISO } from "@/lib/date";
 import { PLAN_TYPES, isValidPlanType } from "@/lib/plan-type";
+import { mesocycleOptionsForPlan } from "@/lib/mesocycle-options";
 import type { Database } from "@/lib/supabase/types";
 
 export type ActionResult = { error?: string };
@@ -351,6 +352,13 @@ export async function updatePlanMetaAction(
     .select("id, series_id, title, category_label, scope_type, group_id, athlete_id, mesocycle_id")
     .eq("id", planId)
     .single();
+
+  if (before && meta.mesocycleId && meta.mesocycleId !== before.mesocycle_id) {
+    const allowed = await mesocycleOptionsForPlan(supabase, before);
+    if (!allowed.some((m) => m.id === meta.mesocycleId)) {
+      return { error: "Dieser Mesozyklus passt nicht zu diesem Training." };
+    }
+  }
 
   const { error } = await supabase
     .from("training_plans")

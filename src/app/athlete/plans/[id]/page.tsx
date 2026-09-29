@@ -6,6 +6,7 @@ import { PlanTableEditor } from "@/components/plans/plan-table-editor";
 import { PlanActions } from "@/components/plans/plan-actions";
 import { CopyOwnPlanDialog } from "@/components/plans/copy-own-plan-dialog";
 import { formatDateShort } from "@/lib/date";
+import { mesocycleOptionsForPlan } from "@/lib/mesocycle-options";
 
 export default async function AthletePlanPage({
   params,
@@ -22,7 +23,7 @@ export default async function AthletePlanPage({
   const [{ data: plan }, { data: items }] = await Promise.all([
     supabase
       .from("training_plans")
-      .select("id, title, category_label, date, time, scope_type, created_by, groups(name)")
+      .select("id, title, category_label, date, time, scope_type, group_id, athlete_id, created_by, mesocycle_id, groups(name)")
       .eq("id", id)
       .single(),
     supabase
@@ -52,7 +53,12 @@ export default async function AthletePlanPage({
   const isOwnPlan = plan.created_by === user?.id;
 
   if (isOwnPlan) {
-    const { data: exerciseLibrary } = await supabase.from("exercises").select("id, name").order("name");
+    const [{ data: exerciseLibrary }, mesocycles] = await Promise.all([
+      supabase.from("exercises").select("id, name").order("name"),
+      // The athlete's own training can count toward a Mesozyklus too — their
+      // personal ones or their group's. No picker if there's none to pick.
+      mesocycleOptionsForPlan(supabase, plan),
+    ]);
 
     return (
       <div>
@@ -67,6 +73,8 @@ export default async function AthletePlanPage({
             kicker="Eigenes Training"
             backHref="/athlete"
             subtitle="Nur du und dein Trainer können dieses Training sehen."
+            mesocycles={mesocycles.length > 0 ? mesocycles : undefined}
+            initialMesocycleId={plan.mesocycle_id}
             headerActions={
               <>
                 {(items ?? []).length > 0 && (

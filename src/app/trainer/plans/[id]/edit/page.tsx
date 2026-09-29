@@ -5,6 +5,7 @@ import { PlanTableEditor } from "@/components/plans/plan-table-editor";
 import { PlanReadOnlyTable } from "@/components/plans/plan-readonly-table";
 import { PlanActions } from "@/components/plans/plan-actions";
 import { CopyPlanDialog } from "@/components/plans/copy-plan-dialog";
+import { mesocycleOptionsForPlan } from "@/lib/mesocycle-options";
 
 export default async function EditPlanPage({
   params,
@@ -44,15 +45,9 @@ export default async function EditPlanPage({
 
   const isAthletik = plan.category_label?.trim().toLowerCase() === "athletik";
 
-  // Mesozyklen für dasselbe Scope-Ziel wie dieser Plan (Gruppe oder Athlet)
-  // — nur die sind als Zuordnung sinnvoll.
-  const { data: mesocycleRows } =
-    plan.scope_type === "group" && plan.group_id
-      ? await supabase.from("training_mesocycles").select("id, title").eq("group_id", plan.group_id).order("start_date", { ascending: false })
-      : plan.scope_type === "athlete" && plan.athlete_id
-        ? await supabase.from("training_mesocycles").select("id, title").eq("athlete_id", plan.athlete_id).order("start_date", { ascending: false })
-        : { data: [] };
-  const mesocycles = mesocycleRows ?? [];
+  // Gruppenplan → Mesozyklen der Gruppe; Einzeltraining → persönliche
+  // Mesozyklen des Athleten plus die seiner Gruppen.
+  const mesocycles = await mesocycleOptionsForPlan(supabase, plan);
 
   // The Sportartspezifisch row editor's "Anweisung und Link" panel edits
   // exercise_instructions (steps + video), shared per exercise_id — preload

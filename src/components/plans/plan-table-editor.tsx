@@ -88,9 +88,9 @@ export function PlanTableEditor({
   // reusable plan_templates row. Not shown on the athlete's own-plan editor
   // — plan_templates_insert RLS only allows admin/trainer to create one.
   allowSaveAsTemplate?: boolean;
-  // Trainer-only: lets this plan be assigned to one of the Mesozyklen
-  // already set up for its own group/athlete. Not shown on the athlete's
-  // own-plan editor — Mesozyklen are a trainer planning tool.
+  // Lets this plan be assigned to one of the Mesozyklen it may belong to
+  // (see mesocycleOptionsForPlan) — the trainer's editor and the athlete's
+  // own-plan editor both pass it; omitted, the assignment is left untouched.
   mesocycles?: { id: string; title: string }[];
   initialMesocycleId?: string | null;
 }) {
@@ -437,7 +437,7 @@ export function PlanTableEditor({
             />
           </div>
           {mesocycles && (
-            <div className="field" style={{ width: 260, maxWidth: "100%", margin: 0 }}>
+            <div className="field" style={{ width: 360, maxWidth: "100%", margin: 0 }}>
               <label htmlFor="plan-mesocycle">Mesozyklus</label>
               <select
                 id="plan-mesocycle"

@@ -190,13 +190,20 @@ export default async function TrainerMesocyclesPage({
 
   const allIds = [...(groupMesocycleRows ?? []).map((m) => m.id), ...(athleteMesocycleRows ?? []).map((m) => m.id)];
   const { data: planRows } = allIds.length
-    ? await supabase.from("training_plans").select("id, title, date, mesocycle_id").in("mesocycle_id", allIds).order("date", { ascending: false })
+    ? await supabase
+        .from("training_plans")
+        .select("id, title, date, mesocycle_id, profiles!training_plans_athlete_id_fkey(full_name)")
+        .in("mesocycle_id", allIds)
+        .order("date", { ascending: false })
     : { data: [] };
   const plansByMesocycle = new Map<string, Plan[]>();
   for (const p of planRows ?? []) {
     if (!p.mesocycle_id) continue;
     const list = plansByMesocycle.get(p.mesocycle_id) ?? [];
-    list.push({ id: p.id, title: p.title, date: p.date });
+    // An athlete's Einzeltraining can sit in a group's Mesozyklus — name them
+    // so it doesn't read like a group session.
+    const athleteName = p.profiles?.full_name;
+    list.push({ id: p.id, title: athleteName ? `${p.title} · ${athleteName}` : p.title, date: p.date });
     plansByMesocycle.set(p.mesocycle_id, list);
   }
 
