@@ -1,0 +1,227 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/types";
+import { formatDateLabel } from "@/lib/date";
+import { signCardioScreenshots } from "@/lib/cardio-screenshots";
+import type { SessionExercise, SessionCardio, SessionKarateRow } from "@/components/athlete/workout-session";
+
+// Everything the live, tap-to-log session (WorkoutSession) needs for one
+// plan, loaded for whoever is logging it — the athlete for their own
+// training, or a coach training along with a plan themselves. All results
+// (sets, cardio, RPE) are read and written under that user's own id.
+export async function loadWorkoutSession(supabase: SupabaseClient<Database>, planId: string, userId: string) {
+  const [{ data: plan }, { data: items }] = await Promise.all([
+    supabase
+      .from("training_plans")
+      .select("id, title, category_label, date, scope_type, created_by, athlete_id, groups(name)")
+      .eq("id", planId)
+      .single(),
+    supabase
+      .from("training_plan_items")
+      .select(
+        "id, position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, notes, round_rest, heart_rate_on, heart_rate_off, description, link_url"
+      )
+      .eq("training_plan_id", planId)
+      .order("position"),
+  ]);
+
+  if (!plan) return null;
+
+  // Adding an exercise mid-session is offered for any training assigned
+  // directly to this user — an athlete's own self-built plans and individual
+  // trainer-assigned ones alike (training_plan_items_insert RLS covers
+  // both: plan.created_by === them, or plan.athlete_id === them). A
+  // shared group plan's items stay exactly as the trainer prescribed,
+  // since one athlete's ad-hoc addition would otherwise show up for
+  // everyone else in that group's session too.
+  const canAddExercises = plan.athlete_id === userId;
+  const { data: exerciseLibraryRows } = canAddExercises
+    ? await supabase.from("exercises").select("id, name").order("name")
+    : { data: [] };
+
+  const { data: trainerProfile } = plan.created_by
+    ? await supabase.from("profiles").select("full_name").eq("id", plan.created_by).maybeSingle()
+    : { data: null };
+
+  const exerciseIds = Array.from(new Set((items ?? []).map((i) => i.exercise_id).filter((x): x is string => !!x)));
+
+  const [{ data: existingResults }, { data: instructions }, { data: rating }, { data: historyRows }] = await Promise.all([
+    // Scoped to this plan specifically (not just user+date+exercise) —
+    // without training_plan_id here, two plans on the same day that both
+    // reference the same exercise would bleed into each other's set list,
+    // and confirming a set in one could silently overwrite the other's
+    // saved data (same athlete_id/exercise_id/date/set_number).
+    exerciseIds.length
+      ? supabase
+          .from("exercise_results")
+          .select("exercise_id, set_number, value, reps, unit, set_type, rir")
+          .eq("athlete_id", userId)
+          .eq("date", plan.date)
+          .eq("training_plan_id", planId)
+          .in("exercise_id", exerciseIds)
+          .order("set_number")
+      : Promise.resolve({ data: [] }),
+    exerciseIds.length
+      ? supabase
+          .from("exercise_instructions")
+          .select("exercise_id, short_summary, watch_note, steps, video_url, video_label")
+          .in("exercise_id", exerciseIds)
+      : Promise.resolve({ data: [] }),
+    supabase.from("session_ratings").select("rpe").eq("training_plan_id", planId).eq("athlete_id", userId).maybeSingle(),
+    // Weight suggestions: the user's most recent arbeitssatz per exercise
+    // from an earlier session, used to prefill the numeric pad so they don't
+    // have to remember/re-type what they lifted last time.
+    exerciseIds.length
+      ? supabase
+          .from("exercise_results")
+          .select("exercise_id, date, value, reps, set_type")
+          .eq("athlete_id", userId)
+          .in("exercise_id", exerciseIds)
+          .lt("date", plan.date)
+          .order("date", { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const latestDateByExercise = new Map<string, string>();
+  for (const r of historyRows ?? []) {
+    if (!latestDateByExercise.has(r.exercise_id)) latestDateByExercise.set(r.exercise_id, r.date);
+  }
+  const lastKnownByExercise: Record<string, { weight: string; reps: string }> = {};
+  for (const r of historyRows ?? []) {
+    if (r.set_type !== "arbeitssatz" || r.date !== latestDateByExercise.get(r.exercise_id)) continue;
+    const existing = lastKnownByExercise[r.exercise_id];
+    if (!existing || Number(r.value) > Number(existing.weight)) {
+      lastKnownByExercise[r.exercise_id] = {
+        weight: String(r.value),
+        reps: r.reps != null ? String(r.reps) : "",
+      };
+    }
+  }
+
+  const kraftItems = (items ?? []).filter((i) => i.section === "kraft" || i.section === "sprung");
+  const cardioItems = (items ?? []).filter((i) => i.section === "cardio");
+  const roundItems = (items ?? []).filter((i) => i.section === "runden");
+
+  const resultsByExercise = new Map<
+    string,
+    { setNumber: number; type: "aufwaermsatz" | "arbeitssatz"; reps: string; weight: string; rir: string }[]
+  >();
+  for (const r of existingResults ?? []) {
+    const list = resultsByExercise.get(r.exercise_id) ?? [];
+    list.push({
+      setNumber: r.set_number,
+      type: r.set_type === "aufwaermsatz" ? "aufwaermsatz" : "arbeitssatz",
+      reps: r.reps != null ? String(r.reps) : "",
+      weight: String(r.value),
+      rir: r.rir != null ? String(r.rir) : "",
+    });
+    resultsByExercise.set(r.exercise_id, list);
+  }
+
+  const exerciseUnitByExercise = new Map<string, string>();
+  for (const r of existingResults ?? []) {
+    if (r.unit) exerciseUnitByExercise.set(r.exercise_id, r.unit);
+  }
+
+  const exercises: SessionExercise[] = kraftItems.map((item) => ({
+    itemId: item.id,
+    exerciseId: item.exercise_id,
+    name: item.exercise_name,
+    spec: item.reps_or_duration ?? "",
+    sets: item.sets ?? "",
+    restLabel: item.rest_time ?? "",
+    restSeconds: parseRest(item.rest_time),
+    note: item.notes ?? "",
+    unit: (item.exercise_id ? exerciseUnitByExercise.get(item.exercise_id) : undefined) || "kg",
+    initialSets: (item.exercise_id ? resultsByExercise.get(item.exercise_id) : undefined) ?? [],
+  }));
+
+  const cardioIds = cardioItems.map((i) => i.id);
+  const { data: cardioFeedback } = cardioIds.length
+    ? await supabase
+        .from("athlete_feedback")
+        .select("training_plan_item_id, actual_value, screenshot_path")
+        .eq("athlete_id", userId)
+        .in("training_plan_item_id", cardioIds)
+    : { data: [] };
+  const cardioResultByItem = new Map((cardioFeedback ?? []).map((f) => [f.training_plan_item_id, f.actual_value ?? ""]));
+  const screenshotUrls = await signCardioScreenshots(
+    supabase,
+    (cardioFeedback ?? []).map((f) => f.screenshot_path).filter((p): p is string => !!p)
+  );
+  const screenshotUrlByItem = new Map(
+    (cardioFeedback ?? []).map((f) => [
+      f.training_plan_item_id,
+      f.screenshot_path ? (screenshotUrls.get(f.screenshot_path) ?? null) : null,
+    ])
+  );
+
+  const cardio: SessionCardio[] = cardioItems.map((item) => ({
+    itemId: item.id,
+    name: item.exercise_name,
+    spec: item.reps_or_duration ?? "",
+    restLabel: item.rest_time ?? "",
+    on: item.heart_rate_on ?? "",
+    off: item.heart_rate_off ?? "",
+    note: item.notes ?? "",
+    result: cardioResultByItem.get(item.id) ?? "",
+    screenshotUrl: screenshotUrlByItem.get(item.id) ?? null,
+  }));
+
+  const karateRows: SessionKarateRow[] = roundItems.map((item) => ({
+    itemId: item.id,
+    exerciseId: item.exercise_id,
+    name: item.exercise_name,
+    desc: item.description ?? "",
+    note: item.notes ?? "",
+    linkUrl: item.link_url ?? "",
+    rounds: Number(item.sets) || 3,
+    restLabel: item.round_rest ?? item.rest_time ?? "",
+    valLabel: item.reps_or_duration ?? "",
+  }));
+
+  const instructionsByExercise: Record<
+    string,
+    { short_summary: string | null; watch_note: string | null; steps: string[]; video_url: string | null; video_label: string | null }
+  > = {};
+  for (const row of instructions ?? []) {
+    instructionsByExercise[row.exercise_id] = {
+      short_summary: row.short_summary,
+      watch_note: row.watch_note,
+      steps: row.steps ?? [],
+      video_url: row.video_url,
+      video_label: row.video_label,
+    };
+  }
+
+  const planKicker = `${formatDateLabel(plan.date)}${trainerProfile?.full_name ? ` · ${trainerProfile.full_name}` : ""}${
+    plan.scope_type === "group" && plan.groups?.name ? ` · ${plan.groups.name}` : ""
+  }`;
+
+  return {
+    athleteId: userId,
+    planId: plan.id,
+    planDate: plan.date,
+    planTitle: plan.title,
+    planKicker,
+    categoryLabel: plan.category_label ?? "",
+    exercises,
+    cardio,
+    karateRows,
+    instructionsByExercise,
+    initialRpe: rating?.rpe ?? null,
+    lastKnownByExercise,
+    canAddExercises,
+    exerciseLibrary: exerciseLibraryRows ?? [],
+  };
+}
+
+function parseRest(label: string | null): number {
+  if (!label) return 0;
+  const m = label.match(/(\d+)\s*[:.]\s*(\d{1,2})/);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
+  const secOnly = label.match(/(\d+)\s*(sek|s)\b/i);
+  if (secOnly) return Number(secOnly[1]);
+  const minOnly = label.match(/(\d+)\s*min/i);
+  if (minOnly) return Number(minOnly[1]) * 60;
+  return 0;
+}

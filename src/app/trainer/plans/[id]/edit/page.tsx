@@ -177,6 +177,11 @@ export default async function EditPlanPage({
             <Link href={`/trainer/plans/${plan.id}/workout`} className="btn btn-secondary">
               Workout-Ansicht
             </Link>
+            {(items ?? []).length > 0 && (
+              <Link href={`/trainer/plans/${plan.id}/session`} className="btn btn-secondary">
+                Selbst trainieren
+              </Link>
+            )}
             {isAthletik && plan.athlete_id && (
               <Link href={`/trainer/plans/${plan.id}/athlete/${plan.athlete_id}`} className="btn btn-secondary">
                 Sätze, Wdh. und Gewichte ansehen
@@ -224,6 +229,11 @@ export default async function EditPlanPage({
                 <Link href={`/trainer/plans/${plan.id}/workout`} className="btn btn-secondary">
                   Workout-Ansicht
                 </Link>
+                {(items ?? []).length > 0 && (
+                  <Link href={`/trainer/plans/${plan.id}/session`} className="btn btn-secondary">
+                    Selbst trainieren
+                  </Link>
+                )}
                 {isAthletik && plan.scope_type === "athlete" && plan.athlete_id && (
                   <Link href={`/trainer/plans/${plan.id}/athlete/${plan.athlete_id}`} className="btn btn-secondary">
                     Sätze, Wdh. und Gewichte ansehen

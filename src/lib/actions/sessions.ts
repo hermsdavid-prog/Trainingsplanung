@@ -36,6 +36,8 @@ export async function saveSessionRpeAction(
   revalidatePath(`/athlete/plans/${planId}/session`);
   revalidatePath("/athlete");
   revalidatePath("/trainer/athletes");
+  revalidatePath("/trainer/training");
+  revalidatePath(`/trainer/plans/${planId}/session`);
 
   const newBadges = await checkSessionBadges(supabase, user.id);
   return newBadges.length > 0 ? { newBadges } : {};

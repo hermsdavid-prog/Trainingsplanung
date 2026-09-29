@@ -15,6 +15,7 @@ import {
   Layers,
   FileText,
   Download,
+  Activity,
   Menu,
   X,
 } from "lucide-react";
@@ -43,6 +44,7 @@ const NAV = [
   { href: "/trainer/groups", label: "Gruppen", Icon: Users, match: (p: string) => p.startsWith("/trainer/groups") },
   { href: "/trainer/athletes", label: "Athleten", Icon: UserRound, match: (p: string) => p.startsWith("/trainer/athletes") },
   { href: "/trainer/mesocycles", label: "Mesozyklen", Icon: Layers, match: (p: string) => p.startsWith("/trainer/mesocycles") },
+  { href: "/trainer/training", label: "Mein Training", Icon: Activity, match: (p: string) => p.startsWith("/trainer/training") || /^\/trainer\/plans\/[^/]+\/session$/.test(p) },
   { href: "/trainer/report", label: "Wochenbericht", Icon: FileText, match: (p: string) => p.startsWith("/trainer/report") },
   { href: "/trainer/export", label: "Export", Icon: Download, match: (p: string) => p.startsWith("/trainer/export") },
 ];

@@ -96,9 +96,16 @@ export default async function TrainerPlanWorkoutPage({
         <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-ghost">
           ← Zurück
         </Link>
-        <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-secondary">
-          Bearbeiten
-        </Link>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Link href={`/trainer/plans/${plan.id}/edit`} className="btn btn-secondary">
+            Bearbeiten
+          </Link>
+          {(items ?? []).length > 0 && (
+            <Link href={`/trainer/plans/${plan.id}/session`} className="btn btn-primary">
+              Selbst trainieren
+            </Link>
+          )}
+        </div>
       </div>
       <div className="mt-2.5">
         <div className="kicker capitalize">

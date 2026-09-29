@@ -41,6 +41,7 @@ export async function upsertExerciseResultAction(
   if (error) return { error: "Ergebnis konnte nicht gespeichert werden." };
 
   revalidatePath("/trainer/athletes");
+  revalidatePath("/trainer/training");
   revalidatePath("/athlete/athletik");
   revalidatePath("/athlete");
 
@@ -78,6 +79,7 @@ export async function deleteExerciseResultSetAction(
   if (error) return { error: "Satz konnte nicht gelöscht werden." };
 
   revalidatePath("/trainer/athletes");
+  revalidatePath("/trainer/training");
   revalidatePath("/athlete/athletik");
   return {};
 }

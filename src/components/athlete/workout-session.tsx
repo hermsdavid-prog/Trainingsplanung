@@ -171,6 +171,7 @@ export function WorkoutSession({
   planTitle,
   planKicker,
   backHref,
+  doneHref = "/athlete",
   categoryLabel,
   exercises: initialExercises,
   cardio,
@@ -187,6 +188,9 @@ export function WorkoutSession({
   planTitle: string;
   planKicker: string;
   backHref: string;
+  // Where "Speichern und beenden" lands: the athlete's home, or a coach's
+  // "Mein Training" when they trained along themselves.
+  doneHref?: string;
   categoryLabel: string;
   exercises: SessionExercise[];
   cardio: SessionCardio[];
@@ -514,7 +518,7 @@ export function WorkoutSession({
     }
     toast.success("Training gespeichert.");
     notifyNewBadges(result.newBadges);
-    router.push("/athlete");
+    router.push(doneHref);
   }
 
   const padKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "⌫"];
