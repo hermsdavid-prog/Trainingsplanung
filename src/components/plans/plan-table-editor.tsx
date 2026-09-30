@@ -9,6 +9,7 @@ import {
   savePlanItemsAction,
   updatePlanMetaAction,
   repeatPlanWeeklyAction,
+  applyToFollowingOccurrencesAction,
   saveAsTemplateAction,
   ensureExerciseAction,
 } from "@/lib/actions/plans";
@@ -84,6 +85,7 @@ export function PlanTableEditor({
   initialMesocycleId = null,
   allowWeeklyRepeat = false,
   seriesLastDate = null,
+  followingCount = 0,
 }: {
   planId: string;
   initialItems: Row[];
@@ -111,6 +113,9 @@ export function PlanTableEditor({
   allowWeeklyRepeat?: boolean;
   // Last date of the series this plan already belongs to, for the hint.
   seriesLastDate?: string | null;
+  // Later occurrences of this plan's weekly series — offers "Änderungen auch
+  // für die folgenden Termine übernehmen" (applyToFollowingOccurrencesAction).
+  followingCount?: number;
 }) {
   const isAthletik = categoryLabel?.trim().toLowerCase() === "athletik";
 
@@ -128,6 +133,10 @@ export function PlanTableEditor({
   // null → follows the plan's own weekday until the trainer picks one.
   const [repeatWeekday, setRepeatWeekday] = useState<number | null>(null);
   const [untilMode, setUntilMode] = useState<"meso" | "date">("meso");
+  const [applyToFollowing, setApplyToFollowing] = useState(true);
+  // Title/time as last saved — only a changed one is passed on to the
+  // following occurrences, so a time moved in a single week isn't reset.
+  const [savedMeta, setSavedMeta] = useState({ title: initialTitle, time: initialTime ?? "" });
   const selectedMesocycle = mesocycles?.find((m) => m.id === mesocycleId) ?? null;
   const effectiveWeekday = repeatWeekday ?? (date ? weekdayOfDate(date) : 0);
   const effectiveUntil = selectedMesocycle && untilMode === "meso" ? selectedMesocycle.endDate : repeatUntil;
@@ -319,6 +328,27 @@ export function PlanTableEditor({
         });
       }
 
+      let followingNote = "";
+      if (followingCount > 0 && applyToFollowing) {
+        const followResult = await applyToFollowingOccurrencesAction(planId, {
+          ...(title.trim() !== savedMeta.title.trim() ? { title } : {}),
+          ...(time.trim() !== savedMeta.time.trim() ? { time } : {}),
+        });
+        if (followResult.error) {
+          toast.error(followResult.error);
+          return;
+        }
+        const updated = followResult.updated ?? 0;
+        const skipped = followResult.skipped ?? 0;
+        if (updated > 0) {
+          followingNote += ` ${updated} ${updated === 1 ? "folgender Termin wurde" : "folgende Termine wurden"} ebenfalls angepasst.`;
+        }
+        if (skipped > 0) {
+          followingNote += ` ${skipped} ${skipped === 1 ? "Termin wurde" : "Termine wurden"} schon trainiert und ${skipped === 1 ? "bleibt" : "bleiben"} unverändert.`;
+        }
+      }
+      setSavedMeta({ title, time });
+
       // Weekly copies are made after the rows are saved, so every copy gets
       // this plan's current exercise table.
       let repeatNote = "";
@@ -345,7 +375,7 @@ export function PlanTableEditor({
           propagated > 0
             ? ` ${propagated} ${propagated === 1 ? "Kopie wurde" : "Kopien wurden"} ebenfalls dem Mesozyklus zugeordnet.`
             : ""
-        }${repeatNote}`
+        }${followingNote}${repeatNote}`
       );
     });
   }
@@ -513,6 +543,26 @@ export function PlanTableEditor({
             </div>
           )}
         </div>
+
+        {followingCount > 0 && (
+          <div className="mt-4 max-w-[640px]">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={applyToFollowing}
+                onChange={(e) => setApplyToFollowing(e.target.checked)}
+              />
+              <span>
+                Änderungen auch für {followingCount === 1 ? "den folgenden Termin" : `die ${followingCount} folgenden Termine`}{" "}
+                dieser Serie übernehmen
+              </span>
+            </label>
+            <p className="mt-1 text-xs text-muted">
+              Übernommen werden Übungen sowie ein geänderter Titel oder eine geänderte Uhrzeit. Frühere Termine und
+              Termine, die schon trainiert wurden, bleiben unverändert.
+            </p>
+          </div>
+        )}
 
         {allowWeeklyRepeat && (
           <div

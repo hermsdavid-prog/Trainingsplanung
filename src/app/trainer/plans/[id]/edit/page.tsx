@@ -100,7 +100,7 @@ export default async function EditPlanPage({
           .maybeSingle()
       : { data: null };
 
-  const [{ count: seriesCount }, { data: seriesLast }] = plan.series_id
+  const [{ count: seriesCount }, { data: seriesLast }, { count: followingCount }] = plan.series_id
     ? await Promise.all([
         supabase.from("training_plans").select("id", { count: "exact", head: true }).eq("series_id", plan.series_id),
         supabase
@@ -110,8 +110,13 @@ export default async function EditPlanPage({
           .order("date", { ascending: false })
           .limit(1)
           .maybeSingle(),
+        supabase
+          .from("training_plans")
+          .select("id", { count: "exact", head: true })
+          .eq("series_id", plan.series_id)
+          .gt("date", plan.date),
       ])
-    : [{ count: null }, { data: null }];
+    : [{ count: null }, { data: null }, { count: null }];
 
   // Athlete-by-athlete completion overview, shown for any group-assigned
   // plan (Athletik or Sportartspezifisch) — the RPE ("Belastungsempfinden")
@@ -225,12 +230,9 @@ export default async function EditPlanPage({
             initialMesocycleId={plan.mesocycle_id}
             allowWeeklyRepeat
             seriesLastDate={seriesCount && seriesCount > 1 ? (seriesLast?.date ?? null) : null}
+            followingCount={followingCount ?? 0}
             subtitle={`Für: ${targetLabel ?? "—"} (${plan.scope_type === "group" ? "Gruppe" : "Einzelplan"})${
               plan.scope_type === "athlete" ? " · Vom Athleten selbst erstellt" : ""
-            }${
-              plan.series_id && seriesCount && seriesCount > 1
-                ? " · Übungen werden beim Speichern automatisch auf noch leere Termine dieser Serie übertragen."
-                : ""
             }`}
             badges={
               (plan.series_id && seriesCount && seriesCount > 1) || plan.scope_type === "athlete" ? (

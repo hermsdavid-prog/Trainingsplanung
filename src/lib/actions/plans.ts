@@ -712,6 +712,91 @@ export async function repeatPlanWeeklyAction(
   return { created: newPlans.length };
 }
 
+// "Änderungen auch für die folgenden Termine übernehmen": after a plan of a
+// weekly series was saved, copies its exercise table — and its title/time,
+// when those were changed in this save — onto every LATER occurrence of the
+// series. Earlier weeks are history and stay as they were. An occurrence
+// that has already been trained (results, an RPE rating or exercise
+// feedback exist) is skipped: replacing its items would cascade-delete that
+// feedback, and what was trained there shouldn't be rewritten afterwards.
+// Date and Mesozyklus are per occurrence and never touched here.
+export async function applyToFollowingOccurrencesAction(
+  planId: string,
+  changed: { title?: string; time?: string } = {}
+): Promise<ActionResult & { updated?: number; skipped?: number }> {
+  const { supabase } = await requirePlanEditAccess(planId);
+
+  const { data: plan } = await supabase
+    .from("training_plans")
+    .select("id, date, series_id")
+    .eq("id", planId)
+    .single();
+  if (!plan) return { error: "Plan nicht gefunden." };
+  if (!plan.series_id) return { updated: 0, skipped: 0 };
+
+  const { data: following } = await supabase
+    .from("training_plans")
+    .select("id")
+    .eq("series_id", plan.series_id)
+    .neq("id", planId)
+    .gt("date", plan.date);
+  const followingIds = (following ?? []).map((p) => p.id);
+  if (followingIds.length === 0) return { updated: 0, skipped: 0 };
+
+  const [{ data: resultRows }, { data: ratingRows }, { data: feedbackRows }] = await Promise.all([
+    supabase.from("exercise_results").select("training_plan_id").in("training_plan_id", followingIds),
+    supabase.from("session_ratings").select("training_plan_id").in("training_plan_id", followingIds),
+    supabase
+      .from("athlete_feedback")
+      .select("training_plan_items!inner(training_plan_id)")
+      .in("training_plan_items.training_plan_id", followingIds),
+  ]);
+  const trained = new Set<string>([
+    ...(resultRows ?? []).map((r) => r.training_plan_id as string),
+    ...(ratingRows ?? []).map((r) => r.training_plan_id),
+    ...(feedbackRows ?? []).map((r) => r.training_plan_items.training_plan_id),
+  ]);
+  const targetIds = followingIds.filter((id) => !trained.has(id));
+  const skipped = followingIds.length - targetIds.length;
+  if (targetIds.length === 0) return { updated: 0, skipped };
+
+  const metaPatch: { title?: string; time?: string | null } = {};
+  if (changed.title !== undefined && changed.title.trim()) metaPatch.title = changed.title.trim();
+  if (changed.time !== undefined) metaPatch.time = changed.time.trim() || null;
+  if (Object.keys(metaPatch).length > 0) {
+    const { error } = await supabase.from("training_plans").update(metaPatch).in("id", targetIds);
+    if (error) return { error: "Folgetermine konnten nicht aktualisiert werden." };
+  }
+
+  const { data: sourceItems } = await supabase
+    .from("training_plan_items")
+    .select(
+      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes, description, duration_mode"
+    )
+    .eq("training_plan_id", planId)
+    .order("position");
+
+  // One transaction per occurrence (same RPC as a normal save), so a failure
+  // can never leave an occurrence with its exercise table wiped.
+  const results = await Promise.all(
+    targetIds.map((id) =>
+      supabase.rpc("replace_training_plan_items", { p_plan_id: id, p_items: sourceItems ?? [] })
+    )
+  );
+  const failed = results.filter((r) => r.error).length;
+
+  revalidatePath("/trainer/plans");
+  revalidatePath("/trainer/calendar");
+  revalidatePath("/athlete/calendar");
+  revalidatePath("/athlete");
+  revalidatePath("/trainer/mesocycles");
+  revalidatePath("/athlete/mesocycles");
+  if (failed > 0) {
+    return { error: `${failed} von ${targetIds.length} Folgeterminen konnten nicht aktualisiert werden.` };
+  }
+  return { updated: targetIds.length, skipped };
+}
+
 export async function reschedulePlanAction(
   planId: string,
   newDate: string
