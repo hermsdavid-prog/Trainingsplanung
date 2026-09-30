@@ -743,18 +743,19 @@ export async function applyToFollowingOccurrencesAction(
   const followingIds = (following ?? []).map((p) => p.id);
   if (followingIds.length === 0) return { updated: 0, skipped: 0 };
 
-  const [{ data: resultRows }, { data: ratingRows }, { data: feedbackRows }] = await Promise.all([
+  const [{ data: resultRows }, { data: ratingRows }, { data: itemRows }] = await Promise.all([
     supabase.from("exercise_results").select("training_plan_id").in("training_plan_id", followingIds),
     supabase.from("session_ratings").select("training_plan_id").in("training_plan_id", followingIds),
-    supabase
-      .from("athlete_feedback")
-      .select("training_plan_items!inner(training_plan_id)")
-      .in("training_plan_items.training_plan_id", followingIds),
+    supabase.from("training_plan_items").select("id, training_plan_id").in("training_plan_id", followingIds),
   ]);
+  const planByItem = new Map((itemRows ?? []).map((i) => [i.id, i.training_plan_id]));
+  const { data: feedbackRows } = planByItem.size
+    ? await supabase.from("athlete_feedback").select("training_plan_item_id").in("training_plan_item_id", [...planByItem.keys()])
+    : { data: [] as { training_plan_item_id: string }[] };
   const trained = new Set<string>([
     ...(resultRows ?? []).map((r) => r.training_plan_id as string),
     ...(ratingRows ?? []).map((r) => r.training_plan_id),
-    ...(feedbackRows ?? []).map((r) => r.training_plan_items.training_plan_id),
+    ...(feedbackRows ?? []).map((r) => planByItem.get(r.training_plan_item_id) as string),
   ]);
   const targetIds = followingIds.filter((id) => !trained.has(id));
   const skipped = followingIds.length - targetIds.length;
