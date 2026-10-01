@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import { formatDateLabel } from "@/lib/date";
 import { signCardioScreenshots } from "@/lib/cardio-screenshots";
 import { exerciseNoteKey } from "@/lib/exercise-note-key";
+import { isPerSide, type Side } from "@/lib/per-side";
 import type { SessionExercise, SessionCardio, SessionKarateRow } from "@/components/athlete/workout-session";
 
 // Everything the live, tap-to-log session (WorkoutSession) needs for one
@@ -54,7 +55,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     exerciseIds.length
       ? supabase
           .from("exercise_results")
-          .select("exercise_id, set_number, value, reps, unit, set_type, rir")
+          .select("exercise_id, set_number, value, reps, unit, set_type, rir, side")
           .eq("athlete_id", userId)
           .eq("date", plan.date)
           .eq("training_plan_id", planId)
@@ -104,7 +105,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
 
   const resultsByExercise = new Map<
     string,
-    { setNumber: number; type: "aufwaermsatz" | "arbeitssatz"; reps: string; weight: string; rir: string }[]
+    { setNumber: number; type: "aufwaermsatz" | "arbeitssatz"; reps: string; weight: string; rir: string; side: Side | null }[]
   >();
   for (const r of existingResults ?? []) {
     const list = resultsByExercise.get(r.exercise_id) ?? [];
@@ -114,6 +115,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
       reps: r.reps != null ? String(r.reps) : "",
       weight: String(r.value),
       rir: r.rir != null ? String(r.rir) : "",
+      side: r.side === "links" || r.side === "rechts" ? r.side : null,
     });
     resultsByExercise.set(r.exercise_id, list);
   }
@@ -162,6 +164,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     restLabel: item.rest_time ?? "",
     restSeconds: parseRest(item.rest_time),
     note: item.notes ?? "",
+    perSide: isPerSide(item.reps_or_duration),
     unit: (item.exercise_id ? exerciseUnitByExercise.get(item.exercise_id) : undefined) || "kg",
     initialSets: (item.exercise_id ? resultsByExercise.get(item.exercise_id) : undefined) ?? [],
     ...noteFields(item.id),

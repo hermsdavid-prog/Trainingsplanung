@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateLabel } from "@/lib/date";
 import { signCardioScreenshots } from "@/lib/cardio-screenshots";
+import { SIDE_LABEL, countSets, isPairedRight, type Side } from "@/lib/per-side";
 
 const SET_TYPE_LABEL: Record<string, string> = {
   aufwaermsatz: "Aufwärmsatz",
@@ -74,7 +75,7 @@ export default async function TrainerAthletePlanPage({
   const { data: results } = exerciseIds.length
     ? await supabase
         .from("exercise_results")
-        .select("exercise_id, set_number, value, reps, unit, set_type")
+        .select("exercise_id, set_number, value, reps, unit, set_type, side")
         .eq("athlete_id", athleteId)
         .eq("date", plan.date)
         .eq("training_plan_id", id)
@@ -84,11 +85,18 @@ export default async function TrainerAthletePlanPage({
 
   const resultsByExercise = new Map<
     string,
-    { setNumber: number; type: string; reps: number | null; value: number; unit: string | null }[]
+    { setNumber: number; type: string; reps: number | null; value: number; unit: string | null; side: Side | null }[]
   >();
   for (const r of results ?? []) {
     const list = resultsByExercise.get(r.exercise_id) ?? [];
-    list.push({ setNumber: r.set_number, type: r.set_type, reps: r.reps, value: r.value, unit: r.unit });
+    list.push({
+      setNumber: r.set_number,
+      type: r.set_type,
+      reps: r.reps,
+      value: r.value,
+      unit: r.unit,
+      side: r.side === "links" || r.side === "rechts" ? r.side : null,
+    });
     resultsByExercise.set(r.exercise_id, list);
   }
 
@@ -100,8 +108,8 @@ export default async function TrainerAthletePlanPage({
 
   const totals = exercises.reduce(
     (acc, ex) => {
-      acc.total += Math.max(ex.planned, ex.sets.length);
-      acc.done += ex.sets.length;
+      acc.total += Math.max(ex.planned, countSets(ex.sets));
+      acc.done += countSets(ex.sets);
       for (const s of ex.sets) {
         if (s.type === "arbeitssatz" && s.reps != null) {
           acc.tonnage += s.value * s.reps;
@@ -220,7 +228,8 @@ export default async function TrainerAthletePlanPage({
                   {ex.reps_or_duration && <span className="tag tag-neutral">{ex.reps_or_duration}</span>}
                 </div>
                 <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
-                  {ex.sets.length} {ex.sets.length === 1 ? "Satz" : "Sätze"}
+                  {countSets(ex.sets)} {countSets(ex.sets) === 1 ? "Satz" : "Sätze"}
+                  {ex.sets.some((s) => s.side) ? " · je Seite" : ""}
                 </span>
               </div>
               {noteByItem.get(ex.id) && (
@@ -248,8 +257,12 @@ export default async function TrainerAthletePlanPage({
               {(() => {
                 const typeCounts: Record<string, number> = {};
                 return ex.sets.map((s, si) => {
-                  typeCounts[s.type] = (typeCounts[s.type] ?? 0) + 1;
-                  const label = `${SET_TYPE_LABEL[s.type] ?? s.type} ${typeCounts[s.type]}`;
+                  const isRight = isPairedRight(ex.sets, si);
+                  if (!isRight) typeCounts[s.type] = (typeCounts[s.type] ?? 0) + 1;
+                  const sideLabel = s.side ? SIDE_LABEL[s.side] : "";
+                  const label = isRight
+                    ? sideLabel
+                    : `${SET_TYPE_LABEL[s.type] ?? s.type} ${typeCounts[s.type]}${sideLabel ? ` · ${sideLabel}` : ""}`;
                   const tone =
                     s.type === "arbeitssatz"
                       ? "var(--dc-text)"

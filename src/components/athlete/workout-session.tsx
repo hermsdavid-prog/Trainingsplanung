@@ -21,6 +21,7 @@ import {
   type ExerciseNoteState,
 } from "@/components/athlete/exercise-notes";
 import type { BadgeAward } from "@/lib/badges";
+import { SIDE_LABEL, countSets, isPairedRight, type Side } from "@/lib/per-side";
 
 type SetType = "aufwaermsatz" | "arbeitssatz";
 
@@ -32,6 +33,8 @@ type SessionSet = {
   weight: string;
   rir: string;
   confirmed: boolean;
+  // Unilateral exercises: the left/right row of one set (see lib/per-side).
+  side: Side | null;
 };
 
 type ExerciseInstructions = {
@@ -51,8 +54,10 @@ export type SessionExercise = {
   restLabel: string;
   restSeconds: number;
   note: string;
+  // "je Seite": every set is logged as a left + right pair.
+  perSide?: boolean;
   unit: string;
-  initialSets: { setNumber: number; type: SetType; reps: string; weight: string; rir: string }[];
+  initialSets: { setNumber: number; type: SetType; reps: string; weight: string; rir: string; side?: Side | null }[];
 } & ExerciseNoteFields;
 
 // Private reminder for next time + message to the trainer (see exercise-notes).
@@ -148,35 +153,53 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
     weight: s.weight,
     rir: s.rir,
     confirmed: true,
+    side: s.side ?? null,
   }));
   const suggested = Number(ex.sets) || 1;
-  const rows = [...confirmedSets];
-  let nextSetNumber = rows.reduce((m, r) => Math.max(m, r.setNumber), 0) + 1;
+  const rows: SessionSet[] = [];
+  const taken = new Set(confirmedSets.map((r) => r.setNumber));
+  let nextSetNumber = confirmedSets.reduce((m, r) => Math.max(m, r.setNumber), 0) + 1;
+  // Only confirmed rows come back from the database: a left side whose
+  // right side wasn't logged yet gets its (empty) right row back.
+  confirmedSets.forEach((r, i) => {
+    rows.push(r);
+    if (ex.perSide && r.side === "links" && confirmedSets[i + 1]?.side !== "rechts") {
+      const setNumber = taken.has(r.setNumber + 1) ? nextSetNumber++ : r.setNumber + 1;
+      taken.add(setNumber);
+      rows.push({ ...r, key: nextKey(), setNumber, rir: "", confirmed: false, side: "rechts" });
+    }
+  });
+  nextSetNumber = Math.max(nextSetNumber, ...[...taken].map((n) => n + 1));
+  // One set = one row, or a left + right row for a "je Seite" exercise.
+  const newSet = (type: SetType): SessionSet[] =>
+    (ex.perSide ? (["links", "rechts"] as const) : [null]).map((side) => ({
+      key: nextKey(),
+      setNumber: nextSetNumber++,
+      type,
+      reps: parseLeadingNumber(ex.spec),
+      weight: "",
+      rir: "",
+      confirmed: false,
+      side,
+    }));
   const hasWarmup = rows.some((r) => r.type === "aufwaermsatz");
   if (!hasWarmup) {
-    rows.unshift({
-      key: nextKey(),
-      setNumber: nextSetNumber++,
-      type: "aufwaermsatz",
-      reps: parseLeadingNumber(ex.spec),
-      weight: "",
-      rir: "",
-      confirmed: false,
-    });
+    rows.unshift(...newSet("aufwaermsatz"));
   }
-  const workSetCount = rows.filter((r) => r.type === "arbeitssatz").length;
+  const workSetCount = countSets(rows.filter((r) => r.type === "arbeitssatz"));
   for (let i = workSetCount; i < suggested; i++) {
-    rows.push({
-      key: nextKey(),
-      setNumber: nextSetNumber++,
-      type: "arbeitssatz",
-      reps: parseLeadingNumber(ex.spec),
-      weight: "",
-      rir: "",
-      confirmed: false,
-    });
+    rows.push(...newSet("arbeitssatz"));
   }
   return rows;
+}
+
+// The rows that make up the set `set` belongs to: itself, or both sides.
+function setMembers(rows: SessionSet[], set: SessionSet): SessionSet[] {
+  const i = rows.findIndex((r) => r.key === set.key);
+  if (i < 0) return [set];
+  if (isPairedRight(rows, i)) return [rows[i - 1], rows[i]];
+  if (isPairedRight(rows, i + 1)) return [rows[i], rows[i + 1]];
+  return [rows[i]];
 }
 
 export function WorkoutSession({
@@ -328,6 +351,7 @@ export function WorkoutSession({
       restSeconds: 0,
       note: "",
       unit: "kg",
+      perSide: false,
       initialSets: [],
       noteKey: exerciseNoteKey(result.item.exerciseId, result.item.name),
       selfNote: null,
@@ -390,10 +414,10 @@ export function WorkoutSession({
     for (const ex of exercises) {
       const rows = setsByItem[ex.itemId] ?? [];
       const suggested = Number(ex.sets) || 1;
-      total += Math.max(suggested, rows.length);
+      total += Math.max(suggested, countSets(rows));
+      done += countSets(rows, (r) => r.confirmed);
       for (const r of rows) {
         if (!r.confirmed) continue;
-        done += 1;
         if (r.type === "arbeitssatz") {
           const w = Number(r.weight.replace(",", "."));
           const reps = Number(r.reps.replace(",", "."));
@@ -421,37 +445,51 @@ export function WorkoutSession({
   // together at the top of the list rather than trailing after work sets
   // that were already logged.
   function addSet(itemId: string, type: SetType) {
+    const perSide = exercises.find((e) => e.itemId === itemId)?.perSide ?? false;
     setSetsByItem((prev) => {
       const rows = prev[itemId] ?? [];
       const maxSetNumber = rows.reduce((m, r) => Math.max(m, r.setNumber), 0);
-      const newSet: SessionSet = { key: nextKey(), setNumber: maxSetNumber + 1, type, reps: "", weight: "", rir: "", confirmed: false };
+      const newSets: SessionSet[] = (perSide ? (["links", "rechts"] as const) : [null]).map((side, i) => ({
+        key: nextKey(),
+        setNumber: maxSetNumber + 1 + i,
+        type,
+        reps: "",
+        weight: "",
+        rir: "",
+        confirmed: false,
+        side,
+      }));
       if (type === "arbeitssatz") {
-        return { ...prev, [itemId]: [...rows, newSet] };
+        return { ...prev, [itemId]: [...rows, ...newSets] };
       }
       let insertAt = 0;
       rows.forEach((r, i) => {
         if (r.type === "aufwaermsatz") insertAt = i + 1;
       });
       const next = [...rows];
-      next.splice(insertAt, 0, newSet);
+      next.splice(insertAt, 0, ...newSets);
       return { ...prev, [itemId]: next };
     });
   }
 
+  // Removes the whole set — for a "je Seite" exercise both sides at once.
   async function removeSet(ex: SessionExercise, set: SessionSet) {
-    if (set.confirmed) {
+    const members = setMembers(setsByItem[ex.itemId] ?? [], set);
+    for (const m of members) {
+      if (!m.confirmed) continue;
       if (!ex.exerciseId) return;
       setPendingKey(set.key);
-      const result = await deleteExerciseResultSetAction(ex.exerciseId, planDate, set.setNumber, planId);
+      const result = await deleteExerciseResultSetAction(ex.exerciseId, planDate, m.setNumber, planId);
       setPendingKey(null);
       if (result.error) {
         toast.error(result.error);
         return;
       }
     }
+    const keys = new Set(members.map((m) => m.key));
     setSetsByItem((prev) => ({
       ...prev,
-      [ex.itemId]: prev[ex.itemId].filter((s) => s.key !== set.key),
+      [ex.itemId]: prev[ex.itemId].filter((s) => !keys.has(s.key)),
     }));
   }
 
@@ -477,18 +515,31 @@ export function WorkoutSession({
       ex.unit || "kg",
       planId,
       set.type,
-      rir
+      rir,
+      set.side
     );
     setPendingKey(null);
     if (result.error) {
       toast.error(result.error);
       return;
     }
-    setSetsByItem((prev) => ({
-      ...prev,
-      [ex.itemId]: prev[ex.itemId].map((s) => (s.key === set.key ? { ...s, confirmed: true } : s)),
-    }));
-    if (ex.restSeconds > 0) {
+    setSetsByItem((prev) => {
+      const rows = prev[ex.itemId];
+      const i = rows.findIndex((s) => s.key === set.key);
+      return {
+        ...prev,
+        [ex.itemId]: rows.map((s, j) => {
+          if (s.key === set.key) return { ...s, confirmed: true };
+          // Left side logged: suggest the same load for the right side
+          // (still to be confirmed with ✓, nothing is saved for it yet).
+          if (j === i + 1 && set.side === "links" && isPairedRight(rows, j) && !s.confirmed && !s.weight.trim()) {
+            return { ...s, weight: set.weight, reps: set.reps.trim() ? set.reps : s.reps };
+          }
+          return s;
+        }),
+      };
+    });
+    if (ex.restSeconds > 0 && set.side !== "links") {
       setRestRemaining(ex.restSeconds);
     }
     notifyNewBadges(result.newBadges);
@@ -646,8 +697,8 @@ export function WorkoutSession({
             <div className="mt-5 flex flex-col gap-2.5">
               {exercises.map((ex) => {
                 const rows = setsByItem[ex.itemId] ?? [];
-                const done = rows.filter((r) => r.confirmed).length;
-                const planned = Math.max(Number(ex.sets) || 1, rows.length);
+                const done = countSets(rows, (r) => r.confirmed);
+                const planned = Math.max(Number(ex.sets) || 1, countSets(rows));
                 const isOpen = openIds.has(ex.itemId);
                 const complete = done > 0 && done >= planned;
                 return (
@@ -671,6 +722,11 @@ export function WorkoutSession({
                             {ex.spec}
                             {ex.restLabel ? ` · Pause ${ex.restLabel}` : ""}
                           </span>
+                          {ex.perSide && (
+                            <span className="mt-0.5 block text-[12px]" style={{ color: "var(--dc-accent-700)" }}>
+                              Jeder Satz mit linker und rechter Seite
+                            </span>
+                          )}
                         </span>
                         <span className="flex flex-none items-center gap-2.5">
                           <span
@@ -727,24 +783,36 @@ export function WorkoutSession({
                         </div>
                         {(() => {
                           const typeCounts: Partial<Record<SetType, number>> = {};
-                          return rows.map((s) => {
-                            typeCounts[s.type] = (typeCounts[s.type] ?? 0) + 1;
+                          return rows.map((s, si) => {
+                            // The right side continues the set started by the left one:
+                            // no new number, no divider in between.
+                            const isRight = isPairedRight(rows, si);
+                            const hasRight = isPairedRight(rows, si + 1);
+                            if (!isRight) typeCounts[s.type] = (typeCounts[s.type] ?? 0) + 1;
                             const pending = pendingKey === s.key;
                             return (
                               <div
                                 key={s.key}
-                                className="grid items-center gap-1 py-2"
+                                className={`grid items-center gap-1 ${hasRight ? "pt-2 pb-1" : isRight ? "pt-1 pb-2" : "py-2"}`}
                                 style={{
                                   gridTemplateColumns: SET_GRID,
-                                  borderBottom: "1px solid color-mix(in srgb, var(--dc-text) 8%, transparent)",
+                                  borderBottom: hasRight ? "none" : "1px solid color-mix(in srgb, var(--dc-text) 8%, transparent)",
                                 }}
                               >
                                 <span
                                   className="text-[12.5px] leading-tight"
                                   style={{ color: s.confirmed ? "var(--dc-accent-700)" : "var(--dc-muted)" }}
                                 >
-                                  {SET_TYPE_LABEL[s.type]}
-                                  <span className="block tabular-nums">{typeCounts[s.type]}</span>
+                                  {isRight ? null : SET_TYPE_LABEL[s.type]}
+                                  <span className="block tabular-nums">
+                                    {isRight ? "" : typeCounts[s.type]}
+                                    {s.side ? (
+                                      <span style={{ fontWeight: 600 }}>
+                                        {isRight ? "" : " · "}
+                                        {SIDE_LABEL[s.side]}
+                                      </span>
+                                    ) : null}
+                                  </span>
                                 </span>
                                 <button
                                   type="button"
@@ -788,16 +856,20 @@ export function WorkoutSession({
                                 >
                                   ✓
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => removeSet(ex, s)}
-                                  disabled={pending}
-                                  aria-label="Satz entfernen"
-                                  className="h-10 w-6 text-[15px]"
-                                  style={{ color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}
-                                >
-                                  ✕
-                                </button>
+                                {isRight ? (
+                                  <span />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSet(ex, s)}
+                                    disabled={pending}
+                                    aria-label={hasRight ? "Satz (beide Seiten) entfernen" : "Satz entfernen"}
+                                    className="h-10 w-6 text-[15px]"
+                                    style={{ color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}
+                                  >
+                                    ✕
+                                  </button>
+                                )}
                               </div>
                             );
                           });

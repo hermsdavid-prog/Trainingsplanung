@@ -121,6 +121,7 @@ export async function buildTrainerExportWorkbook(
     { header: "Athlet", key: "athlete", width: 22 },
     { header: "Übung", key: "exercise", width: 26 },
     { header: "Satzart", key: "setType", width: 16 },
+    { header: "Seite", key: "side", width: 10 },
     { header: "Wert", key: "value", width: 10 },
     { header: "Einheit", key: "unit", width: 10 },
   ]);
@@ -128,7 +129,7 @@ export async function buildTrainerExportWorkbook(
   const { data: results } = athleteIds.length
     ? await supabase
         .from("exercise_results")
-        .select("athlete_id, date, value, unit, set_type, exercises(name)")
+        .select("athlete_id, date, value, unit, set_type, side, exercises(name)")
         .in("athlete_id", athleteIds)
         .gte("date", from)
         .lte("date", to)
@@ -141,6 +142,7 @@ export async function buildTrainerExportWorkbook(
       athlete: athleteName.get(r.athlete_id) ?? "",
       exercise: r.exercises?.name ?? "",
       setType: r.set_type,
+      side: r.side ?? "",
       value: r.value,
       unit: r.unit ?? "",
     });

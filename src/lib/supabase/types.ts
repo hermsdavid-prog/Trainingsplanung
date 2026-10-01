@@ -368,6 +368,7 @@ export type Database = {
           rir: number | null
           set_number: number
           set_type: string
+          side: string | null
           status: string | null
           training_plan_id: string | null
           unit: string | null
@@ -384,6 +385,7 @@ export type Database = {
           rir?: number | null
           set_number?: number
           set_type?: string
+          side?: string | null
           status?: string | null
           training_plan_id?: string | null
           unit?: string | null
@@ -400,6 +402,7 @@ export type Database = {
           rir?: number | null
           set_number?: number
           set_type?: string
+          side?: string | null
           status?: string | null
           training_plan_id?: string | null
           unit?: string | null

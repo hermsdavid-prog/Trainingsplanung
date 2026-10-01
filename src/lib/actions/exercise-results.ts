@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/actions/plans";
 import { checkExercisePr, type BadgeAward } from "@/lib/badges";
+import type { Side } from "@/lib/per-side";
 
 export async function upsertExerciseResultAction(
   exerciseId: string,
@@ -14,7 +15,9 @@ export async function upsertExerciseResultAction(
   unit: string,
   planId: string,
   setType: "aufwaermsatz" | "arbeitssatz" = "arbeitssatz",
-  rir: number | null = null
+  rir: number | null = null,
+  // Left or right row of a unilateral ("je Seite") exercise; null otherwise.
+  side: Side | null = null
 ): Promise<ActionResult & { newBadges?: BadgeAward[] }> {
   const supabase = await createClient();
   const {
@@ -34,6 +37,7 @@ export async function upsertExerciseResultAction(
       training_plan_id: planId,
       set_type: setType,
       rir,
+      side,
     },
     { onConflict: "training_plan_id,athlete_id,exercise_id,date,set_number" }
   );
