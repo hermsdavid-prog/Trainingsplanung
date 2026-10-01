@@ -28,19 +28,20 @@ export default function Error({ error, retry }: { error: Error & { digest?: stri
       <p className="mt-2 text-sm leading-[1.55]" style={{ color: "var(--dc-muted)" }}>
         {sessionGone
           ? "Bitte melde dich neu an. Bereits gespeicherte Eingaben bleiben erhalten."
-          : "Versuch es noch einmal. Wenn es wieder passiert, lade die Seite neu."}
+          : "Versuch es noch einmal. Hilft das nicht, ist vielleicht deine Anmeldung abgelaufen."}
       </p>
       <div className="mt-5 flex flex-wrap gap-2">
-        {sessionGone ? (
-          <Link href="/login" className="btn btn-primary">
-            Neu anmelden
-          </Link>
-        ) : (
+        {/* In production Next replaces server error messages with a generic
+            text, so "Neu anmelden" is always offered as a way out. */}
+        {sessionGone ? null : (
           <button type="button" className="btn btn-primary" onClick={() => retry()}>
             Erneut versuchen
           </button>
         )}
-        <Link href="/" className="btn btn-secondary">
+        <Link href="/login" className={sessionGone ? "btn btn-primary" : "btn btn-secondary"}>
+          Neu anmelden
+        </Link>
+        <Link href="/" className="btn btn-ghost">
           Zur Startseite
         </Link>
       </div>

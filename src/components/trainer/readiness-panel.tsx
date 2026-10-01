@@ -21,7 +21,9 @@ export function ReadinessPanel({ rows, notCheckedIn = [] }: { rows: ReadinessRow
   const redCount = rows.filter((r) => r.level === "red").length;
   // Open straight away when it fits on screen anyway (small groups) or when
   // something needs attention; only a long roster starts collapsed.
-  const [open, setOpen] = useState(redCount > 0 || (rows.length > 0 && rows.length <= 8));
+  const [open, setOpen] = useState(
+    redCount > 0 || (rows.length > 0 && rows.length <= 8) || (rows.length === 0 && notCheckedIn.length > 0)
+  );
   const router = useRouter();
 
   return (

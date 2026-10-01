@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -12,7 +13,7 @@ async function requireUser() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nicht angemeldet.");
+  if (!user) redirect("/login");
   return { supabase, userId: user.id };
 }
 

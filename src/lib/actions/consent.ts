@@ -88,7 +88,7 @@ async function requireAdmin() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nicht angemeldet.");
+  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")

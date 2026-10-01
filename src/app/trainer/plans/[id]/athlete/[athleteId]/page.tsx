@@ -102,15 +102,18 @@ export default async function TrainerAthletePlanPage({
   }
 
   // Same exercise twice in the plan: each occurrence has its own block of
-  // set numbers (lib/set-numbers).
+  // set numbers (lib/set-numbers), counted over the same items as the live
+  // session does (Kraft and Leistungsdiagnostik, in plan order).
   const occurrences = new Map<string, number>();
-  for (const item of kraftItems) {
-    if (item.exercise_id) occurrences.set(item.exercise_id, (occurrences.get(item.exercise_id) ?? 0) + 1);
+  const occurrenceOfItem = new Map<string, number>();
+  for (const item of items ?? []) {
+    if ((item.section !== "kraft" && item.section !== "sprung") || !item.exercise_id) continue;
+    const k = occurrences.get(item.exercise_id) ?? 0;
+    occurrenceOfItem.set(item.id, k);
+    occurrences.set(item.exercise_id, k + 1);
   }
-  const seen = new Map<string, number>();
   const exercises = kraftItems.map((item) => {
-    const k = item.exercise_id ? (seen.get(item.exercise_id) ?? 0) : 0;
-    if (item.exercise_id) seen.set(item.exercise_id, k + 1);
+    const k = occurrenceOfItem.get(item.id) ?? 0;
     const sets = item.exercise_id
       ? (resultsByExercise.get(item.exercise_id) ?? []).filter(
           (r) => occurrenceOfSet(r.setNumber, occurrences.get(item.exercise_id as string) ?? 1) === k

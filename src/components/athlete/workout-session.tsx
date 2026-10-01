@@ -531,7 +531,7 @@ export function WorkoutSession({
     }));
   }
 
-  async function confirmSet(ex: SessionExercise, set: SessionSet, opts: { askRir?: boolean } = {}) {
+  async function confirmSet(ex: SessionExercise, set: SessionSet, opts: { askRir?: boolean; startRest?: boolean } = {}) {
     if (!ex.exerciseId) {
       toast.error("Diese Übung ist nicht in der Übungsbibliothek verknüpft.");
       return;
@@ -584,7 +584,9 @@ export function WorkoutSession({
         }),
       };
     });
-    if (ex.restSeconds > 0 && set.side !== "links") {
+    // Only a newly logged set starts the rest — not adding RIR to it or
+    // correcting it afterwards.
+    if ((opts.startRest ?? !set.confirmed) && ex.restSeconds > 0 && set.side !== "links") {
       startRest(ex.restSeconds);
     }
     // Ask for RIR right after a work set is logged instead of relying on
@@ -655,7 +657,7 @@ export function WorkoutSession({
     const ex = exercises.find((e) => e.itemId === itemId);
     const current = (setsByItem[itemId] ?? []).find((s) => s.key === setKey);
     if (!ex || !current) return;
-    await confirmSet(ex, { ...current, rir: rirValue });
+    await confirmSet(ex, { ...current, rir: rirValue }, { startRest: false });
   }
 
   async function handleRpeSave() {
@@ -732,10 +734,11 @@ export function WorkoutSession({
             )}
 
             {restRemaining > 0 && (
-              // Sticks to the top while scrolling to the next exercise.
+              // Sticks below the app's sticky header (~56px) while scrolling
+              // to the next exercise.
               <div
                 className="mt-3.5 flex items-center justify-between px-3.5 py-2.5"
-                style={{ background: "var(--dc-accent-100)", position: "sticky", top: 0, zIndex: 20, boxShadow: "var(--dc-shadow-md)" }}
+                style={{ background: "var(--dc-accent-100)", position: "sticky", top: 56, zIndex: 25, boxShadow: "var(--dc-shadow-md)" }}
                 role="timer"
                 aria-live="off"
               >

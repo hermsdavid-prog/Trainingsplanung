@@ -30,7 +30,7 @@ async function requireTrainerOrAdmin() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nicht angemeldet.");
+  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -50,7 +50,7 @@ async function requireAthlete() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nicht angemeldet.");
+  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -77,7 +77,7 @@ async function requirePlanEditAccess(planId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Nicht angemeldet.");
+  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
