@@ -28,3 +28,11 @@ export function countSets<T extends { side?: Side | null }>(rows: T[], done?: (r
   });
   return n;
 }
+
+// The editor's "je Seite" checkbox: adds or removes the marker in the reps
+// text, so the text the athletes read and the left/right logging always
+// agree (and copies, templates and series pick it up with the text).
+export function withPerSide(spec: string, on: boolean): string {
+  if (on) return isPerSide(spec) ? spec : `${spec.trim()} je Seite`.trim();
+  return spec.replace(/\s*\b(je|pro)\s+(seite|bein|arm)\b/gi, "").trim();
+}

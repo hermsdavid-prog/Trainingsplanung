@@ -16,6 +16,7 @@ import {
 import { upsertExerciseInstructionsAction } from "@/lib/actions/exercise-instructions";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, CopyIcon, GripVerticalIcon } from "lucide-react";
+import { isPerSide, withPerSide } from "@/lib/per-side";
 
 type Section = "kraft" | "cardio" | "sprung" | "runden";
 type DurationMode = "reps" | "duration";
@@ -706,6 +707,18 @@ export function PlanTableEditor({
                         onChange={(e) => updateRow(index, "reps_or_duration", e.target.value)}
                         placeholder="z. B. 10 Wdh. / 30 Sek."
                       />
+                      <label
+                        className="mt-1 flex items-center gap-1.5 text-xs"
+                        style={{ color: "var(--dc-muted)", cursor: "pointer" }}
+                        title="Einseitige Übung: Athleten tragen jeden Satz mit linker und rechter Seite ein"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isPerSide(row.reps_or_duration)}
+                          onChange={(e) => updateRow(index, "reps_or_duration", withPerSide(row.reps_or_duration, e.target.checked))}
+                        />
+                        je Seite
+                      </label>
                     </td>
                     <td>
                       <input
