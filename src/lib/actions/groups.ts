@@ -199,7 +199,14 @@ export async function setGroupAthleteAction(
         .eq("group_id", groupId)
         .eq("athlete_id", athleteId);
 
-  if (error) return { error: "Änderung konnte nicht gespeichert werden." };
+  if (error) {
+    // RLS (group_athletes_insert): a trainer can't pull an athlete out of
+    // another trainer's group into their own — that takes an admin.
+    if (assign && error.code === "42501") {
+      return { error: "Dieser Athlet ist bereits in einer anderen Gruppe. Bitte den Admin, ihn zuzuordnen." };
+    }
+    return { error: "Änderung konnte nicht gespeichert werden." };
+  }
 
   revalidatePath("/admin/groups");
   revalidatePath("/trainer/groups");
@@ -214,6 +221,16 @@ export async function promoteHeadTrainerAction(
   trainerId: string
 ): Promise<ActionResult> {
   const { supabase } = await requireGroupManageAccess(groupId, { requireHead: true });
+
+  // Only a trainer of this group can become its head — otherwise the old
+  // head would be cleared and the group left without one.
+  const { data: member } = await supabase
+    .from("group_trainers")
+    .select("trainer_id")
+    .eq("group_id", groupId)
+    .eq("trainer_id", trainerId)
+    .maybeSingle();
+  if (!member) return { error: "Diese Person ist kein Trainer der Gruppe." };
 
   const { error: clearError } = await supabase
     .from("group_trainers")

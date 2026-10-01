@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  moveStartToAppDate,
+  utcISOToAppTimeString,
   formatDateShort,
   appWallTimeToUTCISOString,
   utcISOToAppDateString,
@@ -129,5 +131,24 @@ describe("shiftMonthStr", () => {
   });
   it("rolls back into the previous year", () => {
     expect(shiftMonthStr("2026-01", -1)).toBe("2025-12");
+  });
+});
+
+describe("moveStartToAppDate", () => {
+  it("keeps the Berlin wall-clock time across the end of DST", () => {
+    // 20.10.2026 18:00 Berlin (CEST, UTC+2) → 27.10.2026 18:00 Berlin (CET, UTC+1)
+    const moved = moveStartToAppDate("2026-10-20T16:00:00.000Z", false, "2026-10-27");
+    expect(moved).toBe("2026-10-27T17:00:00.000Z");
+    expect(utcISOToAppTimeString(moved)).toBe("18:00");
+  });
+
+  it("keeps a just-after-midnight event on the target day", () => {
+    // 00:30 Berlin on 14.10. is stored as 22:30Z on 13.10.
+    const moved = moveStartToAppDate("2026-10-13T22:30:00.000Z", false, "2026-10-21");
+    expect(utcISOToAppDateString(moved)).toBe("2026-10-21");
+  });
+
+  it("leaves all-day events at UTC midnight", () => {
+    expect(moveStartToAppDate("2026-10-20T00:00:00Z", true, "2026-10-27")).toBe("2026-10-27T00:00:00Z");
   });
 });

@@ -20,8 +20,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const groupId = searchParams.get("group");
   const today = todayISO();
-  const from = searchParams.get("from") || shiftDateISO(today, -28);
-  const to = searchParams.get("to") || today;
+  const isDate = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
+  const from = isDate(fromParam) ? fromParam : shiftDateISO(today, -28);
+  const to = isDate(toParam) ? toParam : today;
 
   const buffer = await buildTrainerExportWorkbook(supabase, { groupId, from, to });
 

@@ -59,6 +59,14 @@ export async function changePasswordAction(
     redirect("/login");
   }
 
+  // This form skips the current password, so it's only for the forced
+  // first-login change; any later change goes through updatePasswordAction,
+  // which re-checks the current password.
+  const { data: profile } = await supabase.from("profiles").select("must_change_password").eq("id", user.id).single();
+  if (!profile?.must_change_password) {
+    return { error: "Bitte ändere dein Passwort in den Einstellungen (mit deinem aktuellen Passwort)." };
+  }
+
   const { error: updateError } = await supabase.auth.updateUser({ password });
   if (updateError) {
     return { error: "Passwort konnte nicht geändert werden. Bitte erneut versuchen." };

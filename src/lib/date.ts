@@ -59,6 +59,19 @@ export function utcISOToAppDateString(iso: string): string {
   return new Date(iso).toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
 }
 
+// The app-timezone wall-clock time ("HH:MM") of a stored UTC instant.
+export function utcISOToAppTimeString(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+// Moves a stored event start to another calendar day keeping its Berlin
+// wall-clock time (18:00 stays 18:00 across the DST switch). All-day events
+// are stored as UTC midnight of their date and stay that way.
+export function moveStartToAppDate(startIso: string, allDay: boolean, newDate: string): string {
+  if (allDay) return `${newDate}T00:00:00Z`;
+  return appWallTimeToUTCISOString(newDate, utcISOToAppTimeString(startIso));
+}
+
 // Compact "d.M." form used in chart headers/axes, e.g. "6.8." (no leading zeros).
 export function formatDateCompact(dateStr: string): string {
   const [, m, d] = dateStr.split("-").map(Number);

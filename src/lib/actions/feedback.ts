@@ -17,11 +17,15 @@ export async function upsertFeedbackAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
+  // Server actions can be called with any payload: only the result text is
+  // taken from the client (screenshot and note fields have their own
+  // actions), and the athlete is always the signed-in user.
+  const actualValue = typeof data?.actual_value === "string" ? data.actual_value.trim().slice(0, 200) : "";
   const { error } = await supabase.from("athlete_feedback").upsert(
     {
       training_plan_item_id: itemId,
+      actual_value: actualValue,
       athlete_id: user.id,
-      ...data,
     },
     { onConflict: "training_plan_item_id,athlete_id" }
   );

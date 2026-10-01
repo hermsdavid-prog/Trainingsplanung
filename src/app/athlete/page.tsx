@@ -44,7 +44,7 @@ export default async function AthleteTodayPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: plans }, { data: healthLog }, { data: recentLogs }, { data: exerciseResultRows }, { data: unreadNoteRows }, { data: badgeRows }, { data: ratingRows }] =
+  const [{ data: plans }, { data: healthLog }, { data: recentLogs }, { data: exerciseResultRows }, { data: unreadNoteRows }, { data: badgeRows }, { data: ratingRows }, { data: consentRow }] =
     await Promise.all([
       supabase
         .from("training_plans")
@@ -72,7 +72,11 @@ export default async function AthleteTodayPage({
             .from("exercise_results")
             .select("exercise_id, date, value, unit, set_type, exercises(name)")
             .eq("athlete_id", user.id)
-            .order("date")
+            // Newest first and capped: the trends only compare the latest
+            // sessions, and an unbounded query silently stopped at the API's
+            // row limit (dropping exactly the newest results).
+            .order("date", { ascending: false })
+            .limit(3000)
         : Promise.resolve({ data: [] }),
       user
         ? supabase
@@ -97,7 +101,14 @@ export default async function AthleteTodayPage({
             .eq("athlete_id", user.id)
             .eq("training_plans.date", date)
         : Promise.resolve({ data: [] }),
+      user
+        ? supabase.from("athlete_consents").select("health_consent").eq("athlete_id", user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
+
+  // Health values (check-in, chart, readiness) only with the athlete's
+  // consent — the database refuses to store them otherwise.
+  const healthConsent = consentRow?.health_consent === true;
 
   const completedPlanIds = new Set((ratingRows ?? []).map((r) => r.training_plan_id));
 
@@ -230,28 +241,13 @@ export default async function AthleteTodayPage({
       }))
   );
 
-  const showCheckin = date === today && !healthLog;
+  const showCheckin = healthConsent && date === today && !healthLog;
 
   return (
     <div>
       <div className="kicker">{formatDateLabel(date)}</div>
 
       <CoachNotesBanner notes={unreadNotes} />
-
-      {user && <GoalsPanel groups={goalGroups} athleteId={user.id} />}
-
-      {kickoff && (
-        <GoalKickoffPrompt
-          key={kickoff.id}
-          mesocycleId={kickoff.id}
-          mesocycleTitle={kickoff.title}
-          scopeLabel={kickoff.groups?.name ?? "Persönlicher Block"}
-          rangeLabel={`${formatDateCompact(kickoff.start_date)}–${formatDateCompact(
-            shiftDateISO(kickoff.start_date, kickoff.weeks * 7 - 1)
-          )} · ${kickoff.weeks} ${kickoff.weeks === 1 ? "Woche" : "Wochen"}`}
-          recap={kickoffRecap}
-        />
-      )}
 
       <CheckinGate
         showCheckin={showCheckin}
@@ -269,6 +265,14 @@ export default async function AthleteTodayPage({
         main={
         <>
           <h2 className="mt-1.5 text-[27px] leading-[1.08]">Training heute</h2>
+          {!healthConsent && date === today && (
+            <p className="mt-2 text-[13px] leading-[1.5]" style={{ color: "var(--dc-muted)" }}>
+              Der tägliche Check-in ist aus, weil keine Einwilligung für Gesundheitswerte vorliegt.{" "}
+              <Link href="/consent" className="underline">
+                Einwilligung ändern
+              </Link>
+            </p>
+          )}
 
           <div className="mt-4">
             {(!plans || plans.length === 0) && (
@@ -282,7 +286,7 @@ export default async function AthleteTodayPage({
                   className="mb-2.5 p-3.5"
                   style={{
                     background: "var(--dc-surface)",
-                    borderLeft: `2px solid ${plan.scope_type === "group" ? plan.groups?.color ?? "#4b3793" : "#4b3793"}`,
+                    borderLeft: `2px solid ${plan.scope_type === "group" ? plan.groups?.color ?? "var(--dc-accent)" : "var(--dc-accent)"}`,
                   }}
                 >
                   <div className="flex items-baseline justify-between gap-2.5">
@@ -306,9 +310,31 @@ export default async function AthleteTodayPage({
           </div>
 
           <Link href="/athlete/plans/new" className="btn btn-secondary btn-block">
-            + Eigenes Workout erstellen
+            + Eigenes Training erstellen
           </Link>
 
+          {/* Today's training comes first; goals and the kickoff prompt
+              follow below it instead of pushing it off the screen. */}
+          <div className="mt-6">
+      {user && <GoalsPanel groups={goalGroups} athleteId={user.id} />}
+
+      {kickoff && (
+        <GoalKickoffPrompt
+          key={kickoff.id}
+          mesocycleId={kickoff.id}
+          mesocycleTitle={kickoff.title}
+          scopeLabel={kickoff.groups?.name ?? "Persönlicher Block"}
+          rangeLabel={`${formatDateCompact(kickoff.start_date)}–${formatDateCompact(
+            shiftDateISO(kickoff.start_date, kickoff.weeks * 7 - 1)
+          )} · ${kickoff.weeks} ${kickoff.weeks === 1 ? "Woche" : "Wochen"}`}
+          recap={kickoffRecap}
+        />
+      )}
+
+          </div>
+
+          {healthConsent && (
+          <>
           <div className="kicker mt-7">Deine Werte · 14 Tage</div>
           <div className="mt-3">
             <HealthChart data={recentLogs ?? []} />
@@ -329,6 +355,8 @@ export default async function AthleteTodayPage({
                 : "Noch keine Eingabe für heute."}
             </p>
           </div>
+          </>
+          )}
 
           {trends.length > 0 && (
             <>

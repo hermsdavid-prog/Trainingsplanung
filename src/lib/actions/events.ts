@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { weeklyOccurrences, dailyOccurrences, appWallTimeToUTCISOString } from "@/lib/date";
+import { weeklyOccurrences, dailyOccurrences, appWallTimeToUTCISOString, moveStartToAppDate } from "@/lib/date";
 
 export type ActionResult = { error?: string };
 
@@ -14,6 +14,11 @@ async function requireUser() {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht angemeldet.");
   return { supabase, userId: user.id };
+}
+
+async function currentRole(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data } = await supabase.from("profiles").select("role").eq("id", userId).single();
+  return data?.role ?? null;
 }
 
 export type CreateEventInput = {
@@ -38,6 +43,10 @@ export type CreateEventInput = {
 
 export async function createEventAction(input: CreateEventInput): Promise<ActionResult> {
   const { supabase, userId } = await requireUser();
+  // Athletes propose dates (proposeEventAction); confirmed ones are for
+  // trainers and admins only.
+  const role = await currentRole(supabase, userId);
+  if (role !== "trainer" && role !== "admin") return { error: "Keine Berechtigung." };
 
   if (!input.title.trim() || !input.date) {
     return { error: "Bitte Titel und Datum angeben." };
@@ -128,8 +137,7 @@ export async function duplicateEventToDateAction(
   if (!existing) return { error: "Termin nicht gefunden." };
 
   const oldStart = new Date(existing.start_at);
-  const timePart = oldStart.toISOString().slice(11);
-  const newStart = `${newDate}T${timePart}`;
+  const newStart = moveStartToAppDate(existing.start_at, existing.all_day, newDate);
 
   let newEnd: string | null = null;
   if (existing.end_at) {
@@ -166,15 +174,14 @@ export async function rescheduleEventAction(
 
   const { data: existing } = await supabase
     .from("events")
-    .select("start_at, end_at")
+    .select("start_at, end_at, all_day")
     .eq("id", eventId)
     .single();
 
   if (!existing) return { error: "Termin nicht gefunden." };
 
   const oldStart = new Date(existing.start_at);
-  const timePart = oldStart.toISOString().slice(11);
-  const newStart = `${newDate}T${timePart}`;
+  const newStart = moveStartToAppDate(existing.start_at, existing.all_day, newDate);
 
   let newEnd: string | null = null;
   if (existing.end_at) {
@@ -199,7 +206,9 @@ export async function rescheduleEventAction(
 }
 
 export async function confirmEventAction(eventId: string): Promise<ActionResult> {
-  const { supabase } = await requireUser();
+  const { supabase, userId } = await requireUser();
+  const role = await currentRole(supabase, userId);
+  if (role !== "trainer" && role !== "admin") return { error: "Nur Trainer können Vorschläge bestätigen." };
 
   const { data, error } = await supabase
     .from("events")

@@ -18,6 +18,16 @@ export async function upsertHealthLogAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
+  // Health data only with consent (also enforced by RLS on health_logs).
+  const { data: consent } = await supabase
+    .from("athlete_consents")
+    .select("health_consent")
+    .eq("athlete_id", user.id)
+    .maybeSingle();
+  if (!consent?.health_consent) {
+    return { error: "Für Gesundheitswerte fehlt deine Einwilligung (Einstellungen → Datenschutz → Einwilligung ändern)." };
+  }
+
   if (!input.wellbeing || input.wellbeing < 1 || input.wellbeing > 10) {
     return { error: "Bitte Wohlbefinden auf einer Skala von 1-10 angeben." };
   }
