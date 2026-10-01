@@ -111,12 +111,15 @@ export async function updateMesocycleAction(
     return { error: "Bitte eine gültige Anzahl Wochen angeben." };
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("training_mesocycles")
     .update({ title, description: description || null, start_date: startDate, weeks })
-    .eq("id", mesocycleId);
+    .eq("id", mesocycleId)
+    .select("id");
 
   if (error) return { error: "Änderungen konnten nicht gespeichert werden." };
+  // RLS turns a missing permission into "0 rows changed", not an error.
+  if (!data || data.length === 0) return { error: "Keine Berechtigung, diesen Mesozyklus zu ändern." };
 
   revalidatePath("/trainer/mesocycles");
   return {};
@@ -129,8 +132,9 @@ export async function deleteMesocycleAction(mesocycleId: string): Promise<Action
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
-  const { error } = await supabase.from("training_mesocycles").delete().eq("id", mesocycleId);
+  const { data, error } = await supabase.from("training_mesocycles").delete().eq("id", mesocycleId).select("id");
   if (error) return { error: "Mesozyklus konnte nicht gelöscht werden." };
+  if (!data || data.length === 0) return { error: "Keine Berechtigung, diesen Mesozyklus zu löschen." };
 
   revalidatePath("/trainer/mesocycles");
   revalidatePath("/trainer/plans");

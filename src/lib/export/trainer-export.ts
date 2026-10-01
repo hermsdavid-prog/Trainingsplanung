@@ -120,30 +120,43 @@ export async function buildTrainerExportWorkbook(
     { header: "Datum", key: "date", width: 12 },
     { header: "Athlet", key: "athlete", width: 22 },
     { header: "Übung", key: "exercise", width: 26 },
+    { header: "Satz", key: "setNumber", width: 8 },
     { header: "Satzart", key: "setType", width: 16 },
     { header: "Seite", key: "side", width: 10 },
     { header: "Wert", key: "value", width: 10 },
+    { header: "Wdh.", key: "reps", width: 8 },
+    { header: "RIR", key: "rir", width: 8 },
     { header: "Einheit", key: "unit", width: 10 },
   ]);
 
-  const { data: results } = athleteIds.length
-    ? await supabase
-        .from("exercise_results")
-        .select("athlete_id, date, value, unit, set_type, side, exercises(name)")
-        .in("athlete_id", athleteIds)
-        .gte("date", from)
-        .lte("date", to)
-        .order("date")
-    : { data: [] };
+  // Paged: a single request stops at the API's row limit (1000), which cut
+  // longer export periods off without notice.
+  const results = [];
+  for (let offset = 0; athleteIds.length > 0; offset += 1000) {
+    const { data: page } = await supabase
+      .from("exercise_results")
+      .select("athlete_id, date, set_number, value, reps, rir, unit, set_type, side, exercises(name)")
+      .in("athlete_id", athleteIds)
+      .gte("date", from)
+      .lte("date", to)
+      .order("date")
+      .order("id")
+      .range(offset, offset + 999);
+    results.push(...(page ?? []));
+    if (!page || page.length < 1000) break;
+  }
 
-  for (const r of results ?? []) {
+  for (const r of results) {
     resultsSheet.addRow({
       date: r.date,
       athlete: athleteName.get(r.athlete_id) ?? "",
       exercise: r.exercises?.name ?? "",
+      setNumber: r.set_number,
       setType: r.set_type,
       side: r.side ?? "",
       value: r.value,
+      reps: r.reps ?? "",
+      rir: r.rir ?? "",
       unit: r.unit ?? "",
     });
   }

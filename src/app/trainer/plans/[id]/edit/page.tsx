@@ -100,22 +100,23 @@ export default async function EditPlanPage({
           .maybeSingle()
       : { data: null };
 
+  // Counted within this plan's own group/athlete: a plan created for several
+  // groups at once shares one series_id across all of them.
+  const inSeries = () => {
+    const q = supabase.from("training_plans").select("id", { count: "exact", head: true }).eq("series_id", plan.series_id!);
+    const byGroup = plan.group_id ? q.eq("group_id", plan.group_id) : q.is("group_id", null);
+    return plan.athlete_id ? byGroup.eq("athlete_id", plan.athlete_id) : byGroup.is("athlete_id", null);
+  };
+  const lastInSeries = () => {
+    const q = supabase.from("training_plans").select("date").eq("series_id", plan.series_id!);
+    const byGroup = plan.group_id ? q.eq("group_id", plan.group_id) : q.is("group_id", null);
+    return (plan.athlete_id ? byGroup.eq("athlete_id", plan.athlete_id) : byGroup.is("athlete_id", null))
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+  };
   const [{ count: seriesCount }, { data: seriesLast }, { count: followingCount }] = plan.series_id
-    ? await Promise.all([
-        supabase.from("training_plans").select("id", { count: "exact", head: true }).eq("series_id", plan.series_id),
-        supabase
-          .from("training_plans")
-          .select("date")
-          .eq("series_id", plan.series_id)
-          .order("date", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("training_plans")
-          .select("id", { count: "exact", head: true })
-          .eq("series_id", plan.series_id)
-          .gt("date", plan.date),
-      ])
+    ? await Promise.all([inSeries(), lastInSeries(), inSeries().gt("date", plan.date)])
     : [{ count: null }, { data: null }, { count: null }];
 
   // Athlete-by-athlete completion overview, shown for any group-assigned

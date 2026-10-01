@@ -1,14 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import {
-  currentMonthStr,
-  formatMonthLabel,
-  getMonthGridDays,
-  getWeekDays,
-  shiftMonthStr,
-  todayISO,
-  utcISOToAppDateString,
-} from "@/lib/date";
+import { currentMonthStr, formatMonthLabel, getMonthGridDays, getWeekDays, shiftMonthStr, todayISO, utcISOToAppDateString, appWallTimeToUTCISOString, shiftDateISO } from "@/lib/date";
 import { CalendarGrid, type CalendarItem } from "@/components/calendar/calendar-grid";
 import { ProposeEventDialog } from "@/components/calendar/propose-event-dialog";
 
@@ -58,8 +50,10 @@ export default async function AthleteCalendarPage({
     supabase
       .from("events")
       .select("id, title, description, start_at, event_type, color, status, group_id, athlete_id, all_day, series_id")
-      .gte("start_at", `${rangeStart}T00:00:00Z`)
-      .lte("start_at", `${rangeEnd}T23:59:59Z`),
+      .gte("start_at", appWallTimeToUTCISOString(rangeStart, "00:00"))
+      // Berlin day bounds: events between 00:00 and 02:00 local time used to
+      // fall outside a UTC-midnight window.
+      .lt("start_at", appWallTimeToUTCISOString(shiftDateISO(rangeEnd, 1), "00:00")),
   ]);
 
   const itemsByDate: Record<string, CalendarItem[]> = {};

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
+import { todayISO } from "@/lib/date";
 
 export type BadgeAward = {
   key: string;
@@ -131,7 +132,7 @@ export async function checkSessionBadges(supabase: Client, athleteId: string): P
 
   if (dates.length > 0) {
     const weekStarts = new Set(dates.map(mondayOf));
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = todayISO();
     const streak = currentWeekStreak(weekStarts, todayIso);
     for (const tier of WEEK_STREAKS) {
       if (streak < tier.weeks) continue;
@@ -158,7 +159,7 @@ export async function checkHealthBadges(supabase: Client, athleteId: string): Pr
   const days = new Set((rows ?? []).map((r) => r.date));
   if (days.size === 0) return [];
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = todayISO();
   const streak = currentDayStreak(days, todayIso);
 
   const awards: BadgeAward[] = [];
@@ -189,14 +190,22 @@ export async function checkExercisePr(
 ): Promise<BadgeAward | null> {
   const { data: rows } = await supabase
     .from("exercise_results")
-    .select("value, reps, unit, set_type")
+    .select("value, reps, unit, set_type, date")
     .eq("athlete_id", athleteId)
     .eq("exercise_id", exerciseId)
     .eq("set_type", "arbeitssatz");
 
   if (!rows || rows.length === 0) return null;
 
+  // A PR is beating what was logged on EARLIER days — recomputed from the
+  // results themselves, so correcting a typo (1000 → 100 kg) doesn't lock
+  // the badge, and the very first session of an exercise isn't a "PR".
+  const latestDate = rows.reduce((m, r) => (r.date > m ? r.date : m), rows[0].date);
+  const earlier = rows.filter((r) => r.date < latestDate);
+  if (earlier.length === 0) return null;
   const best = Math.max(...rows.map((r) => r.value));
+  const previousBest = Math.max(...earlier.map((r) => r.value));
+  if (best <= previousBest) return null;
   const bestOneRm = rows.reduce<number | null>((max, r) => {
     const oneRm = r.reps != null ? estimateOneRepMax(r.value, r.reps) : null;
     if (oneRm == null) return max;
@@ -205,15 +214,14 @@ export async function checkExercisePr(
   const unit = rows.find((r) => r.unit)?.unit ?? "kg";
   const badgeKey = `pr:${exerciseId}`;
 
+  // Already awarded for exactly this value (e.g. the set was saved again).
   const { data: existing } = await supabase
     .from("athlete_badges")
     .select("context")
     .eq("athlete_id", athleteId)
     .eq("badge_key", badgeKey)
     .maybeSingle();
-
-  const previousBest = (existing?.context as { value?: number } | null)?.value ?? null;
-  if (previousBest != null && best <= previousBest) return null;
+  if ((existing?.context as { value?: number } | null)?.value === best) return null;
 
   const title = `Bestleistung: ${exerciseName}`;
   const description =

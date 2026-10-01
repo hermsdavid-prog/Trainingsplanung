@@ -13,6 +13,18 @@ export type ActionResult = { error?: string };
 
 type PlanScope = Database["public"]["Enums"]["plan_scope"];
 
+// A plan created for several groups/athletes at once shares one series_id
+// across all of them (so the first exercise table fills the others). Series
+// actions — copy edits to following weeks, extend the series, follow the
+// Mesozyklus — must stay within the same group or athlete.
+function sameTarget<Q extends { eq: (col: string, v: string) => Q; is: (col: string, v: null) => Q }>(
+  query: Q,
+  plan: { group_id: string | null; athlete_id: string | null }
+): Q {
+  const byGroup = plan.group_id ? query.eq("group_id", plan.group_id) : query.is("group_id", null);
+  return plan.athlete_id ? byGroup.eq("athlete_id", plan.athlete_id) : byGroup.is("athlete_id", null);
+}
+
 async function requireTrainerOrAdmin() {
   const supabase = await createClient();
   const {
@@ -307,7 +319,7 @@ async function propagateMesocycleToCopies(
   const [{ data: adhocRows }, { data: seriesRows }] = await Promise.all([
     adhoc,
     plan.series_id
-      ? supabase.from("training_plans").select(cols).neq("id", plan.id).eq("series_id", plan.series_id)
+      ? sameTarget(supabase.from("training_plans").select(cols).neq("id", plan.id).eq("series_id", plan.series_id), plan)
       : Promise.resolve({ data: [] as { id: string; date: string; mesocycle_id: string | null }[] }),
   ]);
 
@@ -659,7 +671,10 @@ export async function repeatPlanWeeklyAction(
     if (error) return { error: "Wiederholung konnte nicht angelegt werden." };
   }
 
-  const { data: seriesRows } = await supabase.from("training_plans").select("date").eq("series_id", seriesId);
+  const { data: seriesRows } = await sameTarget(
+    supabase.from("training_plans").select("date").eq("series_id", seriesId),
+    plan
+  );
   const takenWeeks = new Set([plan.date, ...(seriesRows ?? []).map((r) => r.date)].map(getWeekStart));
 
   const planWeekday = (new Date(`${plan.date}T00:00:00Z`).getUTCDay() + 6) % 7;
@@ -728,18 +743,16 @@ export async function applyToFollowingOccurrencesAction(
 
   const { data: plan } = await supabase
     .from("training_plans")
-    .select("id, date, series_id")
+    .select("id, date, series_id, group_id, athlete_id")
     .eq("id", planId)
     .single();
   if (!plan) return { error: "Plan nicht gefunden." };
   if (!plan.series_id) return { updated: 0, skipped: 0 };
 
-  const { data: following } = await supabase
-    .from("training_plans")
-    .select("id")
-    .eq("series_id", plan.series_id)
-    .neq("id", planId)
-    .gt("date", plan.date);
+  const { data: following } = await sameTarget(
+    supabase.from("training_plans").select("id").eq("series_id", plan.series_id).neq("id", planId).gt("date", plan.date),
+    plan
+  );
   const followingIds = (following ?? []).map((p) => p.id);
   if (followingIds.length === 0) return { updated: 0, skipped: 0 };
 
@@ -798,21 +811,34 @@ export async function applyToFollowingOccurrencesAction(
   return { updated: targetIds.length, skipped };
 }
 
+// Every page a plan's date or existence shows up on, for trainers and athletes.
+function revalidatePlanViews() {
+  revalidatePath("/trainer/calendar");
+  revalidatePath("/trainer/plans");
+  revalidatePath("/trainer/mesocycles");
+  revalidatePath("/athlete/calendar");
+  revalidatePath("/athlete/mesocycles");
+  revalidatePath("/athlete");
+}
+
 export async function reschedulePlanAction(
   planId: string,
   newDate: string
 ): Promise<ActionResult> {
   const { supabase } = await requirePlanEditAccess(planId);
 
+  // Moved out of its Mesozyklus → no longer part of it.
+  const { data: plan } = await supabase.from("training_plans").select("mesocycle_id").eq("id", planId).single();
+  const mesocycleId = await inheritedMesocycleId(supabase, plan?.mesocycle_id ?? null, newDate);
+
   const { error } = await supabase
     .from("training_plans")
-    .update({ date: newDate })
+    .update({ date: newDate, mesocycle_id: mesocycleId })
     .eq("id", planId);
 
   if (error) return { error: "Plan konnte nicht verschoben werden." };
 
-  revalidatePath("/trainer/calendar");
-  revalidatePath("/trainer/plans");
+  revalidatePlanViews();
   return {};
 }
 
@@ -882,8 +908,7 @@ export async function duplicatePlanToDateAction(
     }
   }
 
-  revalidatePath("/trainer/calendar");
-  revalidatePath("/trainer/plans");
+  revalidatePlanViews();
   revalidatePath(`/trainer/plans/${newPlan.id}/edit`);
   return {};
 }
@@ -944,7 +969,7 @@ export async function duplicateDayToDateAction(
     if (error || !newPlan) continue;
 
     if (sourceItems && sourceItems.length > 0) {
-      await supabase.from("training_plan_items").insert(
+      const { error: itemsError } = await supabase.from("training_plan_items").insert(
         sourceItems.map((item) => ({
           training_plan_id: newPlan.id,
           position: item.position,
@@ -963,14 +988,18 @@ export async function duplicateDayToDateAction(
           duration_mode: item.duration_mode,
         }))
       );
+      // A copy without its exercises would look like a finished plan.
+      if (itemsError) {
+        await supabase.from("training_plans").delete().eq("id", newPlan.id);
+        continue;
+      }
     }
     copiedCount++;
   }
 
   if (copiedCount === 0) return { error: "Kein Plan konnte kopiert werden." };
 
-  revalidatePath("/trainer/calendar");
-  revalidatePath("/trainer/plans");
+  revalidatePlanViews();
   return { count: copiedCount };
 }
 
@@ -980,8 +1009,7 @@ export async function deletePlanAction(planId: string): Promise<ActionResult> {
   const { error } = await supabase.from("training_plans").delete().eq("id", planId);
   if (error) return { error: "Plan konnte nicht gelöscht werden." };
 
-  revalidatePath("/trainer/plans");
-  revalidatePath("/athlete");
+  revalidatePlanViews();
   return {};
 }
 

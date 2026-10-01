@@ -35,6 +35,9 @@ type SessionSet = {
   confirmed: boolean;
   // Unilateral exercises: the left/right row of one set (see lib/per-side).
   side: Side | null;
+  // Date the set was saved under; differs from the plan date when the
+  // training was moved after logging. Unset for sets not saved yet.
+  date?: string;
 };
 
 type ExerciseInstructions = {
@@ -57,7 +60,10 @@ export type SessionExercise = {
   // "je Seite": every set is logged as a left + right pair.
   perSide?: boolean;
   unit: string;
-  initialSets: { setNumber: number; type: SetType; reps: string; weight: string; rir: string; side?: Side | null }[];
+  initialSets: { setNumber: number; type: SetType; reps: string; weight: string; rir: string; side?: Side | null; date?: string }[];
+  // First set number of this item's block (lib/set-numbers): 0, or 100, 200 …
+  // when the same exercise appears more than once in the plan.
+  setNumberBase?: number;
 } & ExerciseNoteFields;
 
 // Private reminder for next time + message to the trainer (see exercise-notes).
@@ -145,7 +151,12 @@ function nextKey() {
 // session, see addExercise) starts with the same pre-populated rows
 // instead of an empty list the athlete would have to build up manually.
 function buildInitialSets(ex: SessionExercise): SessionSet[] {
-  const confirmedSets: SessionSet[] = ex.initialSets.map((s) => ({
+  // Warm-ups first, then work sets, each in logging order — a warm-up added
+  // later has a higher set number but still belongs at the top.
+  const ordered = [...ex.initialSets].sort(
+    (a, b) => Number(a.type === "arbeitssatz") - Number(b.type === "arbeitssatz") || a.setNumber - b.setNumber
+  );
+  const confirmedSets: SessionSet[] = ordered.map((s) => ({
     key: nextKey(),
     setNumber: s.setNumber,
     type: s.type,
@@ -154,11 +165,12 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
     rir: s.rir,
     confirmed: true,
     side: s.side ?? null,
+    date: s.date,
   }));
   const suggested = Number(ex.sets) || 1;
   const rows: SessionSet[] = [];
   const taken = new Set(confirmedSets.map((r) => r.setNumber));
-  let nextSetNumber = confirmedSets.reduce((m, r) => Math.max(m, r.setNumber), 0) + 1;
+  let nextSetNumber = confirmedSets.reduce((m, r) => Math.max(m, r.setNumber), ex.setNumberBase ?? 0) + 1;
   // Only confirmed rows come back from the database: a left side whose
   // right side wasn't logged yet gets its (empty) right row back.
   confirmedSets.forEach((r, i) => {
@@ -341,7 +353,12 @@ export function WorkoutSession({
       toast.error(result.error ?? "Übung konnte nicht hinzugefügt werden.");
       return;
     }
+    // Already in the plan? Then this one gets the next block of set numbers.
+    const sameExerciseBases = exercises
+      .filter((e) => e.exerciseId && e.exerciseId === result.item!.exerciseId)
+      .map((e) => e.setNumberBase ?? 0);
     const newExercise: SessionExercise = {
+      setNumberBase: sameExerciseBases.length ? Math.max(...sameExerciseBases) + 100 : 0,
       itemId: result.item.itemId,
       exerciseId: result.item.exerciseId,
       name: result.item.name,
@@ -445,10 +462,11 @@ export function WorkoutSession({
   // together at the top of the list rather than trailing after work sets
   // that were already logged.
   function addSet(itemId: string, type: SetType) {
-    const perSide = exercises.find((e) => e.itemId === itemId)?.perSide ?? false;
+    const ex = exercises.find((e) => e.itemId === itemId);
+    const perSide = ex?.perSide ?? false;
     setSetsByItem((prev) => {
       const rows = prev[itemId] ?? [];
-      const maxSetNumber = rows.reduce((m, r) => Math.max(m, r.setNumber), 0);
+      const maxSetNumber = rows.reduce((m, r) => Math.max(m, r.setNumber), ex?.setNumberBase ?? 0);
       const newSets: SessionSet[] = (perSide ? (["links", "rechts"] as const) : [null]).map((side, i) => ({
         key: nextKey(),
         setNumber: maxSetNumber + 1 + i,
@@ -479,7 +497,7 @@ export function WorkoutSession({
       if (!m.confirmed) continue;
       if (!ex.exerciseId) return;
       setPendingKey(set.key);
-      const result = await deleteExerciseResultSetAction(ex.exerciseId, planDate, m.setNumber, planId);
+      const result = await deleteExerciseResultSetAction(ex.exerciseId, m.date ?? planDate, m.setNumber, planId);
       setPendingKey(null);
       if (result.error) {
         toast.error(result.error);
@@ -508,7 +526,7 @@ export function WorkoutSession({
     setPendingKey(set.key);
     const result = await upsertExerciseResultAction(
       ex.exerciseId,
-      planDate,
+      set.date ?? planDate,
       set.setNumber,
       weight,
       reps,
@@ -529,7 +547,7 @@ export function WorkoutSession({
       return {
         ...prev,
         [ex.itemId]: rows.map((s, j) => {
-          if (s.key === set.key) return { ...s, confirmed: true };
+          if (s.key === set.key) return { ...s, confirmed: true, date: set.date ?? planDate };
           // Left side logged: suggest the same load for the right side
           // (still to be confirmed with ✓, nothing is saved for it yet).
           if (j === i + 1 && set.side === "links" && isPairedRight(rows, j) && !s.confirmed && !s.weight.trim()) {

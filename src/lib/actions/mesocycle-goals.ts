@@ -70,8 +70,9 @@ export async function updateMesocycleGoalTextAction(goalId: string, text: string
   const trimmed = text.trim();
   if (!trimmed) return { error: "Bitte ein Ziel eingeben." };
 
-  const { error } = await supabase.from("mesocycle_goals").update({ text: trimmed }).eq("id", goalId);
+  const { data, error } = await supabase.from("mesocycle_goals").update({ text: trimmed }).eq("id", goalId).select("id");
   if (error) return { error: "Ziel konnte nicht gespeichert werden." };
+  if (!data || data.length === 0) return { error: "Keine Berechtigung, dieses Ziel zu ändern." };
 
   revalidatePath("/trainer/athletes");
   revalidatePath("/athlete/mesocycles");
@@ -85,8 +86,9 @@ export async function deleteMesocycleGoalAction(goalId: string): Promise<ActionR
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
-  const { error } = await supabase.from("mesocycle_goals").delete().eq("id", goalId);
+  const { data, error } = await supabase.from("mesocycle_goals").delete().eq("id", goalId).select("id");
   if (error) return { error: "Ziel konnte nicht gelöscht werden." };
+  if (!data || data.length === 0) return { error: "Keine Berechtigung, dieses Ziel zu löschen." };
 
   revalidatePath("/trainer/athletes");
   revalidatePath("/athlete/mesocycles");
@@ -102,11 +104,13 @@ export async function toggleMesocycleGoalAction(goalId: string, achieved: boolea
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("mesocycle_goals")
     .update({ achieved_at: achieved ? new Date().toISOString() : null })
-    .eq("id", goalId);
+    .eq("id", goalId)
+    .select("id");
   if (error) return { error: "Ziel konnte nicht aktualisiert werden." };
+  if (!data || data.length === 0) return { error: "Keine Berechtigung, dieses Ziel zu ändern." };
 
   revalidatePath("/athlete/mesocycles");
   revalidatePath("/athlete");

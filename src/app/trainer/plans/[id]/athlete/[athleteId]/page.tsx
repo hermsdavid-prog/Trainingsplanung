@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDateLabel } from "@/lib/date";
 import { signCardioScreenshots } from "@/lib/cardio-screenshots";
 import { SIDE_LABEL, countSets, isPairedRight, type Side } from "@/lib/per-side";
+import { occurrenceOfSet } from "@/lib/set-numbers";
 
 const SET_TYPE_LABEL: Record<string, string> = {
   aufwaermsatz: "Aufwärmsatz",
@@ -77,7 +78,7 @@ export default async function TrainerAthletePlanPage({
         .from("exercise_results")
         .select("exercise_id, set_number, value, reps, unit, set_type, side")
         .eq("athlete_id", athleteId)
-        .eq("date", plan.date)
+        // By plan only: sets stay visible after the training was moved.
         .eq("training_plan_id", id)
         .in("exercise_id", exerciseIds)
         .order("set_number")
@@ -100,8 +101,21 @@ export default async function TrainerAthletePlanPage({
     resultsByExercise.set(r.exercise_id, list);
   }
 
+  // Same exercise twice in the plan: each occurrence has its own block of
+  // set numbers (lib/set-numbers).
+  const occurrences = new Map<string, number>();
+  for (const item of kraftItems) {
+    if (item.exercise_id) occurrences.set(item.exercise_id, (occurrences.get(item.exercise_id) ?? 0) + 1);
+  }
+  const seen = new Map<string, number>();
   const exercises = kraftItems.map((item) => {
-    const sets = item.exercise_id ? (resultsByExercise.get(item.exercise_id) ?? []) : [];
+    const k = item.exercise_id ? (seen.get(item.exercise_id) ?? 0) : 0;
+    if (item.exercise_id) seen.set(item.exercise_id, k + 1);
+    const sets = item.exercise_id
+      ? (resultsByExercise.get(item.exercise_id) ?? []).filter(
+          (r) => occurrenceOfSet(r.setNumber, occurrences.get(item.exercise_id as string) ?? 1) === k
+        ).sort((a, b) => Number(a.type === "arbeitssatz") - Number(b.type === "arbeitssatz") || a.setNumber - b.setNumber)
+      : [];
     const planned = Number(item.sets) || 1;
     return { ...item, sets, planned };
   });

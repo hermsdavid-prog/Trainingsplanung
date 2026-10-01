@@ -4,6 +4,7 @@ import { formatDateLabel } from "@/lib/date";
 import { signCardioScreenshots } from "@/lib/cardio-screenshots";
 import { exerciseNoteKey } from "@/lib/exercise-note-key";
 import { isPerSide, type Side } from "@/lib/per-side";
+import { occurrenceOfSet, setNumberBase } from "@/lib/set-numbers";
 import type { SessionExercise, SessionCardio, SessionKarateRow } from "@/components/athlete/workout-session";
 
 // Everything the live, tap-to-log session (WorkoutSession) needs for one
@@ -55,9 +56,10 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     exerciseIds.length
       ? supabase
           .from("exercise_results")
-          .select("exercise_id, set_number, value, reps, unit, set_type, rir, side")
+          .select("exercise_id, date, set_number, value, reps, unit, set_type, rir, side")
           .eq("athlete_id", userId)
-          .eq("date", plan.date)
+          // By plan only, not by date: after a trainer moved the training
+          // to another day, the sets logged before must still show up.
           .eq("training_plan_id", planId)
           .in("exercise_id", exerciseIds)
           .order("set_number")
@@ -105,7 +107,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
 
   const resultsByExercise = new Map<
     string,
-    { setNumber: number; type: "aufwaermsatz" | "arbeitssatz"; reps: string; weight: string; rir: string; side: Side | null }[]
+    { setNumber: number; type: "aufwaermsatz" | "arbeitssatz"; reps: string; weight: string; rir: string; side: Side | null; date: string }[]
   >();
   for (const r of existingResults ?? []) {
     const list = resultsByExercise.get(r.exercise_id) ?? [];
@@ -116,6 +118,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
       weight: String(r.value),
       rir: r.rir != null ? String(r.rir) : "",
       side: r.side === "links" || r.side === "rechts" ? r.side : null,
+      date: r.date,
     });
     resultsByExercise.set(r.exercise_id, list);
   }
@@ -155,6 +158,27 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     return { noteKey, selfNote: selfNoteByKey.get(noteKey) ?? null, coachNote: coachNoteByItem.get(itemId) ?? "" };
   };
 
+  // The same exercise more than once in the plan: each occurrence has its
+  // own block of set numbers (see lib/set-numbers).
+  const occurrenceCount = new Map<string, number>();
+  for (const item of kraftItems) {
+    if (item.exercise_id) occurrenceCount.set(item.exercise_id, (occurrenceCount.get(item.exercise_id) ?? 0) + 1);
+  }
+  const occurrenceSeen = new Map<string, number>();
+  const occurrenceOfItem = new Map<string, number>();
+  for (const item of kraftItems) {
+    if (!item.exercise_id) continue;
+    const k = occurrenceSeen.get(item.exercise_id) ?? 0;
+    occurrenceSeen.set(item.exercise_id, k + 1);
+    occurrenceOfItem.set(item.id, k);
+  }
+  const setsForItem = (item: { id: string; exercise_id: string | null }) => {
+    if (!item.exercise_id) return [];
+    const k = occurrenceOfItem.get(item.id) ?? 0;
+    const total = occurrenceCount.get(item.exercise_id) ?? 1;
+    return (resultsByExercise.get(item.exercise_id) ?? []).filter((r) => occurrenceOfSet(r.setNumber, total) === k);
+  };
+
   const exercises: SessionExercise[] = kraftItems.map((item) => ({
     itemId: item.id,
     exerciseId: item.exercise_id,
@@ -166,7 +190,8 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     note: item.notes ?? "",
     perSide: isPerSide(item.reps_or_duration),
     unit: (item.exercise_id ? exerciseUnitByExercise.get(item.exercise_id) : undefined) || "kg",
-    initialSets: (item.exercise_id ? resultsByExercise.get(item.exercise_id) : undefined) ?? [],
+    initialSets: setsForItem(item),
+    setNumberBase: setNumberBase(occurrenceOfItem.get(item.id) ?? 0),
     ...noteFields(item.id),
   }));
 
