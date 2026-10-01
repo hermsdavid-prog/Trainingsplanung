@@ -105,6 +105,11 @@ function parseLeadingNumber(label: string): string {
   return m ? m[0].replace(",", ".") : "";
 }
 
+// Only ever called from event handlers and timers, never during render.
+function currentTimeMs(): number {
+  return Date.now();
+}
+
 function formatMMSS(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
@@ -381,25 +386,38 @@ export function WorkoutSession({
     toast.success(`${newExercise.name} hinzugefügt.`);
   }
 
-  const [restRemaining, setRestRemaining] = useState<number>(0);
+  // The rest timer counts down to an end timestamp rather than ticking a
+  // counter, so it stays right when the phone was locked or the tab slept,
+  // and it vibrates (where supported) when the rest is over.
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  const [now, setNow] = useState(0);
+  const restRemaining = restEndsAt ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  function startRest(seconds: number) {
+    const t = currentTimeMs();
+    setNow(t);
+    setRestEndsAt(t + seconds * 1000);
+  }
+
   useEffect(() => {
-    if (restRemaining <= 0) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      return;
-    }
+    if (!restEndsAt) return;
     timerRef.current = setInterval(() => {
-      setRestRemaining((r) => Math.max(0, r - 1));
-    }, 1000);
+      const t = currentTimeMs();
+      setNow(t);
+      if (t >= restEndsAt) {
+        setRestEndsAt(null);
+        try {
+          navigator.vibrate?.([200, 100, 200]);
+        } catch {
+          // not supported
+        }
+      }
+    }, 500);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restRemaining > 0]);
+  }, [restEndsAt]);
 
   const [pad, setPad] = useState<{
     itemId: string;
@@ -493,6 +511,8 @@ export function WorkoutSession({
   // Removes the whole set — for a "je Seite" exercise both sides at once.
   async function removeSet(ex: SessionExercise, set: SessionSet) {
     const members = setMembers(setsByItem[ex.itemId] ?? [], set);
+    // A saved set is gone for good — ask first (the ✕ sits right next to ✓).
+    if (members.some((m) => m.confirmed) && !window.confirm("Diesen gespeicherten Satz löschen?")) return;
     for (const m of members) {
       if (!m.confirmed) continue;
       if (!ex.exerciseId) return;
@@ -511,14 +531,16 @@ export function WorkoutSession({
     }));
   }
 
-  async function confirmSet(ex: SessionExercise, set: SessionSet) {
+  async function confirmSet(ex: SessionExercise, set: SessionSet, opts: { askRir?: boolean } = {}) {
     if (!ex.exerciseId) {
       toast.error("Diese Übung ist nicht in der Übungsbibliothek verknüpft.");
       return;
     }
-    const weight = Number(set.weight.replace(",", "."));
-    if (!set.weight.trim() || Number.isNaN(weight)) {
-      toast.error("Bitte ein Gewicht eintragen.");
+    // Bodyweight exercises (Liegestütz, Klimmzug): reps alone are enough,
+    // saved as 0 kg.
+    const weight = set.weight.trim() ? Number(set.weight.replace(",", ".")) : 0;
+    if ((!set.weight.trim() && !set.reps.trim()) || Number.isNaN(weight)) {
+      toast.error("Bitte Gewicht oder Wiederholungen eintragen.");
       return;
     }
     const reps = set.reps.trim() ? Number(set.reps.replace(",", ".")) : null;
@@ -553,12 +575,23 @@ export function WorkoutSession({
           if (j === i + 1 && set.side === "links" && isPairedRight(rows, j) && !s.confirmed && !s.weight.trim()) {
             return { ...s, weight: set.weight, reps: set.reps.trim() ? set.reps : s.reps };
           }
+          // Following sets of the same kind (and side) start with this load
+          // as a suggestion, so an unchanged weight is one tap on ✓.
+          if (j > i && !s.confirmed && !s.weight.trim() && s.type === set.type && s.side === set.side && set.weight.trim()) {
+            return { ...s, weight: set.weight };
+          }
           return s;
         }),
       };
     });
     if (ex.restSeconds > 0 && set.side !== "links") {
-      setRestRemaining(ex.restSeconds);
+      startRest(ex.restSeconds);
+    }
+    // Ask for RIR right after a work set is logged instead of relying on
+    // the athlete to find the small RIR cell (for "je Seite" once, after
+    // the right side).
+    if (opts.askRir && set.type === "arbeitssatz" && !set.rir.trim() && set.side !== "links") {
+      setRirPad({ itemId: ex.itemId, setKey: set.key });
     }
     notifyNewBadges(result.newBadges);
   }
@@ -610,7 +643,7 @@ export function WorkoutSession({
     const updated = { ...current, [field]: buffer };
     if (updated.weight.trim()) {
       const ex = exercises.find((e) => e.itemId === itemId);
-      if (ex) confirmSet(ex, updated);
+      if (ex) confirmSet(ex, updated, { askRir: !current.confirmed });
     }
   }
 
@@ -699,14 +732,17 @@ export function WorkoutSession({
             )}
 
             {restRemaining > 0 && (
+              // Sticks to the top while scrolling to the next exercise.
               <div
                 className="mt-3.5 flex items-center justify-between px-3.5 py-2.5"
-                style={{ background: "var(--dc-accent-100)" }}
+                style={{ background: "var(--dc-accent-100)", position: "sticky", top: 0, zIndex: 20, boxShadow: "var(--dc-shadow-md)" }}
+                role="timer"
+                aria-live="off"
               >
                 <span className="text-sm">
                   Pause · <strong>{formatMMSS(restRemaining)}</strong>
                 </span>
-                <button type="button" className="btn btn-ghost" onClick={() => setRestRemaining(0)}>
+                <button type="button" className="btn btn-ghost" onClick={() => setRestEndsAt(null)}>
                   Überspringen
                 </button>
               </div>
@@ -862,7 +898,7 @@ export function WorkoutSession({
                                 )}
                                 <button
                                   type="button"
-                                  onClick={() => confirmSet(ex, s)}
+                                  onClick={() => confirmSet(ex, s, { askRir: !s.confirmed })}
                                   disabled={pending}
                                   aria-label="Satz übernehmen"
                                   className="flex h-10 w-10 items-center justify-center rounded-sm text-[17px]"

@@ -24,7 +24,7 @@ export default async function TrainerDashboardPage() {
 
   const supabase = await createClient();
 
-  const [{ data: groupAthleteRows }, { data: todaysPlans }, { data: proposedRows }] = await Promise.all([
+  const [{ data: groupAthleteRows }, { data: todaysPlans }, { data: proposedRows }, { data: consentRows }] = await Promise.all([
     supabase.from("group_athletes").select("group_id, athlete_id, profiles(full_name)"),
     supabase
       .from("training_plans")
@@ -36,6 +36,7 @@ export default async function TrainerDashboardPage() {
       .select("id, title, description, start_at, groups(name), profiles!events_athlete_id_fkey(full_name)")
       .eq("status", "proposed")
       .order("start_at"),
+    supabase.from("athlete_consents").select("athlete_id").eq("health_consent", true),
   ]);
 
   const proposedEvents: ProposedEvent[] = (proposedRows ?? []).map((e) => ({
@@ -126,6 +127,14 @@ export default async function TrainerDashboardPage() {
       }${todayLog!.resting_hr != null ? ` · Ruhe-HF ${todayLog!.resting_hr}` : ""}`,
     }));
 
+  // Who could check in (consented to health data) but hasn't yet today —
+  // before training that's exactly the list a trainer wants.
+  const consented = new Set((consentRows ?? []).map((c) => c.athlete_id));
+  const notCheckedIn = rows
+    .filter((r) => !r.todayLog && consented.has(r.athlete.id))
+    .map((r) => r.athlete.full_name)
+    .sort((a, b) => a.localeCompare(b, "de"));
+
   return (
     <div>
       <div className="kicker">{formatDateLabel(today)}</div>
@@ -194,7 +203,7 @@ export default async function TrainerDashboardPage() {
         </div>
       )}
 
-      <ReadinessPanel rows={readinessRows} />
+      <ReadinessPanel rows={readinessRows} notCheckedIn={notCheckedIn} />
     </div>
   );
 }

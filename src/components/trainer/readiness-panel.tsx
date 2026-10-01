@@ -17,7 +17,7 @@ export type ReadinessRow = {
 // grows — one row per athlete otherwise pushes everything else below the
 // fold. Expanded by default only when something needs attention (a red
 // reading); the header summary line already surfaces that count either way.
-export function ReadinessPanel({ rows }: { rows: ReadinessRow[] }) {
+export function ReadinessPanel({ rows, notCheckedIn = [] }: { rows: ReadinessRow[]; notCheckedIn?: string[] }) {
   const redCount = rows.filter((r) => r.level === "red").length;
   // Open straight away when it fits on screen anyway (small groups) or when
   // something needs attention; only a long roster starts collapsed.
@@ -70,6 +70,13 @@ export function ReadinessPanel({ rows }: { rows: ReadinessRow[] }) {
             </table>
           </div>
         ))}
+
+      {open && notCheckedIn.length > 0 && (
+        <p className="mt-3 text-[13px] leading-[1.5]" style={{ color: "var(--dc-muted)" }}>
+          <strong style={{ color: "var(--dc-text)" }}>Noch nicht eingecheckt ({notCheckedIn.length}):</strong>{" "}
+          {notCheckedIn.join(", ")}
+        </p>
+      )}
     </div>
   );
 }
