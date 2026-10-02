@@ -201,7 +201,7 @@ export function TrainerShell({
               aria-label="Menü schließen"
               onClick={() => setNavOpen(false)}
               className="flex-1 cursor-default border-0"
-              style={{ background: "color-mix(in srgb, var(--dc-neutral-900) 45%, transparent)" }}
+              style={{ background: "rgb(0 0 0 / 45%)" }}
             />
           </div>
         )}

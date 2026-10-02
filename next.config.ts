@@ -32,8 +32,10 @@ const csp = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
+  // In dev a local Supabase runs on plain http.
+  isDev ? "" : "upgrade-insecure-requests",
 ]
+  .filter(Boolean)
   .map((d) => d.trim())
   .join("; ");
 

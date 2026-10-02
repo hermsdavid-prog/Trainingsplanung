@@ -73,26 +73,38 @@ export async function deleteAthleteNoteAction(noteId: string): Promise<ActionRes
 }
 
 // "Erledigt" on an athlete's hint to the trainer (Trainer-Übersicht). With a
-// reply, the reply goes to the athlete as a normal trainer note first.
+// reply, the reply goes to the athlete as a normal trainer note first. The
+// recipient is taken from the hint itself, not from the client.
 export async function handleAthleteHintAction(
   feedbackId: string,
-  athleteId: string,
   reply?: string
-): Promise<ActionResult> {
+): Promise<ActionResult & { replySent?: boolean }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
+  const { data: feedback } = await supabase
+    .from("athlete_feedback")
+    .select("athlete_id")
+    .eq("id", feedbackId)
+    .maybeSingle();
+  if (!feedback) return { error: "Hinweis nicht gefunden." };
+
   const message = reply?.trim();
   if (message) {
-    const sent = await sendAthleteNoteAction(athleteId, message);
+    const sent = await sendAthleteNoteAction(feedback.athlete_id, message);
     if (sent.error) return sent;
   }
 
   const { data, error } = await supabase.rpc("mark_feedback_note_handled", { p_feedback_id: feedbackId });
-  if (error || data !== true) return { error: "Hinweis konnte nicht als erledigt markiert werden." };
+  if (error || data !== true) {
+    // Don't let a retry send the same reply twice.
+    return message
+      ? { error: "Antwort gesendet, aber nicht als erledigt markiert. Bitte „Erledigt“ erneut tippen.", replySent: true }
+      : { error: "Hinweis konnte nicht als erledigt markiert werden." };
+  }
 
   revalidatePath("/trainer");
   return {};

@@ -1285,7 +1285,7 @@ export function PlanTableEditor({
           bottom: "var(--sticky-bottom-offset, 0px)",
           background: "var(--dc-surface)",
           borderTop: "1px solid var(--dc-divider)",
-          boxShadow: "0 -2px 12px color-mix(in srgb, #2d2b2b 8%, transparent)",
+          boxShadow: "0 -2px 12px rgb(0 0 0 / 10%)",
         }}
       >
         <button type="button" className="btn btn-primary" onClick={handleAssign} disabled={isPending}>

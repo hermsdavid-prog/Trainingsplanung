@@ -31,7 +31,11 @@ export function AthleteHints({ hints }: { hints: AthleteHint[] }) {
 
   function handle(h: AthleteHint, withReply: boolean) {
     startTransition(async () => {
-      const result = await handleAthleteHintAction(h.feedbackId, h.athleteId, withReply ? reply : undefined);
+      const result = await handleAthleteHintAction(h.feedbackId, withReply ? reply : undefined);
+      if (result.replySent) {
+        setReplyFor(null);
+        setReply("");
+      }
       if (result.error) {
         toast.error(result.error);
         return;
@@ -82,7 +86,7 @@ export function AthleteHints({ hints }: { hints: AthleteHint[] }) {
                   >
                     Senden und erledigt
                   </button>
-                  <button type="button" className="btn btn-ghost" onClick={() => setReplyFor(null)}>
+                  <button type="button" className="btn btn-ghost" disabled={isPending} onClick={() => setReplyFor(null)}>
                     Abbrechen
                   </button>
                 </div>
@@ -92,6 +96,7 @@ export function AthleteHints({ hints }: { hints: AthleteHint[] }) {
                 <button
                   type="button"
                   className="btn btn-secondary"
+                  disabled={isPending}
                   onClick={() => {
                     setReplyFor(h.feedbackId);
                     setReply("");
