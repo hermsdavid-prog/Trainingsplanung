@@ -12,7 +12,7 @@ import {
 // Read-only counterpart to the plan editor — a clean, glanceable view of
 // what's in a training (same card layout the athlete's live session uses),
 // with no editing and no set/RPE entry. Reachable from the editor via
-// "Workout-Ansicht", and back via "Bearbeiten" here.
+// "Trainingsansicht", and back via "Bearbeiten" here.
 export default async function TrainerPlanWorkoutPage({
   params,
 }: {

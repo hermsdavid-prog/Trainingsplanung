@@ -102,7 +102,7 @@ export function TrendChart({
               fill="var(--dc-accent-100)"
               dot={{ r: 2, fill: "var(--dc-accent)", strokeWidth: 0 }}
               connectNulls
-              activeDot={{ r: 5, stroke: "#fff", strokeWidth: 2, fill: "var(--dc-accent)" }}
+              activeDot={{ r: 5, stroke: "var(--dc-surface)", strokeWidth: 2, fill: "var(--dc-accent)" }}
             />
           </AreaChart>
         </ResponsiveContainer>

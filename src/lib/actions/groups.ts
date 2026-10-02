@@ -20,7 +20,7 @@ async function requireTrainerOrAdmin() {
     .single();
 
   if (profile?.role !== "admin" && profile?.role !== "trainer") {
-    throw new Error("Keine Berechtigung.");
+    return { error: "Keine Berechtigung." } as const;
   }
 
   return { supabase, userId: user.id, role: profile.role };
@@ -36,7 +36,9 @@ async function requireTrainerOrAdmin() {
 // have a head trainer yet (e.g. created before this feature, or nobody has
 // been promoted) fall back to the old behaviour so nobody gets locked out.
 async function requireGroupManageAccess(groupId: string, options?: { requireHead?: boolean }) {
-  const { supabase, userId, role } = await requireTrainerOrAdmin();
+  const access = await requireTrainerOrAdmin();
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId, role } = access;
 
   if (role === "admin") return { supabase, userId, role };
 
@@ -45,7 +47,7 @@ async function requireGroupManageAccess(groupId: string, options?: { requireHead
     .select("id, created_by")
     .eq("id", groupId)
     .maybeSingle();
-  if (!group) throw new Error("Gruppe nicht gefunden.");
+  if (!group) return { error: "Gruppe nicht gefunden." } as const;
 
   const { data: link } = await supabase
     .from("group_trainers")
@@ -55,7 +57,7 @@ async function requireGroupManageAccess(groupId: string, options?: { requireHead
     .maybeSingle();
 
   const isAssigned = !!link || group.created_by === userId;
-  if (!isAssigned) throw new Error("Du verwaltest diese Gruppe nicht.");
+  if (!isAssigned) return { error: "Du verwaltest diese Gruppe nicht." } as const;
 
   if (options?.requireHead) {
     const { data: headRow } = await supabase
@@ -66,7 +68,7 @@ async function requireGroupManageAccess(groupId: string, options?: { requireHead
       .maybeSingle();
 
     if (headRow && !link?.is_head) {
-      throw new Error("Nur der Haupttrainer darf Gruppe und Team ändern.");
+      return { error: "Nur der Haupttrainer darf Gruppe und Team ändern." } as const;
     }
   }
 
@@ -77,7 +79,9 @@ export async function createGroupAction(
   _prevState: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const { supabase, userId, role } = await requireTrainerOrAdmin();
+  const access = await requireTrainerOrAdmin();
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId, role } = access;
 
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -131,7 +135,11 @@ export async function updateGroupAction(
     return { error: "Bitte einen Namen für die Gruppe angeben." };
   }
 
-  const { supabase } = await requireGroupManageAccess(groupId, { requireHead: true });
+  const access = await requireGroupManageAccess(groupId, { requireHead: true });
+
+  if ("error" in access) return { error: access.error };
+
+  const { supabase } = access;
 
   const { error } = await supabase
     .from("groups")
@@ -148,7 +156,9 @@ export async function updateGroupAction(
 }
 
 export async function deleteGroupAction(groupId: string): Promise<ActionResult> {
-  const { supabase, role } = await requireTrainerOrAdmin();
+  const access = await requireTrainerOrAdmin();
+  if ("error" in access) return { error: access.error };
+  const { supabase, role } = access;
   if (role !== "admin") {
     return { error: "Nur Admins dürfen Gruppen löschen." };
   }
@@ -168,7 +178,9 @@ export async function setGroupTrainerAction(
   trainerId: string,
   assign: boolean
 ): Promise<ActionResult> {
-  const { supabase } = await requireGroupManageAccess(groupId, { requireHead: true });
+  const access = await requireGroupManageAccess(groupId, { requireHead: true });
+  if ("error" in access) return { error: access.error };
+  const { supabase } = access;
 
   const { error } = assign
     ? await supabase.from("group_trainers").insert({ group_id: groupId, trainer_id: trainerId })
@@ -190,7 +202,9 @@ export async function setGroupAthleteAction(
   athleteId: string,
   assign: boolean
 ): Promise<ActionResult> {
-  const { supabase } = await requireGroupManageAccess(groupId);
+  const access = await requireGroupManageAccess(groupId);
+  if ("error" in access) return { error: access.error };
+  const { supabase } = access;
 
   const { error } = assign
     ? await supabase.from("group_athletes").insert({ group_id: groupId, athlete_id: athleteId })
@@ -221,7 +235,9 @@ export async function promoteHeadTrainerAction(
   groupId: string,
   trainerId: string
 ): Promise<ActionResult> {
-  const { supabase } = await requireGroupManageAccess(groupId, { requireHead: true });
+  const access = await requireGroupManageAccess(groupId, { requireHead: true });
+  if ("error" in access) return { error: access.error };
+  const { supabase } = access;
 
   // Only a trainer of this group can become its head — otherwise the old
   // head would be cleared and the group left without one.

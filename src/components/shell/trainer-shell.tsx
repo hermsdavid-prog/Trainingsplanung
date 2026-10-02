@@ -71,7 +71,7 @@ function NavLinks({
             aria-current={active ? "page" : undefined}
             style={{
               background: active ? "var(--dc-accent)" : undefined,
-              color: active ? "#fff" : "var(--dc-text)",
+              color: active ? "var(--dc-on-accent)" : "var(--dc-text)",
               fontWeight: active ? 600 : 400,
             }}
           >

@@ -49,7 +49,7 @@ export default async function TrainerOwnTrainingPage({
       </p>
 
       <div className="mt-7 max-w-[720px]">
-        <div className="kicker-muted">Meine Einheiten</div>
+        <div className="kicker-muted">Meine Trainings</div>
         {(plans ?? []).length === 0 ? (
           <p className="mt-2 text-sm text-muted">
             Noch nichts eingetragen. Öffne ein Training und tippe auf „Selbst trainieren“.

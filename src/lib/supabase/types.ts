@@ -147,6 +147,7 @@ export type Database = {
           done: boolean
           id: string
           note: string | null
+          note_handled_at: string | null
           screenshot_path: string | null
           screenshot_uploaded_at: string | null
           training_plan_item_id: string
@@ -158,6 +159,7 @@ export type Database = {
           done?: boolean
           id?: string
           note?: string | null
+          note_handled_at?: string | null
           screenshot_path?: string | null
           screenshot_uploaded_at?: string | null
           training_plan_item_id: string
@@ -169,6 +171,7 @@ export type Database = {
           done?: boolean
           id?: string
           note?: string | null
+          note_handled_at?: string | null
           screenshot_path?: string | null
           screenshot_uploaded_at?: string | null
           training_plan_item_id?: string
@@ -1130,6 +1133,10 @@ export type Database = {
       expired_cardio_screenshots: {
         Args: { max_age: string }
         Returns: string[]
+      }
+      mark_feedback_note_handled: {
+        Args: { p_feedback_id: string }
+        Returns: boolean
       }
       login_record: {
         Args: { p_keys: string[]; p_success: boolean }

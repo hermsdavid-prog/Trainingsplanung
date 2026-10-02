@@ -17,7 +17,7 @@ async function requireScopeAccess(
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (profile?.role !== "admin" && profile?.role !== "trainer") throw new Error("Keine Berechtigung.");
+  if (profile?.role !== "admin" && profile?.role !== "trainer") return { error: "Keine Berechtigung." } as const;
 
   if (profile.role === "admin") return { supabase, userId: user.id };
 
@@ -39,7 +39,7 @@ async function requireScopeAccess(
     }
   }
 
-  if (!canAccess) throw new Error("Keine Berechtigung für diese Gruppe/diesen Athleten.");
+  if (!canAccess) return { error: "Keine Berechtigung für diese Gruppe/diesen Athleten." } as const;
   return { supabase, userId: user.id };
 }
 
@@ -66,12 +66,9 @@ export async function createMesocycleAction(input: {
   if (scopeType === "group" && !groupId) return { error: "Bitte eine Gruppe wählen." };
   if (scopeType === "athlete" && !athleteId) return { error: "Bitte einen Athleten wählen." };
 
-  let supabase, userId;
-  try {
-    ({ supabase, userId } = await requireScopeAccess(scopeType, groupId, athleteId));
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Keine Berechtigung." };
-  }
+  const access = await requireScopeAccess(scopeType, groupId, athleteId);
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId } = access;
 
   const { error } = await supabase.from("training_mesocycles").insert({
     title,

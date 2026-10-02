@@ -4,10 +4,12 @@ import { createHash } from "crypto";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Brute-force protection for password checks: failures are counted per
 // e-mail (hashed, never stored in clear) and per client IP in the database
-// (login_wait_seconds / login_record). If that bookkeeping itself fails the
+// (login_wait_seconds / login_record — callable by the server's service role
+// only, not through the public API). If that bookkeeping itself fails the
 // login still works — it must never lock everyone out.
 async function attemptKeys(email: string): Promise<string[]> {
   const keys = [`email:${createHash("sha256").update(email.trim().toLowerCase()).digest("hex")}`];
@@ -17,9 +19,33 @@ async function attemptKeys(email: string): Promise<string[]> {
   return keys;
 }
 
-async function waitSeconds(supabase: Awaited<ReturnType<typeof createClient>>, keys: string[]): Promise<number> {
-  const { data, error } = await supabase.rpc("login_wait_seconds", { p_keys: keys });
-  return error || typeof data !== "number" ? 0 : data;
+function attemptsClient() {
+  try {
+    return createAdminClient();
+  } catch {
+    return null; // service role key missing — run without the limit
+  }
+}
+
+async function waitSeconds(keys: string[]): Promise<number> {
+  const admin = attemptsClient();
+  if (!admin) return 0;
+  try {
+    const { data, error } = await admin.rpc("login_wait_seconds", { p_keys: keys });
+    return error || typeof data !== "number" ? 0 : data;
+  } catch {
+    return 0;
+  }
+}
+
+async function recordAttempt(keys: string[], success: boolean) {
+  const admin = attemptsClient();
+  if (!admin) return;
+  try {
+    await admin.rpc("login_record", { p_keys: keys, p_success: success });
+  } catch {
+    // bookkeeping only
+  }
 }
 
 function tooManyAttempts(seconds: number): string {
@@ -43,11 +69,11 @@ export async function loginAction(
 
   const supabase = await createClient();
   const keys = await attemptKeys(email);
-  const wait = await waitSeconds(supabase, keys);
+  const wait = await waitSeconds(keys);
   if (wait > 0) return { error: tooManyAttempts(wait), email };
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  await supabase.rpc("login_record", { p_keys: keys, p_success: !error });
+  await recordAttempt(keys, !error);
 
   if (error) {
     // React resets uncontrolled form fields after every action dispatch, so
@@ -138,14 +164,14 @@ export async function updatePasswordAction(
   }
 
   const keys = await attemptKeys(user.email);
-  const wait = await waitSeconds(supabase, keys);
+  const wait = await waitSeconds(keys);
   if (wait > 0) return { error: tooManyAttempts(wait) };
 
   const { error: verifyError } = await supabase.auth.signInWithPassword({
     email: user.email,
     password: currentPassword,
   });
-  await supabase.rpc("login_record", { p_keys: keys, p_success: !verifyError });
+  await recordAttempt(keys, !verifyError);
   if (verifyError) {
     return { error: "Aktuelles Passwort ist falsch." };
   }

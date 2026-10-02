@@ -8,7 +8,7 @@ const TABS = [
   { href: "/athlete", label: "Heute", Icon: House, match: (p: string) => p === "/athlete" || p.startsWith("/athlete/plans/") && !p.startsWith("/athlete/plans/new") },
   { href: "/athlete/calendar", label: "Kalender", Icon: CalendarDays, match: (p: string) => p.startsWith("/athlete/calendar") },
   { href: "/athlete/athletik", label: "Athletik", Icon: Dumbbell, match: (p: string) => p.startsWith("/athlete/athletik") },
-  { href: "/athlete/mesocycles", label: "Zyklen", Icon: Layers, match: (p: string) => p.startsWith("/athlete/mesocycles") },
+  { href: "/athlete/mesocycles", label: "Mesozyklen", Icon: Layers, match: (p: string) => p.startsWith("/athlete/mesocycles") },
   { href: "/athlete/plans/new", label: "Erstellen", Icon: CirclePlus, match: (p: string) => p.startsWith("/athlete/plans/new") },
 ];
 
@@ -65,7 +65,13 @@ export function AthleteShell({
         </nav>
       </header>
 
-      <main className="flex-1 px-4 pt-4 pb-28 sm:px-6">{children}</main>
+      <main
+        className="flex-1 px-4 pt-4 pb-28 sm:px-6"
+        // Sticky bottom bars inside pages sit above the fixed tab bar.
+        style={{ ["--sticky-bottom-offset" as string]: "calc(50px + max(env(safe-area-inset-bottom), 10px))" }}
+      >
+        {children}
+      </main>
 
       <nav
         className="fixed inset-x-0 bottom-0 z-30 mx-auto flex w-full max-w-[560px]"

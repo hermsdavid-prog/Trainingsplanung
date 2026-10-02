@@ -259,6 +259,34 @@ export function PlanTableEditor({
       return next;
     });
   }
+  // Touch-friendly alternative to dragging (HTML5 drag doesn't work on
+  // phones): move a row one place up/down within its own section.
+  function sectionNeighbour(index: number, dir: -1 | 1): number | null {
+    const section = rows[index]?.section;
+    for (let j = index + dir; j >= 0 && j < rows.length; j += dir) {
+      if (rows[j].section === section) return j;
+    }
+    return null;
+  }
+  function moveBy(index: number, dir: -1 | 1) {
+    const j = sectionNeighbour(index, dir);
+    if (j !== null) moveRow(index, j);
+  }
+  function sortButtons(index: number) {
+    const up = sectionNeighbour(index, -1);
+    const down = sectionNeighbour(index, 1);
+    const style = { width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--dc-accent-700)" } as const;
+    return (
+      <span className="inline-flex items-center">
+        <button type="button" aria-label="Nach oben" disabled={up === null} onClick={() => moveBy(index, -1)} style={{ ...style, opacity: up === null ? 0.3 : 1 }}>
+          ▲
+        </button>
+        <button type="button" aria-label="Nach unten" disabled={down === null} onClick={() => moveBy(index, 1)} style={{ ...style, opacity: down === null ? 0.3 : 1 }}>
+          ▼
+        </button>
+      </span>
+    );
+  }
   function dragHandleProps(index: number) {
     return {
       draggable: true,
@@ -276,6 +304,13 @@ export function PlanTableEditor({
       },
     };
   }
+
+  // The button says when a save also rewrites the following weeks of the
+  // series, so nobody changes them without noticing.
+  const saveLabel =
+    followingCount > 0 && applyToFollowing
+      ? `Speichern + ${followingCount} ${followingCount === 1 ? "folgender Termin" : "folgende Termine"}`
+      : "Plan speichern";
 
   // Single "Plan speichern" action for the whole editor — saves the
   // rahmendaten (title/date/time) and the exercise rows together instead of
@@ -499,7 +534,7 @@ export function PlanTableEditor({
               </button>
             )}
             <button type="button" className="btn btn-primary" onClick={handleAssign} disabled={isPending}>
-              {isPending ? "Wird gespeichert…" : "Plan speichern"}
+              {isPending ? "Wird gespeichert…" : saveLabel}
             </button>
           </div>
         </div>
@@ -602,7 +637,7 @@ export function PlanTableEditor({
                       style={{
                         border: `1px solid ${effectiveWeekday === i ? "var(--dc-accent)" : "var(--dc-divider)"}`,
                         background: effectiveWeekday === i ? "var(--dc-accent)" : "var(--dc-surface)",
-                        color: effectiveWeekday === i ? "#fff" : "var(--dc-text)",
+                        color: effectiveWeekday === i ? "var(--dc-on-accent)" : "var(--dc-text)",
                         fontWeight: effectiveWeekday === i ? 600 : 400,
                       }}
                     >
@@ -687,8 +722,11 @@ export function PlanTableEditor({
                 {kraftRows.map(({ row, index }) => (
                   <tr key={index} {...dropTargetProps(index)} style={{ opacity: dragIndex === index ? 0.4 : 1 }}>
                     <td>
-                      <span {...dragHandleProps(index)} aria-label="Zum Sortieren ziehen" style={{ cursor: "grab", display: "inline-flex", color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}>
-                        <GripVerticalIcon size={16} />
+                      <span className="inline-flex items-center gap-0.5">
+                        <span {...dragHandleProps(index)} aria-label="Zum Sortieren ziehen" style={{ cursor: "grab", display: "inline-flex", color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}>
+                          <GripVerticalIcon size={16} />
+                        </span>
+                        {sortButtons(index)}
                       </span>
                     </td>
                     <td>
@@ -811,8 +849,11 @@ export function PlanTableEditor({
                 {cardioRows.map(({ row, index }) => (
                   <tr key={index} {...dropTargetProps(index)} style={{ opacity: dragIndex === index ? 0.4 : 1 }}>
                     <td>
-                      <span {...dragHandleProps(index)} aria-label="Zum Sortieren ziehen" style={{ cursor: "grab", display: "inline-flex", color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}>
-                        <GripVerticalIcon size={16} />
+                      <span className="inline-flex items-center gap-0.5">
+                        <span {...dragHandleProps(index)} aria-label="Zum Sortieren ziehen" style={{ cursor: "grab", display: "inline-flex", color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}>
+                          <GripVerticalIcon size={16} />
+                        </span>
+                        {sortButtons(index)}
                       </span>
                     </td>
                     <td>
@@ -943,8 +984,11 @@ export function PlanTableEditor({
                 {sprungRows.map(({ row, index }) => (
                   <tr key={index} {...dropTargetProps(index)} style={{ opacity: dragIndex === index ? 0.4 : 1 }}>
                     <td>
-                      <span {...dragHandleProps(index)} aria-label="Zum Sortieren ziehen" style={{ cursor: "grab", display: "inline-flex", color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}>
-                        <GripVerticalIcon size={16} />
+                      <span className="inline-flex items-center gap-0.5">
+                        <span {...dragHandleProps(index)} aria-label="Zum Sortieren ziehen" style={{ cursor: "grab", display: "inline-flex", color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}>
+                          <GripVerticalIcon size={16} />
+                        </span>
+                        {sortButtons(index)}
                       </span>
                     </td>
                     <td>
@@ -1033,13 +1077,16 @@ export function PlanTableEditor({
                   {...dropTargetProps(index)}
                   style={{ border: "1px solid var(--dc-divider)", opacity: dragIndex === index ? 0.4 : 1 }}
                 >
-                  <div
-                    {...dragHandleProps(index)}
-                    aria-label="Zum Sortieren ziehen"
-                    className="flex items-center gap-1.5 text-xs text-muted"
-                    style={{ cursor: "grab", padding: "8px 16px 0" }}
-                  >
-                    <GripVerticalIcon size={14} /> Ziehen zum Sortieren
+                  <div className="flex items-center justify-between gap-2" style={{ padding: "8px 16px 0" }}>
+                    <div
+                      {...dragHandleProps(index)}
+                      aria-label="Zum Sortieren ziehen"
+                      className="flex items-center gap-1.5 text-xs text-muted"
+                      style={{ cursor: "grab" }}
+                    >
+                      <GripVerticalIcon size={14} /> Ziehen oder Pfeile zum Sortieren
+                    </div>
+                    {sortButtons(index)}
                   </div>
                   <div
                     className="grid grid-cols-2 items-end gap-3 lg:[grid-template-columns:1fr_130px_90px_90px_40px]"
@@ -1228,6 +1275,23 @@ export function PlanTableEditor({
           </div>
         </div>
       )}
+
+      {/* Phones: the save button at the top is far away after scrolling
+          through a long exercise table, so it stays reachable at the bottom
+          (above the athlete app's tab bar via --sticky-bottom-offset). */}
+      <div
+        className="no-print sticky z-20 mt-6 flex items-center justify-end gap-2 px-3 py-2.5 lg:hidden"
+        style={{
+          bottom: "var(--sticky-bottom-offset, 0px)",
+          background: "var(--dc-surface)",
+          borderTop: "1px solid var(--dc-divider)",
+          boxShadow: "0 -2px 12px color-mix(in srgb, #2d2b2b 8%, transparent)",
+        }}
+      >
+        <button type="button" className="btn btn-primary" onClick={handleAssign} disabled={isPending}>
+          {isPending ? "Wird gespeichert…" : saveLabel}
+        </button>
+      </div>
 
       <Dialog open={notesOpenIndex !== null} onOpenChange={(open) => !open && setNotesOpenIndex(null)}>
         <DialogPortal>

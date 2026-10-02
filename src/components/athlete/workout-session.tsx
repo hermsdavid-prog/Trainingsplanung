@@ -1327,7 +1327,7 @@ export function WorkoutSession({
               </button>
             </div>
             <div className="mt-2 text-[13px] leading-[1.5]" style={{ color: "var(--dc-muted)" }}>
-              Belastungsempfinden für die ganze Einheit — {RPE_WORDS[rpeValue ?? 5]}.
+              Belastungsempfinden für das ganze Training — {RPE_WORDS[rpeValue ?? 5]}.
             </div>
             <div className="mt-3.5 grid grid-cols-5 gap-2">
               {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (

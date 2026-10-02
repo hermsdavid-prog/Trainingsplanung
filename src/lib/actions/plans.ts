@@ -39,7 +39,7 @@ async function requireTrainerOrAdmin() {
     .single();
 
   if (profile?.role !== "admin" && profile?.role !== "trainer") {
-    throw new Error("Keine Berechtigung.");
+    return { error: "Keine Berechtigung." } as const;
   }
 
   return { supabase, userId: user.id, role: profile.role };
@@ -59,7 +59,7 @@ async function requireAthlete() {
     .single();
 
   if (profile?.role !== "athlete") {
-    throw new Error("Keine Berechtigung.");
+    return { error: "Keine Berechtigung." } as const;
   }
 
   return { supabase, userId: user.id };
@@ -84,14 +84,14 @@ async function requirePlanEditAccess(planId: string) {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (!profile) throw new Error("Kein Profil gefunden.");
+  if (!profile) return { error: "Kein Profil gefunden." } as const;
 
   const { data: plan } = await supabase
     .from("training_plans")
     .select("id, created_by, group_id, athlete_id")
     .eq("id", planId)
     .single();
-  if (!plan) throw new Error("Plan nicht gefunden.");
+  if (!plan) return { error: "Plan nicht gefunden." } as const;
 
   let canEdit = profile.role === "admin" || plan.created_by === user.id;
 
@@ -121,7 +121,7 @@ async function requirePlanEditAccess(planId: string) {
     }
   }
 
-  if (!canEdit) throw new Error("Keine Berechtigung, diesen Plan zu bearbeiten.");
+  if (!canEdit) return { error: "Keine Berechtigung, diesen Plan zu bearbeiten." } as const;
 
   return { supabase, userId: user.id, role: profile.role };
 }
@@ -130,7 +130,9 @@ export async function createPlanAction(
   _prevState: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const { supabase, userId } = await requireTrainerOrAdmin();
+  const access = await requireTrainerOrAdmin();
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId } = access;
 
   const categoryLabelRaw = String(formData.get("category_label") ?? "").trim();
   const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
@@ -207,7 +209,9 @@ export async function createOwnPlanAction(
   _prevState: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const { supabase, userId } = await requireAthlete();
+  const access = await requireAthlete();
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId } = access;
 
   const categoryLabelRaw = String(formData.get("category_label") ?? "").trim();
   const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
@@ -344,7 +348,9 @@ export async function updatePlanMetaAction(
   planId: string,
   meta: { title: string; date: string; time: string; mesocycleId?: string | null }
 ): Promise<ActionResult & { propagated?: number }> {
-  const { supabase } = await requirePlanEditAccess(planId);
+  const access = await requirePlanEditAccess(planId);
+  if ("error" in access) return { error: access.error };
+  const { supabase } = access;
 
   const title = meta.title.trim();
   const date = meta.date;
@@ -509,7 +515,9 @@ export async function savePlanItemsAction(
   planId: string,
   items: PlanItemInput[]
 ): Promise<ActionResult & { items?: SavedPlanItem[] }> {
-  const { supabase, userId } = await requirePlanEditAccess(planId);
+  const access = await requirePlanEditAccess(planId);
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId } = access;
 
   // Fetch this up front (not just series_id) so a not-yet-catalogued exercise
   // name can be resolved/auto-created below before the rows are built.
@@ -652,7 +660,9 @@ export async function repeatPlanWeeklyAction(
   until: string,
   weekday?: number
 ): Promise<ActionResult & { created?: number }> {
-  const { supabase, userId } = await requirePlanEditAccess(planId);
+  const access = await requirePlanEditAccess(planId);
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId } = access;
 
   const { data: plan } = await supabase
     .from("training_plans")
@@ -739,7 +749,9 @@ export async function applyToFollowingOccurrencesAction(
   planId: string,
   changed: { title?: string; time?: string } = {}
 ): Promise<ActionResult & { updated?: number; skipped?: number }> {
-  const { supabase } = await requirePlanEditAccess(planId);
+  const access = await requirePlanEditAccess(planId);
+  if ("error" in access) return { error: access.error };
+  const { supabase } = access;
 
   const { data: plan } = await supabase
     .from("training_plans")
@@ -825,7 +837,9 @@ export async function reschedulePlanAction(
   planId: string,
   newDate: string
 ): Promise<ActionResult> {
-  const { supabase } = await requirePlanEditAccess(planId);
+  const access = await requirePlanEditAccess(planId);
+  if ("error" in access) return { error: access.error };
+  const { supabase } = access;
 
   // Moved out of its Mesozyklus → no longer part of it.
   const { data: plan } = await supabase.from("training_plans").select("mesocycle_id").eq("id", planId).single();
@@ -846,7 +860,9 @@ export async function duplicatePlanToDateAction(
   planId: string,
   newDate: string
 ): Promise<ActionResult> {
-  const { supabase, userId } = await requirePlanEditAccess(planId);
+  const access = await requirePlanEditAccess(planId);
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId } = access;
 
   const { data: sourcePlan } = await supabase
     .from("training_plans")
@@ -925,7 +941,9 @@ export async function duplicateDayToDateAction(
   sourceDate: string,
   targetDate: string
 ): Promise<ActionResult & { count?: number }> {
-  const { supabase, userId } = await requireTrainerOrAdmin();
+  const access = await requireTrainerOrAdmin();
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId } = access;
 
   if (!sourceDate || !targetDate) {
     return { error: "Bitte ein Zieldatum angeben." };
@@ -1004,7 +1022,9 @@ export async function duplicateDayToDateAction(
 }
 
 export async function deletePlanAction(planId: string): Promise<ActionResult> {
-  const { supabase } = await requirePlanEditAccess(planId);
+  const access = await requirePlanEditAccess(planId);
+  if ("error" in access) return { error: access.error };
+  const { supabase } = access;
 
   const { error } = await supabase.from("training_plans").delete().eq("id", planId);
   if (error) return { error: "Plan konnte nicht gelöscht werden." };
@@ -1017,7 +1037,9 @@ export async function copyPlanAction(
   _prevState: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const { supabase, userId } = await requireTrainerOrAdmin();
+  const access = await requireTrainerOrAdmin();
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId } = access;
 
   const sourcePlanId = String(formData.get("source_plan_id") ?? "");
   const date = String(formData.get("date") ?? "");
@@ -1118,7 +1140,9 @@ export async function copyPlanForAthleteAction(
   _prevState: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const { supabase, userId } = await requireAthlete();
+  const access = await requireAthlete();
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId } = access;
 
   const sourcePlanId = String(formData.get("source_plan_id") ?? "");
   const newDate = String(formData.get("date") ?? "");
@@ -1207,7 +1231,9 @@ export async function saveAsTemplateAction(
   items: PlanItemInput[],
   title: string
 ): Promise<ActionResult> {
-  const { supabase, userId, role } = await requirePlanEditAccess(planId);
+  const access = await requirePlanEditAccess(planId);
+  if ("error" in access) return { error: access.error };
+  const { supabase, userId, role } = access;
   if (role !== "admin" && role !== "trainer") {
     return { error: "Keine Berechtigung, eine Vorlage zu speichern." };
   }
@@ -1263,7 +1289,9 @@ export async function saveAsTemplateAction(
 // may actually delete a row — this just surfaces a friendly error when that
 // check fails instead of silently reporting success on a 0-row delete.
 export async function deleteTemplateAction(templateId: string): Promise<ActionResult> {
-  const { supabase } = await requireTrainerOrAdmin();
+  const access = await requireTrainerOrAdmin();
+  if ("error" in access) return { error: access.error };
+  const { supabase } = access;
 
   const { data, error } = await supabase
     .from("plan_templates")

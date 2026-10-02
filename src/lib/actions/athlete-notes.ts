@@ -71,3 +71,29 @@ export async function deleteAthleteNoteAction(noteId: string): Promise<ActionRes
   revalidatePath("/athlete");
   return {};
 }
+
+// "Erledigt" on an athlete's hint to the trainer (Trainer-Übersicht). With a
+// reply, the reply goes to the athlete as a normal trainer note first.
+export async function handleAthleteHintAction(
+  feedbackId: string,
+  athleteId: string,
+  reply?: string
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+
+  const message = reply?.trim();
+  if (message) {
+    const sent = await sendAthleteNoteAction(athleteId, message);
+    if (sent.error) return sent;
+  }
+
+  const { data, error } = await supabase.rpc("mark_feedback_note_handled", { p_feedback_id: feedbackId });
+  if (error || data !== true) return { error: "Hinweis konnte nicht als erledigt markiert werden." };
+
+  revalidatePath("/trainer");
+  return {};
+}

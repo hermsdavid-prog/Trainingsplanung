@@ -15,9 +15,9 @@ export function ExerciseProgressChart({ data }: { data: Point[] }) {
         <XAxis
           dataKey="date"
           tickFormatter={(value) => formatDateCompact(String(value))}
-          tick={{ fontSize: 11, fill: "color-mix(in srgb, #201e1d 55%, transparent)" }}
+          tick={{ fontSize: 11, fill: "var(--dc-muted)" }}
         />
-        <YAxis tick={{ fontSize: 11, fill: "color-mix(in srgb, #201e1d 55%, transparent)" }} domain={["auto", "auto"]} width={44} />
+        <YAxis tick={{ fontSize: 11, fill: "var(--dc-muted)" }} domain={["auto", "auto"]} width={44} />
         <Tooltip
           content={<ChartTooltip unit={unit} />}
           cursor={CHART_CURSOR}
@@ -30,7 +30,7 @@ export function ExerciseProgressChart({ data }: { data: Point[] }) {
           strokeWidth={1.5}
           fill="var(--dc-accent-100)"
           dot={{ r: 3, fill: "var(--dc-accent)", strokeWidth: 0 }}
-          activeDot={{ r: 5.5, stroke: "#fff", strokeWidth: 2, fill: "var(--dc-accent)" }}
+          activeDot={{ r: 5.5, stroke: "var(--dc-surface)", strokeWidth: 2, fill: "var(--dc-accent)" }}
           connectNulls
         />
       </AreaChart>

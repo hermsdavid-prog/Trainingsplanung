@@ -164,14 +164,11 @@ export default async function EditPlanPage({
   const targetLabel =
     plan.scope_type === "group" ? plan.groups?.name : plan.profiles?.full_name;
 
-  const isKarate = plan.category_label?.trim() === "Sportartspezifisch";
   const kicker = isAthletik
     ? plan.scope_type === "group"
       ? "Gruppenplan · ohne Gewichte, die sind individuell"
       : "Einzelplan"
-    : isKarate
-      ? "Sportartspezifisch · Karate"
-      : "Sportartspezifisch";
+    : "Karate";
   const backHref = `/trainer/plans?type=${encodeURIComponent(plan.category_label)}`;
 
   return (
@@ -199,7 +196,7 @@ export default async function EditPlanPage({
           </div>
           <div className="flex flex-none flex-wrap gap-2">
             <Link href={`/trainer/plans/${plan.id}/workout`} className="btn btn-secondary">
-              Workout-Ansicht
+              Trainingsansicht
             </Link>
             {(items ?? []).length > 0 && (
               <Link href={`/trainer/plans/${plan.id}/session`} className="btn btn-secondary">
@@ -250,7 +247,7 @@ export default async function EditPlanPage({
             headerActions={
               <>
                 <Link href={`/trainer/plans/${plan.id}/workout`} className="btn btn-secondary">
-                  Workout-Ansicht
+                  Trainingsansicht
                 </Link>
                 {(items ?? []).length > 0 && (
                   <Link href={`/trainer/plans/${plan.id}/session`} className="btn btn-secondary">

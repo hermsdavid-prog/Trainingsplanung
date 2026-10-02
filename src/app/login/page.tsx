@@ -36,7 +36,7 @@ export default function LoginPage() {
         </div>
         <div
           className="flex flex-col justify-end gap-4 p-6 sm:p-10"
-          style={{ background: "var(--dc-accent-800)", color: "#fff" }}
+          style={{ background: "#004961", color: "#fff" }}
         >
           <div
             className="text-[30px] leading-[1.05] font-semibold sm:text-[38px]"

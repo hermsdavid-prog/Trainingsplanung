@@ -24,6 +24,8 @@
   --dc-text: #201e1d;
   --dc-accent: #007a9e;
   --dc-accent-2: #d6006c;
+  /* Text/icons on an accent-coloured fill (buttons, active chips). */
+  --dc-on-accent: #ffffff;
   --dc-divider: color-mix(in srgb, #201e1d 16%, transparent);
   --dc-muted: color-mix(in srgb, #201e1d 66%, transparent);
 
@@ -163,11 +165,58 @@
   --sidebar-ring: var(--dc-accent);
 }
 
-/* The design has one light "paper" palette and no dark treatment. Rather
-   than invent a dark variant that Claude Design never specified, dark mode
-   keeps the same tokens — the theme toggle stays functional (no-op look)
-   instead of fighting the source design. */
+/* Dark mode (follows the phone/computer setting): the same tokens with a
+   dark ground, light text and a lighter accent so it still reads on dark
+   surfaces. The tint scales flip — 100–300 become dark tinted backgrounds,
+   700–900 light text shades — so every "tinted background + darker text"
+   pairing in the components stays readable. Fills with text on them use
+   --dc-on-accent. */
 .dark {
+  --dc-bg: #141517;
+  --dc-surface: #1e2023;
+  --dc-text: #ecebea;
+  --dc-accent: #3fb0d8;
+  --dc-accent-2: #ff5c9d;
+  --dc-on-accent: #0b1a20;
+  --dc-divider: color-mix(in srgb, #ecebea 16%, transparent);
+  --dc-muted: color-mix(in srgb, #ecebea 66%, transparent);
+
+  --dc-neutral-100: #1b1c1f;
+  --dc-neutral-200: #25272b;
+  --dc-neutral-300: #34363b;
+  --dc-neutral-400: #4a4c52;
+  --dc-neutral-500: #6b6d73;
+  --dc-neutral-600: #8d8f95;
+  --dc-neutral-700: #b0b1b5;
+  --dc-neutral-800: #d3d3d6;
+  --dc-neutral-900: #ecebea;
+
+  --dc-accent-100: #0f2a35;
+  --dc-accent-200: #123a4a;
+  --dc-accent-300: #1a5068;
+  --dc-accent-400: #23708f;
+  --dc-accent-500: #2f93ba;
+  --dc-accent-600: #3fb0d8;
+  --dc-accent-700: #7fd0ee;
+  --dc-accent-800: #a9e2f7;
+  --dc-accent-900: #d6f2fc;
+
+  --dc-accent-2-100: #3a1424;
+  --dc-accent-2-200: #4b1a30;
+  --dc-accent-2-300: #6a2244;
+  --dc-accent-2-400: #a02f62;
+  --dc-accent-2-500: #e04787;
+  --dc-accent-2-600: #ff5c9d;
+  --dc-accent-2-700: #ff86b5;
+  --dc-accent-2-800: #ffb3d0;
+  --dc-accent-2-900: #ffdbe8;
+
+  --dc-shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --dc-shadow-md: 0 3px 10px rgb(0 0 0 / 45%);
+  --dc-shadow-lg: 0 12px 32px rgb(0 0 0 / 55%);
+
+  color-scheme: dark;
+
   --background: var(--dc-bg);
   --foreground: var(--dc-text);
   --card: var(--dc-bg);
@@ -251,7 +300,7 @@
 }
 .btn svg { display: block; width: 16px; height: 16px; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-primary { background: var(--dc-accent); color: #fff; }
+.btn-primary { background: var(--dc-accent); color: var(--dc-on-accent); }
 .btn-primary:hover:not(:disabled) { background: var(--dc-accent-700); }
 .btn-primary:active:not(:disabled) { background: var(--dc-accent-800); }
 .btn-secondary { border-color: color-mix(in srgb, var(--dc-text) 22%, transparent); background: var(--dc-surface); }
@@ -317,7 +366,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .tag-accent { background: var(--dc-accent-100); color: var(--dc-accent-800); }
 .tag-accent-2 { background: var(--dc-accent-2-100); color: var(--dc-accent-2-800); }
-.tag-neutral { background: #ecebea; color: var(--dc-neutral-800); }
+.tag-neutral { background: color-mix(in srgb, var(--dc-text) 8%, transparent); color: var(--dc-neutral-800); }
 .tag-outline { border: 1px solid color-mix(in srgb, var(--dc-accent) 55%, transparent); color: var(--dc-accent-700); }
 
 /* — kicker / section label — */

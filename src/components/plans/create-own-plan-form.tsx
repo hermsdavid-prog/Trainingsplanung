@@ -34,7 +34,7 @@ export function CreateOwnPlanForm({
           required
           className="input"
           defaultValue={defaultTitle}
-          placeholder="z. B. Eigenes Workout"
+          placeholder="z. B. Eigenes Training"
         />
       </div>
 

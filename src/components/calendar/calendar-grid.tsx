@@ -289,7 +289,7 @@ export function CalendarGrid({
                 {isToday ? (
                   <span
                     className="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold tabular-nums"
-                    style={{ background: "var(--dc-accent)", color: "#fff" }}
+                    style={{ background: "var(--dc-accent)", color: "var(--dc-on-accent)" }}
                   >
                     {Number(day.slice(8, 10))}
                   </span>
@@ -589,7 +589,7 @@ export function CalendarGrid({
                             href={`/trainer/plans/new?type=Sportartspezifisch&date=${selectedDate}`}
                             className="exrow"
                           >
-                            <span className="text-[16px]">Sportartspezifisch</span>
+                            <span className="text-[16px]">Karatetraining</span>
                           </Link>
                         </div>
                       </div>
