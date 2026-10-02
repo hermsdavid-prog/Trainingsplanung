@@ -301,7 +301,7 @@ export default async function EditPlanPage({
           />
 
           {planGroupAthletes && planGroupAthletes.length > 0 && (
-            <div>
+            <div id="ergebnisse" style={{ scrollMarginTop: 72 }}>
               <div className="kicker-muted mb-2">Athleten in dieser Gruppe</div>
               <div className="overflow-x-auto">
               <table className="table" style={{ minWidth: 420 }}>

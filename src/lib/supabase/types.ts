@@ -656,6 +656,12 @@ export type Database = {
           },
         ]
       }
+      login_attempts: {
+        Row: { created_at: string; id: number; key: string }
+        Insert: { created_at?: string; id?: never; key: string }
+        Update: { created_at?: string; id?: never; key?: string }
+        Relationships: []
+      }
       mesocycle_goal_prompt_skips: {
         Row: {
           athlete_id: string
@@ -1124,6 +1130,14 @@ export type Database = {
       expired_cardio_screenshots: {
         Args: { max_age: string }
         Returns: string[]
+      }
+      login_record: {
+        Args: { p_keys: string[]; p_success: boolean }
+        Returns: undefined
+      }
+      login_wait_seconds: {
+        Args: { p_keys: string[] }
+        Returns: number
       }
       replace_training_plan_items: {
         Args: { p_items: Json; p_plan_id: string }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import {
   todayISO,
@@ -20,7 +21,7 @@ const LEVEL_TAG: Record<HealthStatusLevel, string> = {
 export default async function TrainerReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string }>;
+  searchParams: Promise<{ group?: string; week?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -41,10 +42,17 @@ export default async function TrainerReportPage({
     );
   }
 
-  const weekDays = getWeekDays(today);
+  // ?week=YYYY-MM-DD (any day of the week) pages back through earlier weeks.
+  const anchor = params.week && /^\d{4}-\d{2}-\d{2}$/.test(params.week) && params.week <= today ? params.week : today;
+  const weekDays = getWeekDays(anchor);
   const weekStart = weekDays[0];
   const weekEnd = weekDays[6];
-  const weekNumber = getISOWeekNumber(today);
+  const weekNumber = getISOWeekNumber(anchor);
+  const isCurrentWeek = weekEnd >= today;
+  // Readiness "as of" the end of the shown week (or today for this week).
+  const asOf = isCurrentWeek ? today : weekEnd;
+  const weekHref = (start: string) =>
+    `/trainer/report?group=${selectedGroup}${start === getWeekDays(today)[0] ? "" : `&week=${start}`}`;
   const prevWeekStart = shiftDateISO(weekStart, -7);
   const prevWeekEnd = shiftDateISO(weekEnd, -7);
   const historyStart = shiftDateISO(weekStart, -37); // rolling history window for readiness
@@ -127,13 +135,17 @@ export default async function TrainerReportPage({
   const { data: ratingsThisWeek } = thisWeek.plans.length
     ? await supabase
         .from("session_ratings")
-        .select("training_plan_id, athlete_id")
+        .select("training_plan_id, athlete_id, rpe")
         .in(
           "training_plan_id",
           thisWeek.plans.map((p) => p.id)
         )
         .in("athlete_id", athleteIds)
     : { data: [] };
+  const rpesByAthlete = new Map<string, number[]>();
+  for (const r of ratingsThisWeek ?? []) {
+    if (r.rpe != null) rpesByAthlete.set(r.athlete_id, [...(rpesByAthlete.get(r.athlete_id) ?? []), r.rpe]);
+  }
   const ratedByAthlete = new Set((ratingsThisWeek ?? []).map((r) => `${r.training_plan_id}:${r.athlete_id}`));
   const assignedTotalByAthlete = new Map<string, number>();
   const documentedByAthlete = new Map<string, number>();
@@ -248,14 +260,14 @@ export default async function TrainerReportPage({
   // Current-moment readiness per athlete (for the table tag), same rule as
   // the Gesundheit page.
   function currentReadiness(athleteId: string): HealthStatusLevel {
-    const logs = (logsByAthlete.get(athleteId) ?? []).filter((l) => l.date <= today);
-    return computeHealthStatus(logs, today).level;
+    const logs = (logsByAthlete.get(athleteId) ?? []).filter((l) => l.date <= asOf);
+    return computeHealthStatus(logs, asOf).level;
   }
 
   const kpis = [
     {
       v: String(thisWeek.plans.length),
-      l: thisWeek.plans.length === 1 ? "Einheit geplant" : "Einheiten geplant",
+      l: thisWeek.plans.length === 1 ? "Training geplant" : "Trainings geplant",
       s: `${athletikCount} Athletik · ${sportCount} Karate`,
     },
     {
@@ -290,9 +302,12 @@ export default async function TrainerReportPage({
       note = `Gewicht reduziert bei ${reduced[0]}`;
     }
 
+    const rpes = rpesByAthlete.get(a.id) ?? [];
     return {
+      id: a.id,
       name: a.full_name,
-      progress: assigned > 0 ? `${documented} von ${assigned} dokumentiert` : "keine Einheit",
+      rpe: rpes.length ? (rpes.reduce((x, y) => x + y, 0) / rpes.length).toFixed(1).replace(".", ",") : "—",
+      progress: assigned > 0 ? `${documented} von ${assigned} dokumentiert` : "kein Training",
       ready: HEALTH_STATUS_LABEL[readyLevel],
       readyClass: LEVEL_TAG[readyLevel],
       top: top ? `${top.exerciseName} ${top.value}${top.unit ? ` ${top.unit}` : ""}` : "—",
@@ -304,10 +319,28 @@ export default async function TrainerReportPage({
     <div>
       <div className="flex items-start justify-between gap-6 border-b-2 pb-4" style={{ borderColor: "var(--dc-text)" }}>
         <div className="min-w-0">
-          <div className="kicker">Wochenbericht · Woche {weekNumber}</div>
+          <div className="kicker">
+            Wochenbericht · Woche {weekNumber} · {formatDateCompact(weekStart)}–{formatDateCompact(weekEnd)}
+          </div>
           <h2 className="mt-2.5 text-[28px] leading-[1.06] lg:text-[34px] lg:leading-[1.05]">{group?.name}</h2>
         </div>
         <PrintButton />
+      </div>
+
+      <div className="no-print mt-4 flex flex-wrap items-center gap-2">
+        <Link href={weekHref(shiftDateISO(weekStart, -7))} className="btn btn-secondary">
+          ← Vorwoche
+        </Link>
+        {!isCurrentWeek && (
+          <>
+            <Link href={weekHref(shiftDateISO(weekStart, 7))} className="btn btn-secondary">
+              Nächste Woche →
+            </Link>
+            <Link href={weekHref(getWeekDays(today)[0])} className="btn btn-ghost">
+              Diese Woche
+            </Link>
+          </>
+        )}
       </div>
 
       <div className="no-print mt-5">
@@ -334,6 +367,7 @@ export default async function TrainerReportPage({
             <tr>
               <th>Athlet</th>
               <th>Woche</th>
+              <th>Ø RPE</th>
               <th>Bereitschaft</th>
               <th>Top-Satz</th>
               <th>Auffällig</th>
@@ -341,9 +375,14 @@ export default async function TrainerReportPage({
           </thead>
           <tbody>
             {trainerRows.map((r) => (
-              <tr key={r.name}>
-                <td className="text-[15px]">{r.name}</td>
+              <tr key={r.id}>
+                <td className="text-[15px]">
+                  <Link href={`/trainer/athletes?group=${selectedGroup}&athlete=${r.id}`} className="underline-offset-2 hover:underline">
+                    {r.name}
+                  </Link>
+                </td>
                 <td>{r.progress}</td>
+                <td>{r.rpe}</td>
                 <td>
                   <span className={`tag ${r.readyClass}`}>{r.ready}</span>
                 </td>

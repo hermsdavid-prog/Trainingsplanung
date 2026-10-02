@@ -28,8 +28,8 @@ export default async function TrainerDashboardPage() {
     supabase.from("group_athletes").select("group_id, athlete_id, profiles(full_name)"),
     supabase
       .from("training_plans")
-      .select("id, title, time, category_label, scope_type, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
-      .eq("date", today)
+      .select("id, date, title, time, category_label, scope_type, group_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
+      .in("date", [shiftDateISO(today, -1), today])
       .order("time", { nullsFirst: false }),
     supabase
       .from("events")
@@ -38,6 +38,33 @@ export default async function TrainerDashboardPage() {
       .order("start_at"),
     supabase.from("athlete_consents").select("athlete_id").eq("health_consent", true),
   ]);
+
+  // Today's and yesterday's trainings with how many athletes finished them
+  // (an RPE saved at "Training beenden") and how hard it felt on average.
+  const recentPlans = todaysPlans ?? [];
+  const { data: ratingRows } = recentPlans.length
+    ? await supabase
+        .from("session_ratings")
+        .select("training_plan_id, rpe")
+        .in(
+          "training_plan_id",
+          recentPlans.map((p) => p.id)
+        )
+    : { data: [] };
+  const groupSize = new Map<string, number>();
+  for (const row of groupAthleteRows ?? []) groupSize.set(row.group_id, (groupSize.get(row.group_id) ?? 0) + 1);
+  const ratingsByPlan = new Map<string, number[]>();
+  for (const r of ratingRows ?? []) {
+    if (r.rpe != null) ratingsByPlan.set(r.training_plan_id, [...(ratingsByPlan.get(r.training_plan_id) ?? []), r.rpe]);
+  }
+  const progressLabel = (plan: { id: string; scope_type: string; group_id: string | null }) => {
+    const ratings = ratingsByPlan.get(plan.id) ?? [];
+    const expected = plan.scope_type === "group" ? (plan.group_id ? groupSize.get(plan.group_id) ?? 0 : 0) : 1;
+    const avg = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1).replace(".", ",") : null;
+    return `${ratings.length}/${expected} erledigt${avg ? ` · Ø RPE ${avg}` : ""}`;
+  };
+  const plansToday = recentPlans.filter((p) => p.date === today);
+  const plansYesterday = recentPlans.filter((p) => p.date !== today);
 
   const proposedEvents: ProposedEvent[] = (proposedRows ?? []).map((e) => ({
     id: e.id,
@@ -142,7 +169,7 @@ export default async function TrainerDashboardPage() {
         Übersicht
       </h2>
       <p className="mt-3 text-sm" style={{ color: "var(--dc-muted)" }}>
-        {(todaysPlans ?? []).length} {(todaysPlans ?? []).length === 1 ? "Einheit" : "Einheiten"} heute geplant · {checkedInCount} von {athletes.length}{" "}
+        {plansToday.length} {plansToday.length === 1 ? "Training" : "Trainings"} heute geplant · {checkedInCount} von {athletes.length}{" "}
         Athleten eingecheckt{redCount > 0 ? ` · ${redCount} rote Bereitschaft${redCount > 1 ? "en" : ""}` : ""}
       </p>
 
@@ -172,35 +199,52 @@ export default async function TrainerDashboardPage() {
         </div>
       )}
 
-      {(todaysPlans ?? []).length > 0 && (
-        <div className="mt-6 flex flex-col gap-2.5">
-          {(todaysPlans ?? []).map((plan) => {
-            const isAthletik = plan.category_label?.trim().toLowerCase() === "athletik";
-            return (
-              <Link
-                key={plan.id}
-                href={`/trainer/plans/${plan.id}/edit`}
-                className="block p-3.5 no-underline"
-                style={{
-                  background: "var(--dc-surface)",
-                  borderLeft: `2px solid ${isAthletik ? "var(--dc-accent)" : "var(--dc-accent-2)"}`,
-                  color: "inherit",
-                }}
-              >
-                <div className="flex items-baseline justify-between gap-2.5">
-                  <span className="text-[16px]">{plan.title}</span>
-                  <span className={`tag ${isAthletik ? "tag-accent" : "tag-accent-2"}`}>{isAthletik ? "Athletik" : "Karate"}</span>
-                </div>
-                <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
-                  {plan.time ? `${plan.time} · ` : ""}
-                  {plan.scope_type === "group"
-                    ? (plan.groups?.name ?? "Gruppe")
-                    : (plan.profiles?.full_name ?? "Einzeltraining")}
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+      {[
+        { label: "Heute", plans: plansToday },
+        { label: "Gestern", plans: plansYesterday },
+      ].map(({ label, plans }) =>
+        plans.length === 0 ? null : (
+          <div key={label} className="mt-6">
+            <div className="kicker-muted">{label}</div>
+            <div className="mt-2 flex flex-col gap-2.5">
+              {plans.map((plan) => {
+                const isAthletik = plan.category_label?.trim().toLowerCase() === "athletik";
+                // Group trainings open the results per athlete; an individual
+                // one goes straight to that athlete's sets.
+                const href =
+                  plan.scope_type === "athlete"
+                    ? `/trainer/plans/${plan.id}/edit`
+                    : `/trainer/plans/${plan.id}/edit#ergebnisse`;
+                return (
+                  <Link
+                    key={plan.id}
+                    href={href}
+                    className="block p-3.5 no-underline"
+                    style={{
+                      background: "var(--dc-surface)",
+                      borderLeft: `2px solid ${isAthletik ? "var(--dc-accent)" : "var(--dc-accent-2)"}`,
+                      color: "inherit",
+                    }}
+                  >
+                    <div className="flex items-baseline justify-between gap-2.5">
+                      <span className="text-[16px]">{plan.title}</span>
+                      <span className={`tag ${isAthletik ? "tag-accent" : "tag-accent-2"}`}>{isAthletik ? "Athletik" : "Karate"}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap justify-between gap-x-3 text-xs" style={{ color: "var(--dc-muted)" }}>
+                      <span>
+                        {plan.time ? `${plan.time} · ` : ""}
+                        {plan.scope_type === "group"
+                          ? (plan.groups?.name ?? "Gruppe")
+                          : (plan.profiles?.full_name ?? "Einzeltraining")}
+                      </span>
+                      <span style={{ color: "var(--dc-text)" }}>{progressLabel(plan)}</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )
       )}
 
       <ReadinessPanel rows={readinessRows} notCheckedIn={notCheckedIn} />

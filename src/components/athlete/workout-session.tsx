@@ -22,6 +22,14 @@ import {
 } from "@/components/athlete/exercise-notes";
 import type { BadgeAward } from "@/lib/badges";
 import { SIDE_LABEL, countSets, isPairedRight, type Side } from "@/lib/per-side";
+import {
+  browserStorage,
+  enqueueSet,
+  isOffline,
+  readQueue,
+  removeQueuedSet,
+  type QueuedSet,
+} from "@/lib/offline-queue";
 
 type SetType = "aufwaermsatz" | "arbeitssatz";
 
@@ -38,6 +46,8 @@ type SessionSet = {
   // Date the set was saved under; differs from the plan date when the
   // training was moved after logging. Unset for sets not saved yet.
   date?: string;
+  // Logged without a connection: kept on the device, sent when back online.
+  waiting?: boolean;
 };
 
 type ExerciseInstructions = {
@@ -276,6 +286,9 @@ export function WorkoutSession({
     }
     return map;
   });
+
+  // Number of sets waiting on this device for a connection.
+  const [queuedCount, setQueuedCount] = useState(0);
 
   // Exercises stay in plan order and expand in place (several may be open)
   // — tapping one used to move it to the top of the page, which made the
@@ -516,8 +529,23 @@ export function WorkoutSession({
     for (const m of members) {
       if (!m.confirmed) continue;
       if (!ex.exerciseId) return;
+      if (m.waiting) {
+        // Never reached the server — just drop it from the device queue.
+        const q = readQueue(browserStorage(), planId).find(
+          (x) => x.exerciseId === ex.exerciseId && x.setNumber === m.setNumber
+        );
+        if (q) setQueuedCount(removeQueuedSet(browserStorage(), planId, q).length);
+        continue;
+      }
       setPendingKey(set.key);
-      const result = await deleteExerciseResultSetAction(ex.exerciseId, m.date ?? planDate, m.setNumber, planId);
+      let result: Awaited<ReturnType<typeof deleteExerciseResultSetAction>>;
+      try {
+        result = await deleteExerciseResultSetAction(ex.exerciseId, m.date ?? planDate, m.setNumber, planId);
+      } catch {
+        setPendingKey(null);
+        toast.error("Keine Verbindung — Löschen geht erst wieder mit Netz.");
+        return;
+      }
       setPendingKey(null);
       if (result.error) {
         toast.error(result.error);
@@ -545,23 +573,37 @@ export function WorkoutSession({
     }
     const reps = set.reps.trim() ? Number(set.reps.replace(",", ".")) : null;
     const rir = set.type === "arbeitssatz" && set.rir.trim() ? Number(set.rir) : null;
-    setPendingKey(set.key);
-    const result = await upsertExerciseResultAction(
-      ex.exerciseId,
-      set.date ?? planDate,
-      set.setNumber,
+    const entry: QueuedSet = {
+      exerciseId: ex.exerciseId,
+      date: set.date ?? planDate,
+      setNumber: set.setNumber,
       weight,
       reps,
-      ex.unit || "kg",
-      planId,
-      set.type,
+      unit: ex.unit || "kg",
+      setType: set.type,
       rir,
-      set.side
-    );
+      side: set.side,
+      itemId: ex.itemId,
+    };
+    setPendingKey(set.key);
+    let result: Awaited<ReturnType<typeof upsertExerciseResultAction>> | null = null;
+    if (!isOffline()) {
+      try {
+        result = await sendSet(entry);
+      } catch {
+        result = null; // no connection — queued below
+      }
+    }
     setPendingKey(null);
-    if (result.error) {
+    if (result?.error) {
       toast.error(result.error);
       return;
+    }
+    const waiting = result === null;
+    if (waiting) {
+      setQueuedCount(enqueueSet(browserStorage(), planId, entry).length);
+    } else if (set.waiting) {
+      setQueuedCount(removeQueuedSet(browserStorage(), planId, entry).length);
     }
     setSetsByItem((prev) => {
       const rows = prev[ex.itemId];
@@ -569,7 +611,7 @@ export function WorkoutSession({
       return {
         ...prev,
         [ex.itemId]: rows.map((s, j) => {
-          if (s.key === set.key) return { ...s, confirmed: true, date: set.date ?? planDate };
+          if (s.key === set.key) return { ...s, confirmed: true, waiting, date: set.date ?? planDate };
           // Left side logged: suggest the same load for the right side
           // (still to be confirmed with ✓, nothing is saved for it yet).
           if (j === i + 1 && set.side === "links" && isPairedRight(rows, j) && !s.confirmed && !s.weight.trim()) {
@@ -595,8 +637,87 @@ export function WorkoutSession({
     if (opts.askRir && set.type === "arbeitssatz" && !set.rir.trim() && set.side !== "links") {
       setRirPad({ itemId: ex.itemId, setKey: set.key });
     }
-    notifyNewBadges(result.newBadges);
+    if (result) notifyNewBadges(result.newBadges);
   }
+
+  function sendSet(q: QueuedSet) {
+    return upsertExerciseResultAction(
+      q.exerciseId,
+      q.date,
+      q.setNumber,
+      q.weight,
+      q.reps,
+      q.unit,
+      planId,
+      q.setType,
+      q.rir,
+      q.side
+    );
+  }
+
+  // Sends everything logged offline, oldest first. Stops at the first
+  // failure — no connection (tried again on the next "online") or a refusal
+  // such as an expired login (reported, the sets stay queued).
+  const flushingRef = useRef(false);
+  async function flushQueue() {
+    if (flushingRef.current) return;
+    const storage = browserStorage();
+    if (isOffline()) {
+      setQueuedCount(readQueue(storage, planId).length);
+      return;
+    }
+    const queue = readQueue(storage, planId);
+    setQueuedCount(queue.length);
+    if (queue.length === 0) return;
+    flushingRef.current = true;
+    let sent = 0;
+    try {
+      for (const q of queue) {
+        let res: Awaited<ReturnType<typeof upsertExerciseResultAction>>;
+        try {
+          res = await sendSet(q);
+        } catch {
+          break;
+        }
+        if (res.error) {
+          // Kept on the device (e.g. the login ran out meanwhile): nothing
+          // logged is thrown away; the athlete can retry after signing in
+          // or remove the set with ✕.
+          toast.error(`Offline eingetragene Sätze konnten nicht gespeichert werden: ${res.error}`);
+          break;
+        }
+        setQueuedCount(removeQueuedSet(storage, planId, q).length);
+        sent += 1;
+        setSetsByItem((prev) => {
+          const rows = prev[q.itemId];
+          if (!rows) return prev;
+          return {
+            ...prev,
+            [q.itemId]: rows.map((r) => (r.setNumber === q.setNumber && r.waiting ? { ...r, waiting: false } : r)),
+          };
+        });
+      }
+    } finally {
+      flushingRef.current = false;
+    }
+    if (sent > 0) {
+      toast.success(`${sent} offline eingetragene${sent === 1 ? "r Satz" : " Sätze"} gespeichert.`);
+      router.refresh();
+    }
+  }
+
+  // Leftovers from an earlier visit without connection are sent right away;
+  // anything logged offline now goes out once the phone is back online.
+  useEffect(() => {
+    const onOnline = () => void flushQueue();
+    const t = setTimeout(onOnline, 0);
+    window.addEventListener("online", onOnline);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("online", onOnline);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planId]);
 
   // The field to fill in always starts empty (or with whatever the athlete
   // already entered) — the last-known value is shown only as a reference
@@ -665,8 +786,19 @@ export function WorkoutSession({
       toast.error("Bitte ein Belastungsempfinden wählen.");
       return;
     }
+    if (queuedCount > 0) {
+      toast.error("Es warten noch Sätze ohne Verbindung. Bitte beende das Training, sobald du wieder Netz hast.");
+      return;
+    }
     setIsSavingRpe(true);
-    const result = await saveSessionRpeAction(planId, rpeValue);
+    let result: Awaited<ReturnType<typeof saveSessionRpeAction>>;
+    try {
+      result = await saveSessionRpeAction(planId, rpeValue);
+    } catch {
+      setIsSavingRpe(false);
+      toast.error("Keine Verbindung — bitte gleich noch einmal versuchen.");
+      return;
+    }
     setIsSavingRpe(false);
     if (result.error) {
       toast.error(result.error);
@@ -731,6 +863,22 @@ export function WorkoutSession({
                   <div className="h-[3px]" style={{ background: "var(--dc-accent)", width: progressWidth }} />
                 </div>
               </>
+            )}
+
+            {queuedCount > 0 && (
+              <div
+                className="mt-3.5 flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm"
+                style={{ background: "#fef3c7", color: "#78350f" }}
+                role="status"
+              >
+                <span>
+                  Keine Verbindung: {queuedCount} {queuedCount === 1 ? "Satz ist" : "Sätze sind"} auf dem Handy gespeichert
+                  und {queuedCount === 1 ? "wird" : "werden"} gesendet, sobald wieder Netz da ist.
+                </span>
+                <button type="button" className="btn btn-ghost flex-none" onClick={() => void flushQueue()}>
+                  Jetzt senden
+                </button>
+              </div>
             )}
 
             {restRemaining > 0 && (
@@ -903,15 +1051,16 @@ export function WorkoutSession({
                                   type="button"
                                   onClick={() => confirmSet(ex, s, { askRir: !s.confirmed })}
                                   disabled={pending}
-                                  aria-label="Satz übernehmen"
+                                  aria-label={s.waiting ? "Gespeichert auf dem Gerät, wird bei Verbindung gesendet" : "Satz übernehmen"}
+                                  title={s.waiting ? "Wartet auf Verbindung" : undefined}
                                   className="flex h-10 w-10 items-center justify-center rounded-sm text-[17px]"
                                   style={{
-                                    border: `1px solid ${s.confirmed ? "#10b981" : "var(--dc-divider)"}`,
-                                    background: s.confirmed ? "#10b981" : "transparent",
-                                    color: s.confirmed ? "#fff" : "var(--dc-text)",
+                                    border: `1px solid ${s.waiting ? "#d97706" : s.confirmed ? "#10b981" : "var(--dc-divider)"}`,
+                                    background: s.waiting ? "#fef3c7" : s.confirmed ? "#10b981" : "transparent",
+                                    color: s.waiting ? "#92400e" : s.confirmed ? "#fff" : "var(--dc-text)",
                                   }}
                                 >
-                                  ✓
+                                  {s.waiting ? "⏳" : "✓"}
                                 </button>
                                 {isRight ? (
                                   <span />
