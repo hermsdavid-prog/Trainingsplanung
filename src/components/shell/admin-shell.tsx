@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth";
+import { ThemeToggle } from "@/components/shell/theme-toggle";
 
 const NAV = [
   { href: "/admin/users", label: "Nutzer" },
@@ -34,6 +35,7 @@ export function AdminShell({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <form action={logoutAction}>
               <button type="submit" className="btn btn-secondary">
                 Abmelden
@@ -52,7 +54,7 @@ export function AdminShell({
                 className="chip"
                 style={{
                   background: active ? "var(--dc-accent)" : "transparent",
-                  color: active ? "var(--dc-bg)" : "var(--dc-text)",
+                  color: active ? "var(--dc-on-accent)" : "var(--dc-text)",
                 }}
               >
                 {item.label}

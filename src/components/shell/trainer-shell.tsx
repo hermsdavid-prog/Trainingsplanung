@@ -1,5 +1,6 @@
 "use client";
 
+import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -113,8 +114,13 @@ export function TrainerShell({
           {/* Sticky inner column so the navigation stays reachable while a
               long page (calendar, plan editor) scrolls underneath. */}
           <div className="sticky top-0 flex max-h-screen flex-col overflow-y-auto p-[26px_22px]" style={{ minHeight: "min(100vh, 100%)" }}>
-            <div className="font-heading text-[17px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
-              Trainingsplanung
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-heading text-[17px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
+                Trainingsplanung
+              </div>
+              <div className="-mr-2">
+                <ThemeToggle />
+              </div>
             </div>
             <div className="mt-0.5 text-[11px]" style={{ color: "var(--dc-muted)" }}>
               {fullName} · Trainer
@@ -152,6 +158,9 @@ export function TrainerShell({
           <span className="text-[17px] font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
             {current}
           </span>
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </div>
 
         {navOpen && (

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { House, CalendarDays, Dumbbell, Layers, CirclePlus, HeartPulse, UserRound } from "lucide-react";
 
 const TABS = [
@@ -62,6 +63,7 @@ export function AthleteShell({
               </Link>
             );
           })}
+          <ThemeToggle variant="tab" />
         </nav>
       </header>
 
