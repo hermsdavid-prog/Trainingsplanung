@@ -5,6 +5,7 @@ import { signCardioScreenshots } from "@/lib/cardio-screenshots";
 import { exerciseNoteKey } from "@/lib/exercise-note-key";
 import { isPerSide, type Side } from "@/lib/per-side";
 import { occurrenceOfSet, setNumberBase } from "@/lib/set-numbers";
+import { testUnit } from "@/lib/test-unit";
 import type { SessionExercise, SessionCardio, SessionKarateRow } from "@/components/athlete/workout-session";
 
 // Everything the live, tap-to-log session (WorkoutSession) needs for one
@@ -189,7 +190,13 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     restSeconds: parseRest(item.rest_time),
     note: item.notes ?? "",
     perSide: isPerSide(item.reps_or_duration),
-    unit: (item.exercise_id ? exerciseUnitByExercise.get(item.exercise_id) : undefined) || "kg",
+    // A test (Leistungsdiagnostik) is logged in the plan's Messgröße, e.g. cm.
+    isTest: item.section === "sprung",
+    unit:
+      item.section === "sprung"
+        ? testUnit(item.reps_or_duration)
+        : (item.exercise_id ? exerciseUnitByExercise.get(item.exercise_id) : undefined) || "kg",
+    linkUrl: item.link_url ?? "",
     initialSets: setsForItem(item),
     setNumberBase: setNumberBase(occurrenceOfItem.get(item.id) ?? 0),
     ...noteFields(item.id),

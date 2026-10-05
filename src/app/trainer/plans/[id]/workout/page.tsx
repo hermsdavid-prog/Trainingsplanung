@@ -29,7 +29,7 @@ export default async function TrainerPlanWorkoutPage({
       .single(),
     supabase
       .from("training_plan_items")
-      .select("id, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, description")
+      .select("id, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, description, link_url")
       .eq("training_plan_id", id)
       .order("position"),
   ]);
@@ -64,6 +64,8 @@ export default async function TrainerPlanWorkoutPage({
       sets: i.sets ?? "",
       restLabel: i.rest_time ?? "",
       exerciseId: i.exercise_id,
+      isTest: i.section === "sprung",
+      linkUrl: i.link_url ?? "",
     }));
   const cardio: OverviewCardio[] = (items ?? [])
     .filter((i) => i.section === "cardio")

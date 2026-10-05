@@ -9,6 +9,9 @@ export type OverviewKraft = {
   sets: string;
   restLabel: string;
   exerciseId: string | null;
+  // Leistungsdiagnostik row: "Versuche" instead of "Sätze".
+  isTest?: boolean;
+  linkUrl?: string;
 };
 
 export type OverviewCardio = {
@@ -75,9 +78,20 @@ export function WorkoutOverview({
                         <div className="text-[16px] leading-[1.25]">{ex.name}</div>
                         <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
                           {ex.spec || "—"}
-                          {ex.sets ? ` · ${ex.sets} Sätze` : ""}
+                          {ex.sets ? ` · ${ex.sets} ${ex.isTest ? "Versuche" : "Sätze"}` : ""}
                           {ex.restLabel ? ` · Pause ${ex.restLabel}` : ""}
                         </div>
+                        {ex.linkUrl && (
+                          <a
+                            href={ex.linkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 inline-block text-xs"
+                            style={{ color: "var(--dc-accent-700)" }}
+                          >
+                            ▸ Video ansehen
+                          </a>
+                        )}
                       </div>
                       {ex.exerciseId && instructionsByExercise[ex.exerciseId]?.steps.length > 0 && (
                         <button

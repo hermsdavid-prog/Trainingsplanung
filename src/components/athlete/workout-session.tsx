@@ -69,7 +69,13 @@ export type SessionExercise = {
   note: string;
   // "je Seite": every set is logged as a left + right pair.
   perSide?: boolean;
+  // Leistungsdiagnostik (e.g. CMJ): each set is one attempt with a single
+  // measured value in `unit` — no reps, no RIR, no warm-ups.
+  isTest?: boolean;
   unit: string;
+  // Video/link from the plan row, shown when the exercise library has no
+  // instruction video of its own.
+  linkUrl?: string;
   initialSets: { setNumber: number; type: SetType; reps: string; weight: string; rir: string; side?: Side | null; date?: string }[];
   // First set number of this item's block (lib/set-numbers): 0, or 100, 200 …
   // when the same exercise appears more than once in the plan.
@@ -203,14 +209,14 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
       key: nextKey(),
       setNumber: nextSetNumber++,
       type,
-      reps: parseLeadingNumber(ex.spec),
+      reps: ex.isTest ? "" : parseLeadingNumber(ex.spec),
       weight: "",
       rir: "",
       confirmed: false,
       side,
     }));
   const hasWarmup = rows.some((r) => r.type === "aufwaermsatz");
-  if (!hasWarmup) {
+  if (!hasWarmup && !ex.isTest) {
     rows.unshift(...newSet("aufwaermsatz"));
   }
   const workSetCount = countSets(rows.filter((r) => r.type === "arbeitssatz"));
@@ -440,6 +446,7 @@ export function WorkoutSession({
     unit: string;
     step: number;
     suggestion?: string;
+    isTest?: boolean;
   } | null>(null);
 
   // RIR ("Reps in Reserve") is asked per work set right after it's logged —
@@ -464,6 +471,7 @@ export function WorkoutSession({
       const suggested = Number(ex.sets) || 1;
       total += Math.max(suggested, countSets(rows));
       done += countSets(rows, (r) => r.confirmed);
+      if (ex.isTest) continue; // jump heights aren't load
       for (const r of rows) {
         if (!r.confirmed) continue;
         if (r.type === "arbeitssatz") {
@@ -565,14 +573,14 @@ export function WorkoutSession({
       return;
     }
     // Bodyweight exercises (Liegestütz, Klimmzug): reps alone are enough,
-    // saved as 0 kg.
+    // saved as 0 kg. A test attempt needs its measured value.
     const weight = set.weight.trim() ? Number(set.weight.replace(",", ".")) : 0;
-    if ((!set.weight.trim() && !set.reps.trim()) || Number.isNaN(weight)) {
-      toast.error("Bitte Gewicht oder Wiederholungen eintragen.");
+    if (ex.isTest ? !set.weight.trim() || Number.isNaN(weight) : (!set.weight.trim() && !set.reps.trim()) || Number.isNaN(weight)) {
+      toast.error(ex.isTest ? "Bitte einen Messwert eintragen." : "Bitte Gewicht oder Wiederholungen eintragen.");
       return;
     }
-    const reps = set.reps.trim() ? Number(set.reps.replace(",", ".")) : null;
-    const rir = set.type === "arbeitssatz" && set.rir.trim() ? Number(set.rir) : null;
+    const reps = !ex.isTest && set.reps.trim() ? Number(set.reps.replace(",", ".")) : null;
+    const rir = !ex.isTest && set.type === "arbeitssatz" && set.rir.trim() ? Number(set.rir) : null;
     const entry: QueuedSet = {
       exerciseId: ex.exerciseId,
       date: set.date ?? planDate,
@@ -614,12 +622,12 @@ export function WorkoutSession({
           if (s.key === set.key) return { ...s, confirmed: true, waiting, date: set.date ?? planDate };
           // Left side logged: suggest the same load for the right side
           // (still to be confirmed with ✓, nothing is saved for it yet).
-          if (j === i + 1 && set.side === "links" && isPairedRight(rows, j) && !s.confirmed && !s.weight.trim()) {
+          if (!ex.isTest && j === i + 1 && set.side === "links" && isPairedRight(rows, j) && !s.confirmed && !s.weight.trim()) {
             return { ...s, weight: set.weight, reps: set.reps.trim() ? set.reps : s.reps };
           }
           // Following sets of the same kind (and side) start with this load
           // as a suggestion, so an unchanged weight is one tap on ✓.
-          if (j > i && !s.confirmed && !s.weight.trim() && s.type === set.type && s.side === set.side && set.weight.trim()) {
+          if (!ex.isTest && j > i && !s.confirmed && !s.weight.trim() && s.type === set.type && s.side === set.side && set.weight.trim()) {
             return { ...s, weight: set.weight };
           }
           return s;
@@ -634,7 +642,7 @@ export function WorkoutSession({
     // Ask for RIR right after a work set is logged instead of relying on
     // the athlete to find the small RIR cell (for "je Seite" once, after
     // the right side).
-    if (opts.askRir && set.type === "arbeitssatz" && !set.rir.trim() && set.side !== "links") {
+    if (opts.askRir && !ex.isTest && set.type === "arbeitssatz" && !set.rir.trim() && set.side !== "links") {
       setRirPad({ itemId: ex.itemId, setKey: set.key });
     }
     if (result) notifyNewBadges(result.newBadges);
@@ -727,7 +735,17 @@ export function WorkoutSession({
     const ex = exercises.find((e) => e.itemId === itemId);
     const suggestion = ex?.exerciseId ? lastKnownByExercise[ex.exerciseId] : undefined;
     const suggestedValue = suggestion ? (field === "weight" ? suggestion.weight : suggestion.reps) : undefined;
-    setPad({ itemId, setKey, field, buffer: current, unit, step: field === "weight" ? 2.5 : 1, suggestion: suggestedValue });
+    const isTest = ex?.isTest ?? false;
+    setPad({
+      itemId,
+      setKey,
+      field,
+      buffer: current,
+      unit,
+      step: isTest ? 0.5 : field === "weight" ? 2.5 : 1,
+      suggestion: suggestedValue,
+      isTest,
+    });
   }
 
   function padPress(key: string) {
@@ -924,7 +942,7 @@ export function WorkoutSession({
                             {ex.name}
                           </span>
                           <span className="mt-0.5 block text-[13px]" style={{ color: "var(--dc-muted)" }}>
-                            {ex.spec}
+                            {ex.isTest ? `Test · Messwert in ${ex.unit}` : ex.spec}
                             {ex.restLabel ? ` · Pause ${ex.restLabel}` : ""}
                           </span>
                           {ex.perSide && (
@@ -979,10 +997,10 @@ export function WorkoutSession({
                             borderBottom: "1px solid var(--dc-divider)",
                           }}
                         >
-                          <span>Satz</span>
-                          <span>Wdh.</span>
-                          <span>Gewicht</span>
-                          <span>RIR</span>
+                          <span>{ex.isTest ? "Versuch" : "Satz"}</span>
+                          <span>{ex.isTest ? "" : "Wdh."}</span>
+                          <span>{ex.isTest ? `Messwert (${ex.unit})` : "Gewicht"}</span>
+                          <span>{ex.isTest ? "" : "RIR"}</span>
                           <span />
                           <span />
                         </div>
@@ -1008,7 +1026,7 @@ export function WorkoutSession({
                                   className="text-[12.5px] leading-tight"
                                   style={{ color: s.confirmed ? "var(--dc-accent-700)" : "var(--dc-muted)" }}
                                 >
-                                  {isRight ? null : SET_TYPE_LABEL[s.type]}
+                                  {isRight ? null : ex.isTest ? "Versuch" : SET_TYPE_LABEL[s.type]}
                                   <span className="block tabular-nums">
                                     {isRight ? "" : typeCounts[s.type]}
                                     {s.side ? (
@@ -1019,13 +1037,17 @@ export function WorkoutSession({
                                     ) : null}
                                   </span>
                                 </span>
-                                <button
-                                  type="button"
-                                  className="tapv text-[17px]"
-                                  onClick={() => openPad(ex.itemId, s.key, "reps", s.reps, "Wdh.")}
-                                >
-                                  {s.reps || "—"}
-                                </button>
+                                {ex.isTest ? (
+                                  <span />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="tapv text-[17px]"
+                                    onClick={() => openPad(ex.itemId, s.key, "reps", s.reps, "Wdh.")}
+                                  >
+                                    {s.reps || "—"}
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   className="tapv text-[17px]"
@@ -1034,7 +1056,9 @@ export function WorkoutSession({
                                 >
                                   {s.weight ? `${s.weight} ${ex.unit || "kg"}` : "—"}
                                 </button>
-                                {s.type === "arbeitssatz" && s.confirmed ? (
+                                {ex.isTest ? (
+                                  <span />
+                                ) : s.type === "arbeitssatz" && s.confirmed ? (
                                   <button
                                     type="button"
                                     className="tapv text-[15px]"
@@ -1085,12 +1109,20 @@ export function WorkoutSession({
                           ex.itemId,
                           ex.noteKey,
                           <>
-                            <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "aufwaermsatz")}>
-                              + Aufwärmsatz
-                            </button>
-                            <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "arbeitssatz")}>
-                              + Arbeitssatz
-                            </button>
+                            {ex.isTest ? (
+                              <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "arbeitssatz")}>
+                                + Versuch
+                              </button>
+                            ) : (
+                              <>
+                                <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "aufwaermsatz")}>
+                                  + Aufwärmsatz
+                                </button>
+                                <button type="button" className="btn btn-secondary" onClick={() => addSet(ex.itemId, "arbeitssatz")}>
+                                  + Arbeitssatz
+                                </button>
+                              </>
+                            )}
                           </>
                         )}
                       </div>
@@ -1240,7 +1272,7 @@ export function WorkoutSession({
           >
             <div className="flex items-baseline justify-between">
               <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
-                {pad.field === "reps" ? "Wiederholungen" : "Gewicht"}
+                {pad.field === "reps" ? "Wiederholungen" : pad.isTest ? "Messwert" : "Gewicht"}
               </span>
               <button type="button" className="btn btn-ghost" onClick={() => setPad(null)}>
                 Abbrechen
@@ -1254,7 +1286,7 @@ export function WorkoutSession({
             </div>
             {pad.suggestion && (
               <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
-                Letztes Training: {pad.suggestion} {pad.unit}
+                {pad.isTest ? "Bisher bester Wert" : "Letztes Training"}: {pad.suggestion} {pad.unit}
               </div>
             )}
             <div className="mt-3 flex gap-2">
@@ -1366,8 +1398,12 @@ export function WorkoutSession({
           const title = ex?.name ?? row?.name ?? "";
           const steps = instr?.steps ?? [];
           const fallbackNote = ex?.note ?? row?.note ?? row?.desc ?? "";
-          const linkUrl = instr?.video_url ?? row?.linkUrl ?? "";
-          const linkLabel = instr?.video_url ? instr.video_label || "Video ansehen" : "Link öffnen";
+          const linkUrl = instr?.video_url || ex?.linkUrl || row?.linkUrl || "";
+          const linkLabel = instr?.video_url
+            ? instr.video_label || "Video ansehen"
+            : /youtube\.com|youtu\.be|vimeo\.com/i.test(linkUrl)
+              ? "Video ansehen"
+              : "Link öffnen";
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "color-mix(in srgb, #201e1d 50%, transparent)" }} onClick={() => setInstrItemId(null)}>
               <div

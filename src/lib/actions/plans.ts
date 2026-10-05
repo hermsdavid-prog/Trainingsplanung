@@ -533,9 +533,10 @@ export async function savePlanItemsAction(
   // in the shared library yet (e.g. "Schwungdrücken") — auto-create it so
   // the item still links to an exercise_id and can be progress-tracked, and
   // so a Sportartspezifisch row has something to hang its
-  // exercise_instructions (steps/video) off of. Cardio and Leistungsdiagnostik
-  // (sprung) rows never resolve to a library exercise — weight/rep-based
-  // result tracking and per-exercise instructions don't apply to them.
+  // exercise_instructions (steps/video) off of. Leistungsdiagnostik (sprung)
+  // rows resolve too: the session logs their attempts (e.g. CMJ in cm) as
+  // exercise results, which need an exercise_id. Only cardio rows never
+  // resolve to a library exercise.
   //
   // Resolved in parallel rather than one at a time, and a failure here is
   // reported back instead of silently saving the row without an exercise_id
@@ -549,7 +550,7 @@ export async function savePlanItemsAction(
   const idsToVerify = Array.from(
     new Set(
       filteredItems
-        .filter((item) => item.section !== "cardio" && item.section !== "sprung" && item.exercise_id)
+        .filter((item) => item.section !== "cardio" && item.exercise_id)
         .map((item) => item.exercise_id as string)
     )
   );
@@ -561,7 +562,7 @@ export async function savePlanItemsAction(
   const resolvedExerciseIds: (string | null)[] = new Array(filteredItems.length).fill(null);
   const toResolve: { index: number; name: string }[] = [];
   filteredItems.forEach((item, index) => {
-    if (item.section === "cardio" || item.section === "sprung") {
+    if (item.section === "cardio") {
       resolvedExerciseIds[index] = item.exercise_id ?? null;
     } else if (item.exercise_id && nameById.get(item.exercise_id) === item.exercise_name.trim().toLowerCase()) {
       resolvedExerciseIds[index] = item.exercise_id;

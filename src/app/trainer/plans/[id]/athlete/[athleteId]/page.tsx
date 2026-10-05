@@ -44,7 +44,7 @@ export default async function TrainerAthletePlanPage({
 
   if (!plan || !athlete) notFound();
 
-  const kraftItems = (items ?? []).filter((i) => i.section === "kraft" && i.exercise_id);
+  const kraftItems = (items ?? []).filter((i) => (i.section === "kraft" || i.section === "sprung") && i.exercise_id);
   const cardioItems = (items ?? []).filter((i) => i.section === "cardio");
   const { data: feedbackRows } = (items ?? []).length
     ? await supabase
@@ -263,9 +263,9 @@ export default async function TrainerAthletePlanPage({
                   borderBottom: "1px solid var(--dc-divider)",
                 }}
               >
-                <span>Satz</span>
-                <span>Wdh.</span>
-                <span>Gewicht</span>
+                <span>{ex.section === "sprung" ? "Versuch" : "Satz"}</span>
+                <span>{ex.section === "sprung" ? "" : "Wdh."}</span>
+                <span>{ex.section === "sprung" ? "Messwert" : "Gewicht"}</span>
                 <span>Vorschlag</span>
               </div>
               {ex.sets.length === 0 && (
@@ -279,7 +279,7 @@ export default async function TrainerAthletePlanPage({
                   const sideLabel = s.side ? SIDE_LABEL[s.side] : "";
                   const label = isRight
                     ? sideLabel
-                    : `${SET_TYPE_LABEL[s.type] ?? s.type} ${typeCounts[s.type]}${sideLabel ? ` · ${sideLabel}` : ""}`;
+                    : `${ex.section === "sprung" ? "Versuch" : (SET_TYPE_LABEL[s.type] ?? s.type)} ${typeCounts[s.type]}${sideLabel ? ` · ${sideLabel}` : ""}`;
                   const tone =
                     s.type === "arbeitssatz"
                       ? "var(--dc-text)"
@@ -297,7 +297,7 @@ export default async function TrainerAthletePlanPage({
                         {label}
                       </span>
                       <span className="text-[15px]" style={{ color: tone }}>
-                        {s.reps ?? "—"}
+                        {ex.section === "sprung" ? "" : (s.reps ?? "—")}
                       </span>
                       <span className="text-[15px]" style={{ color: tone }}>
                         {s.value}

@@ -191,7 +191,7 @@ export function PlanTableEditor({
       prev.map((row, i) => {
         if (i !== index) return row;
         const next = { ...row, [field]: value };
-        if (field === "exercise_name" && (row.section === "kraft" || row.section === "runden")) {
+        if (field === "exercise_name" && row.section !== "cardio") {
           // Only keep exercise_id when the new text still matches a known
           // library exercise — falling back to the row's previous id here
           // used to let a renamed row silently keep pointing at the OLD
@@ -1024,12 +1024,23 @@ export function PlanTableEditor({
                       />
                     </td>
                     <td>
-                      <input
-                        className="input min-w-32"
-                        value={row.notes}
-                        onChange={(e) => updateRow(index, "notes", e.target.value)}
-                        placeholder="Ausführung, Absprunghöhe"
-                      />
+                      <div className="flex gap-1">
+                        <input
+                          className="input min-w-32"
+                          value={row.notes}
+                          onChange={(e) => updateRow(index, "notes", e.target.value)}
+                          placeholder="Ausführung, Absprunghöhe"
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-icon"
+                          onClick={() => setLinkOpenIndex(index)}
+                          aria-label="Link"
+                          style={row.link_url ? { borderColor: "var(--dc-accent)", color: "var(--dc-accent)" } : undefined}
+                        >
+                          <LinkIcon />
+                        </button>
+                      </div>
                     </td>
                     <td>
                       <button
