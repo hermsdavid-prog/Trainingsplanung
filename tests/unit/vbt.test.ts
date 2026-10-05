@@ -78,3 +78,28 @@ describe("load-velocity profile", () => {
     expect(defaultMvt("Rumänisches Kreuzheben")).toBe(0.3);
   });
 });
+
+describe("review edge cases", () => {
+  it("keeps unrelated text when switching VBT off", () => {
+    expect(withVbt("3 Wdh. · VBT je Seite", false)).toBe("3 Wdh. je Seite");
+    expect(withVbt("3 Wdh. · VBT 0,6 m/s je Seite", false)).toBe("3 Wdh. je Seite");
+    expect(withVbt("5x3 VBT, Pause 3 min", false)).toBe("5x3, Pause 3 min");
+    expect(withVbt("3 Wdh. · VBT 0,5 bis 0,6 m/s · max. 12,5 % Verlust", false)).toBe("3 Wdh.");
+  });
+
+  it("parses decimal loss limits and whole-number targets", () => {
+    expect(vbtSpec("VBT · max. 12,5 % Verlust").lossLimit).toBe(12.5);
+    expect(vbtSpec("VBT 0,5-1 m/s")).toMatchObject({ targetMin: 0.5, targetMax: 1 });
+    expect(vbtSpec("VBT 1 m/s")).toMatchObject({ targetMin: 1, targetMax: 1 });
+    expect(vbtSpec("VBT 0,5 bis 0,6 m/s")).toMatchObject({ targetMin: 0.5, targetMax: 0.6 });
+  });
+
+  it("treats a faster last rep as no loss", () => {
+    expect(velocityLoss(0.5, 0.55)).toBeNull();
+  });
+
+  it("never suggests 0 kg", () => {
+    const fit = fitLoadVelocity([40, 60, 80, 100].map((load) => ({ load, velocity: 1.5 - 0.01 * load })))!;
+    expect(suggestLoad(fit, 1.48)).toBeNull();
+  });
+});

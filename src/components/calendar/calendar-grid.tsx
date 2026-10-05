@@ -157,7 +157,7 @@ export function CalendarGrid({
 
   function removeEvent(id: string) {
     startTransition(async () => {
-      const result = await deleteEventAction(id);
+      const result = await deleteEventAction(id, { wholeProposal: true });
       if (result.error) {
         toast.error(result.error);
       } else {

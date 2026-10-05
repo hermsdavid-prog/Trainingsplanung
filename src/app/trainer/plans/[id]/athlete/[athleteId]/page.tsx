@@ -1,3 +1,4 @@
+import { velocityLoss } from "@/lib/vbt";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -320,9 +321,10 @@ export default async function TrainerAthletePlanPage({
                         {s.velocity != null ? (
                           <span className="block text-xs" style={{ color: "var(--dc-muted)" }}>
                             {String(s.velocity).replace(".", ",")} m/s
-                            {s.velocityLast != null && s.velocity > 0
-                              ? ` · −${String(Math.round(((s.velocity - s.velocityLast) / s.velocity) * 1000) / 10).replace(".", ",")} %`
-                              : ""}
+                            {(() => {
+                              const loss = velocityLoss(Number(s.velocity), s.velocityLast != null ? Number(s.velocityLast) : null);
+                              return loss != null ? ` · −${String(loss).replace(".", ",")} %` : "";
+                            })()}
                           </span>
                         ) : null}
                         {s.contactMs != null || s.rsi != null ? (

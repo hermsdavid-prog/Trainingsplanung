@@ -25,6 +25,7 @@ import { SIDE_LABEL, countSets, isPairedRight, type Side } from "@/lib/per-side"
 import { computeRsi, parseDecimal, type JumpMetrics } from "@/lib/jump-metrics";
 import {
   estimateOneRmFromProfile,
+  plausibleVelocity,
   readiness,
   suggestLoad,
   velocityLoss,
@@ -380,7 +381,8 @@ function VbtPanel({
             {String(form).replace(".", ",")} % {form <= -8 ? "(langsamer als üblich, Last senken)" : form >= 3 ? "(schneller als üblich)" : "(normal)"}
           </span>
         )}
-      {oneRm != null && line("Geschätztes 1RM (Profil)", `ca. ${fmt(oneRm, 1).replace(",0", "")} ${unit}`)}
+      {oneRm != null &&
+        line(`Geschätztes 1RM (bei ${fmt(vbt.mvt)} m/s)`, `ca. ${fmt(oneRm, 1).replace(",0", "")} ${unit}`)}
       {!fit && (
         <p style={{ color: "var(--dc-muted)" }}>
           Noch kein Last-Geschwindigkeits-Profil. Es entsteht automatisch, sobald Sätze mit mindestens zwei verschiedenen
@@ -753,7 +755,13 @@ export function WorkoutSession({
     const reps = !ex.isTest && set.reps.trim() ? Number(set.reps.replace(",", ".")) : null;
     const rir = !ex.isTest && !ex.vbt && set.type === "arbeitssatz" && set.rir.trim() ? Number(set.rir) : null;
     const velocity = ex.vbt ? parseDecimal(set.velocity) : null;
-    const velocityLast = ex.vbt ? parseDecimal(set.velocityLast) : null;
+    if (velocity != null && !plausibleVelocity(velocity)) {
+      toast.error("Die Geschwindigkeit ist unplausibel. Bitte in m/s eintragen, z. B. 0,62.");
+      return;
+    }
+    const lastRaw = ex.vbt ? parseDecimal(set.velocityLast) : null;
+    const velocityLast =
+      velocity != null && plausibleVelocity(lastRaw) && lastRaw <= velocity ? lastRaw : null;
     const entry: QueuedSet = {
       exerciseId: ex.exerciseId,
       date: set.date ?? planDate,
@@ -766,7 +774,7 @@ export function WorkoutSession({
       side: set.side,
       contactMs,
       rsi,
-      velocity: velocity != null && velocity > 0 ? velocity : null,
+      velocity,
       velocityLast,
       itemId: ex.itemId,
     };
@@ -819,7 +827,8 @@ export function WorkoutSession({
     // Ask for RIR right after a work set is logged instead of relying on
     // the athlete to find the small RIR cell (for "je Seite" once, after
     // the right side).
-    if (opts.askRir && ex.vbt && !set.velocity.trim() && set.side !== "links") {
+    // (for "je Seite" for each side, since each side has its own bar speed).
+    if (opts.askRir && ex.vbt && !set.velocity.trim()) {
       // VBT replaces RIR: ask for the bar speed from the sensor app instead.
       setVbtPad({ itemId: ex.itemId, setKey: set.key, best: "", last: "" });
     } else if (opts.askRir && !ex.isTest && !ex.vbt && set.type === "arbeitssatz" && !set.rir.trim() && set.side !== "links") {

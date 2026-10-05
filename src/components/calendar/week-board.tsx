@@ -131,7 +131,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
     if (!confirm(`${label} "${item.title}" wirklich löschen?`)) return;
     startTransition(async () => {
       const result =
-        item.kind === "plan" ? await deletePlanAction(item.id) : await deleteEventAction(item.id);
+        item.kind === "plan" ? await deletePlanAction(item.id) : await deleteEventAction(item.id, { wholeProposal: true });
       if (result.error) {
         toast.error(result.error);
       } else {

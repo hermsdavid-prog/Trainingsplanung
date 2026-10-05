@@ -107,6 +107,10 @@ export async function proposeEventAction(input: {
   if (!input.title.trim() || !input.date || !input.groupId) {
     return { error: "Bitte Titel, Datum und Gruppe angeben." };
   }
+  const isDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  if (!isDate(input.date) || (input.endDate && !isDate(input.endDate))) {
+    return { error: "Ungültiges Datum." };
+  }
   const endDate = input.endDate && input.endDate !== input.date ? input.endDate : null;
   if (endDate && endDate < input.date) {
     return { error: "Das Enddatum muss nach dem Startdatum liegen." };
@@ -115,6 +119,7 @@ export async function proposeEventAction(input: {
   // Like a trainer's multi-day event: one all-day row per day, sharing a
   // series so the trainer confirms or declines the whole span at once.
   const dates = endDate ? dailyOccurrences(input.date, endDate) : [input.date];
+  if (dates.length === 0) return { error: "Ungültiges Datum." };
   if (dates.length > MAX_PROPOSAL_DAYS) {
     return { error: `Ein Vorschlag kann höchstens ${MAX_PROPOSAL_DAYS} Tage umfassen.` };
   }
@@ -253,7 +258,8 @@ export async function confirmEventAction(eventId: string): Promise<ActionResult>
 
 export async function deleteEventAction(
   eventId: string,
-  // Declining a multi-day proposal removes all of its still-proposed days.
+  // A multi-day proposal goes as a whole (like confirming it); confirmed
+  // events, including days of a trainer's series, are deleted one by one.
   opts: { wholeProposal?: boolean } = {}
 ): Promise<ActionResult> {
   const { supabase } = await requireUser();

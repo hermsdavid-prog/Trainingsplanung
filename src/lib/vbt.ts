@@ -19,21 +19,22 @@ export type VbtSpec = {
 
 const VBT_MARK = /\bvbt\b/i;
 const num = (s: string) => Number(s.replace(",", "."));
+const NUM = "\\d+(?:[.,]\\d+)?";
 
 export function vbtSpec(spec: string | null | undefined): VbtSpec {
   const text = spec ?? "";
   const on = VBT_MARK.test(text);
   if (!on) return { on: false, targetMin: null, targetMax: null, lossLimit: null };
-  const range = text.match(/(\d+[.,]\d+)\s*[-–bis]+\s*(\d+[.,]\d+)\s*m\/s/i);
-  const single = range ? null : text.match(/(\d+[.,]\d+)\s*m\/s/i);
-  const loss = text.match(/(\d+)\s*%\s*(geschwindigkeits)?verlust/i);
+  const range = text.match(new RegExp(`(${NUM})(?:\\s*[-–]\\s*|\\s+bis\\s+)(${NUM})\\s*m\\/s`, "i"));
+  const single = range ? null : text.match(new RegExp(`(${NUM})\\s*m\\/s`, "i"));
+  const loss = text.match(new RegExp(`(?:^|[^\\d.,])(${NUM})\\s*%\\s*(?:geschwindigkeits)?verlust`, "i"));
   const a = range ? num(range[1]) : single ? num(single[1]) : null;
   const b = range ? num(range[2]) : single ? num(single[1]) : null;
   return {
     on,
     targetMin: a != null && b != null ? Math.min(a, b) : null,
     targetMax: a != null && b != null ? Math.max(a, b) : null,
-    lossLimit: loss ? Number(loss[1]) : null,
+    lossLimit: loss ? num(loss[1]) : null,
   };
 }
 
@@ -41,16 +42,20 @@ export function vbtSpec(spec: string | null | undefined): VbtSpec {
 // the text the trainer writes after it).
 export function withVbt(spec: string, on: boolean): string {
   if (on) return VBT_MARK.test(spec) ? spec : `${spec.trim()} · VBT`.replace(/^ · /, "");
+  // Only the marker, its target zone and the loss limit go; anything else
+  // in the field ("je Seite", "Pause …") stays.
   return spec
-    .replace(/\s*·?\s*\bvbt\b[^·]*/gi, "")
-    .replace(/\s*·?\s*max\.?\s*\d+\s*%\s*(geschwindigkeits)?verlust/gi, "")
+    .replace(new RegExp(`\\s*·?\\s*\\bvbt\\b(?:\\s*${NUM}(?:(?:\\s*[-–]\\s*|\\s+bis\\s+)${NUM})?\\s*m\\/s)?`, "gi"), "")
+    .replace(new RegExp(`\\s*·?\\s*(?:max\\.?\\s*)?${NUM}\\s*%\\s*(?:geschwindigkeits)?verlust`, "gi"), "")
     .replace(/^\s*·\s*/, "")
+    .replace(/\s{2,}/g, " ")
     .trim();
 }
 
 // Velocity loss within a set in percent: fastest rep vs. last rep.
 export function velocityLoss(best: number | null, last: number | null): number | null {
-  if (best == null || last == null || !(best > 0) || last < 0) return null;
+  // A last rep faster than the first is no loss.
+  if (best == null || last == null || !(best > 0) || last < 0 || last > best) return null;
   return Math.round(((best - last) / best) * 1000) / 10;
 }
 
@@ -113,13 +118,17 @@ export function suggestLoad(
   today?: { load: number; velocity: number } | null
 ): number | null {
   const intercept = today ? today.velocity - fit.slope * today.load : fit.intercept;
-  const load = (targetVelocity - intercept) / fit.slope;
-  if (!Number.isFinite(load) || load <= 0) return null;
-  return Math.floor(load / 2.5) * 2.5;
+  const load = Math.floor((targetVelocity - intercept) / fit.slope / 2.5) * 2.5;
+  return Number.isFinite(load) && load > 0 ? load : null;
 }
 
 // Typical minimal velocity thresholds (mean velocity at 1RM) as a starting
 // point; trainers can set their own in the profile view.
+// Mean concentric velocities outside this range are typos ("62" for 0,62).
+export function plausibleVelocity(v: number | null): v is number {
+  return v != null && Number.isFinite(v) && v >= 0.05 && v <= 3;
+}
+
 export function defaultMvt(exerciseName: string): number {
   const n = exerciseName.toLowerCase();
   if (/bank|bench/.test(n)) return 0.17;

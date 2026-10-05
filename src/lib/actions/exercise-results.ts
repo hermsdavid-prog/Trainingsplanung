@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/actions/plans";
 import { checkExercisePr, type BadgeAward } from "@/lib/badges";
 import type { Side } from "@/lib/per-side";
+import { plausibleVelocity } from "@/lib/vbt";
 
 export async function upsertExerciseResultAction(
   exerciseId: string,
@@ -30,6 +31,15 @@ export async function upsertExerciseResultAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
+
+  // VBT: a typo ("62" for 0,62 m/s) would skew the whole profile; the last
+  // rep only counts next to a plausible fastest rep and can't be faster.
+  if (velocity != null && !plausibleVelocity(velocity)) {
+    return { error: "Die Geschwindigkeit ist unplausibel (in m/s eintragen, z. B. 0,62)." };
+  }
+  if (velocity == null || velocityLast == null || !plausibleVelocity(velocityLast) || velocityLast > velocity) {
+    velocityLast = null;
+  }
 
   const { error } = await supabase.from("exercise_results").upsert(
     {
