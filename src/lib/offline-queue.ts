@@ -14,6 +14,9 @@ export type QueuedSet = {
   setType: "aufwaermsatz" | "arbeitssatz";
   rir: number | null;
   side: Side | null;
+  // Jump tests only (older queued entries don't have them).
+  contactMs?: number | null;
+  rsi?: number | null;
   // Session row the set belongs to, to clear its "wartet" mark after sending.
   itemId: string;
 };

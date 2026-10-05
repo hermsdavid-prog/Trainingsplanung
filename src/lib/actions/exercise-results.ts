@@ -17,7 +17,10 @@ export async function upsertExerciseResultAction(
   setType: "aufwaermsatz" | "arbeitssatz" = "arbeitssatz",
   rir: number | null = null,
   // Left or right row of a unilateral ("je Seite") exercise; null otherwise.
-  side: Side | null = null
+  side: Side | null = null,
+  // Jump tests (Leistungsdiagnostik): ground contact time and RSI.
+  contactMs: number | null = null,
+  rsi: number | null = null
 ): Promise<ActionResult & { newBadges?: BadgeAward[] }> {
   const supabase = await createClient();
   const {
@@ -38,6 +41,8 @@ export async function upsertExerciseResultAction(
       set_type: setType,
       rir,
       side,
+      contact_ms: contactMs,
+      rsi,
     },
     { onConflict: "training_plan_id,athlete_id,exercise_id,date,set_number" }
   );

@@ -6,6 +6,7 @@ import { exerciseNoteKey } from "@/lib/exercise-note-key";
 import { isPerSide, type Side } from "@/lib/per-side";
 import { occurrenceOfSet, setNumberBase } from "@/lib/set-numbers";
 import { testUnit } from "@/lib/test-unit";
+import { computeRsi, jumpMetrics } from "@/lib/jump-metrics";
 import type { SessionExercise, SessionCardio, SessionKarateRow } from "@/components/athlete/workout-session";
 
 // Everything the live, tap-to-log session (WorkoutSession) needs for one
@@ -57,7 +58,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     exerciseIds.length
       ? supabase
           .from("exercise_results")
-          .select("exercise_id, date, set_number, value, reps, unit, set_type, rir, side")
+          .select("exercise_id, date, set_number, value, reps, unit, set_type, rir, side, contact_ms, rsi")
           .eq("athlete_id", userId)
           // By plan only, not by date: after a trainer moved the training
           // to another day, the sets logged before must still show up.
@@ -108,7 +109,17 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
 
   const resultsByExercise = new Map<
     string,
-    { setNumber: number; type: "aufwaermsatz" | "arbeitssatz"; reps: string; weight: string; rir: string; side: Side | null; date: string }[]
+    {
+      setNumber: number;
+      type: "aufwaermsatz" | "arbeitssatz";
+      reps: string;
+      weight: string;
+      rir: string;
+      side: Side | null;
+      date: string;
+      contact: string;
+      rsi: string;
+    }[]
   >();
   for (const r of existingResults ?? []) {
     const list = resultsByExercise.get(r.exercise_id) ?? [];
@@ -120,6 +131,10 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
       rir: r.rir != null ? String(r.rir) : "",
       side: r.side === "links" || r.side === "rechts" ? r.side : null,
       date: r.date,
+      contact: r.contact_ms != null ? String(r.contact_ms) : "",
+      // Only a hand-entered RSI is kept as such; one that matches height and
+      // contact time is recomputed in the session (and follows corrections).
+      rsi: r.rsi != null && r.rsi !== computeRsi(Number(r.value), r.contact_ms) ? String(r.rsi) : "",
     });
     resultsByExercise.set(r.exercise_id, list);
   }
@@ -192,6 +207,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     perSide: isPerSide(item.reps_or_duration),
     // A test (Leistungsdiagnostik) is logged in the plan's Messgröße, e.g. cm.
     isTest: item.section === "sprung",
+    metrics: item.section === "sprung" ? jumpMetrics(item.reps_or_duration) : undefined,
     unit:
       item.section === "sprung"
         ? testUnit(item.reps_or_duration)

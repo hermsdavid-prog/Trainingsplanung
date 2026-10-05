@@ -22,6 +22,7 @@ import {
 } from "@/components/athlete/exercise-notes";
 import type { BadgeAward } from "@/lib/badges";
 import { SIDE_LABEL, countSets, isPairedRight, type Side } from "@/lib/per-side";
+import { computeRsi, parseDecimal, type JumpMetrics } from "@/lib/jump-metrics";
 import {
   browserStorage,
   enqueueSet,
@@ -40,6 +41,9 @@ type SessionSet = {
   reps: string;
   weight: string;
   rir: string;
+  // Jump tests: ground contact time (ms) and a hand-entered RSI ("" = computed).
+  contact: string;
+  rsi: string;
   confirmed: boolean;
   // Unilateral exercises: the left/right row of one set (see lib/per-side).
   side: Side | null;
@@ -72,11 +76,23 @@ export type SessionExercise = {
   // Leistungsdiagnostik (e.g. CMJ): each set is one attempt with a single
   // measured value in `unit` — no reps, no RIR, no warm-ups.
   isTest?: boolean;
+  // Jump test that also records contact time and/or RSI (Drop Jump, Pogo).
+  metrics?: JumpMetrics;
   unit: string;
   // Video/link from the plan row, shown when the exercise library has no
   // instruction video of its own.
   linkUrl?: string;
-  initialSets: { setNumber: number; type: SetType; reps: string; weight: string; rir: string; side?: Side | null; date?: string }[];
+  initialSets: {
+    setNumber: number;
+    type: SetType;
+    reps: string;
+    weight: string;
+    rir: string;
+    side?: Side | null;
+    date?: string;
+    contact?: string;
+    rsi?: string;
+  }[];
   // First set number of this item's block (lib/set-numbers): 0, or 100, 200 …
   // when the same exercise appears more than once in the plan.
   setNumberBase?: number;
@@ -142,6 +158,14 @@ function notifyNewBadges(badges: BadgeAward[] | undefined) {
 // phone so "Aufwärmsatz" (number on its own line) and "100 kg" both fit
 // without truncation.
 const SET_GRID = "76px 46px minmax(0,1fr) 38px 40px 24px";
+// Jump test with contact time / RSI: Versuch · Höhe · Kontakt · RSI · ✓ · ✕.
+const JUMP_GRID = "64px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 40px 24px";
+
+type PadField = "reps" | "weight" | "contact" | "rsi";
+
+function isJump(ex: SessionExercise): boolean {
+  return !!ex.isTest && !!(ex.metrics?.contact || ex.metrics?.rsi);
+}
 
 const SET_TYPE_LABEL: Record<SetType, string> = {
   aufwaermsatz: "Aufwärmsatz",
@@ -184,6 +208,8 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
     reps: s.reps,
     weight: s.weight,
     rir: s.rir,
+    contact: s.contact ?? "",
+    rsi: s.rsi ?? "",
     confirmed: true,
     side: s.side ?? null,
     date: s.date,
@@ -199,7 +225,18 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
     if (ex.perSide && r.side === "links" && confirmedSets[i + 1]?.side !== "rechts") {
       const setNumber = taken.has(r.setNumber + 1) ? nextSetNumber++ : r.setNumber + 1;
       taken.add(setNumber);
-      rows.push({ ...r, key: nextKey(), setNumber, rir: "", confirmed: false, side: "rechts" });
+      rows.push({
+        ...r,
+        key: nextKey(),
+        setNumber,
+        // A measured value is never carried over to the other side.
+        weight: ex.isTest ? "" : r.weight,
+        rir: "",
+        contact: "",
+        rsi: "",
+        confirmed: false,
+        side: "rechts",
+      });
     }
   });
   nextSetNumber = Math.max(nextSetNumber, ...[...taken].map((n) => n + 1));
@@ -212,6 +249,8 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
       reps: ex.isTest ? "" : parseLeadingNumber(ex.spec),
       weight: "",
       rir: "",
+      contact: "",
+      rsi: "",
       confirmed: false,
       side,
     }));
@@ -441,7 +480,7 @@ export function WorkoutSession({
   const [pad, setPad] = useState<{
     itemId: string;
     setKey: string;
-    field: "reps" | "weight";
+    field: PadField;
     buffer: string;
     unit: string;
     step: number;
@@ -489,7 +528,7 @@ export function WorkoutSession({
 
   const progressWidth = totals.total > 0 ? `${Math.min(100, (totals.done / totals.total) * 100)}%` : "0%";
 
-  function updateSet(itemId: string, key: string, field: "reps" | "weight" | "rir", value: string) {
+  function updateSet(itemId: string, key: string, field: PadField | "rir", value: string) {
     setSetsByItem((prev) => ({
       ...prev,
       [itemId]: prev[itemId].map((s) => (s.key === key ? { ...s, [field]: value } : s)),
@@ -513,6 +552,8 @@ export function WorkoutSession({
         reps: "",
         weight: "",
         rir: "",
+        contact: "",
+        rsi: "",
         confirmed: false,
         side,
       }));
@@ -575,7 +616,16 @@ export function WorkoutSession({
     // Bodyweight exercises (Liegestütz, Klimmzug): reps alone are enough,
     // saved as 0 kg. A test attempt needs its measured value.
     const weight = set.weight.trim() ? Number(set.weight.replace(",", ".")) : 0;
-    if (ex.isTest ? !set.weight.trim() || Number.isNaN(weight) : (!set.weight.trim() && !set.reps.trim()) || Number.isNaN(weight)) {
+    // Jump tests: contact time and RSI next to the height. The RSI is
+    // computed from height and contact time unless one was typed in.
+    const contactMs = ex.metrics?.contact ? parseDecimal(set.contact) : null;
+    const rsi = ex.metrics?.rsi ? (parseDecimal(set.rsi) ?? computeRsi(weight || null, contactMs)) : null;
+    const hasJumpValue = contactMs != null || rsi != null;
+    if (
+      ex.isTest
+        ? (!set.weight.trim() && !hasJumpValue) || Number.isNaN(weight)
+        : (!set.weight.trim() && !set.reps.trim()) || Number.isNaN(weight)
+    ) {
       toast.error(ex.isTest ? "Bitte einen Messwert eintragen." : "Bitte Gewicht oder Wiederholungen eintragen.");
       return;
     }
@@ -591,6 +641,8 @@ export function WorkoutSession({
       setType: set.type,
       rir,
       side: set.side,
+      contactMs,
+      rsi,
       itemId: ex.itemId,
     };
     setPendingKey(set.key);
@@ -659,7 +711,9 @@ export function WorkoutSession({
       planId,
       q.setType,
       q.rir,
-      q.side
+      q.side,
+      q.contactMs ?? null,
+      q.rsi ?? null
     );
   }
 
@@ -731,10 +785,15 @@ export function WorkoutSession({
   // already entered) — the last-known value is shown only as a reference
   // hint below it, never pre-filled, so nothing gets saved without the
   // athlete actually typing it.
-  function openPad(itemId: string, setKey: string, field: "reps" | "weight", current: string, unit: string) {
+  function openPad(itemId: string, setKey: string, field: PadField, current: string, unit: string) {
     const ex = exercises.find((e) => e.itemId === itemId);
     const suggestion = ex?.exerciseId ? lastKnownByExercise[ex.exerciseId] : undefined;
-    const suggestedValue = suggestion ? (field === "weight" ? suggestion.weight : suggestion.reps) : undefined;
+    const suggestedValue =
+      suggestion && (field === "weight" || field === "reps")
+        ? field === "weight"
+          ? suggestion.weight
+          : suggestion.reps
+        : undefined;
     const isTest = ex?.isTest ?? false;
     setPad({
       itemId,
@@ -742,7 +801,7 @@ export function WorkoutSession({
       field,
       buffer: current,
       unit,
-      step: isTest ? 0.5 : field === "weight" ? 2.5 : 1,
+      step: field === "contact" ? 5 : field === "rsi" ? 0.05 : isTest ? 0.5 : field === "weight" ? 2.5 : 1,
       suggestion: suggestedValue,
       isTest,
     });
@@ -782,7 +841,7 @@ export function WorkoutSession({
     const current = (setsByItem[itemId] ?? []).find((s) => s.key === setKey);
     if (!current) return;
     const updated = { ...current, [field]: buffer };
-    if (updated.weight.trim()) {
+    if (updated.weight.trim() || (exercises.find((e) => e.itemId === itemId)?.isTest && (updated.contact.trim() || updated.rsi.trim()))) {
       const ex = exercises.find((e) => e.itemId === itemId);
       if (ex) confirmSet(ex, updated, { askRir: !current.confirmed });
     }
@@ -942,12 +1001,20 @@ export function WorkoutSession({
                             {ex.name}
                           </span>
                           <span className="mt-0.5 block text-[13px]" style={{ color: "var(--dc-muted)" }}>
-                            {ex.isTest ? `Test · Messwert in ${ex.unit}` : ex.spec}
+                            {ex.isTest
+                              ? `Test · ${
+                                  isJump(ex)
+                                    ? ["Höhe", ex.metrics?.contact ? "Kontaktzeit" : null, ex.metrics?.rsi ? "RSI" : null]
+                                        .filter(Boolean)
+                                        .join(", ")
+                                    : `Messwert in ${ex.unit}`
+                                }`
+                              : ex.spec}
                             {ex.restLabel ? ` · Pause ${ex.restLabel}` : ""}
                           </span>
                           {ex.perSide && (
                             <span className="mt-0.5 block text-[12px]" style={{ color: "var(--dc-accent-700)" }}>
-                              Jeder Satz mit linker und rechter Seite
+                              {ex.isTest ? "Jeder Versuch" : "Jeder Satz"} mit linker und rechter Seite
                             </span>
                           )}
                         </span>
@@ -991,16 +1058,27 @@ export function WorkoutSession({
                         <div
                           className="mt-3 grid gap-1 pb-1.5 text-[10.5px] font-semibold uppercase"
                           style={{
-                            gridTemplateColumns: SET_GRID,
+                            gridTemplateColumns: isJump(ex) ? JUMP_GRID : SET_GRID,
                             letterSpacing: ".07em",
                             color: "var(--dc-muted)",
                             borderBottom: "1px solid var(--dc-divider)",
                           }}
                         >
-                          <span>{ex.isTest ? "Versuch" : "Satz"}</span>
-                          <span>{ex.isTest ? "" : "Wdh."}</span>
-                          <span>{ex.isTest ? `Messwert (${ex.unit})` : "Gewicht"}</span>
-                          <span>{ex.isTest ? "" : "RIR"}</span>
+                          {isJump(ex) ? (
+                            <>
+                              <span>Versuch</span>
+                              <span>Höhe ({ex.unit})</span>
+                              <span>{ex.metrics?.contact ? "Kontakt (ms)" : ""}</span>
+                              <span>{ex.metrics?.rsi ? "RSI" : ""}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>{ex.isTest ? "Versuch" : "Satz"}</span>
+                              <span>{ex.isTest ? "" : "Wdh."}</span>
+                              <span>{ex.isTest ? `Messwert (${ex.unit})` : "Gewicht"}</span>
+                              <span>{ex.isTest ? "" : "RIR"}</span>
+                            </>
+                          )}
                           <span />
                           <span />
                         </div>
@@ -1018,7 +1096,7 @@ export function WorkoutSession({
                                 key={s.key}
                                 className={`grid items-center gap-1 ${hasRight ? "pt-2 pb-1" : isRight ? "pt-1 pb-2" : "py-2"}`}
                                 style={{
-                                  gridTemplateColumns: SET_GRID,
+                                  gridTemplateColumns: isJump(ex) ? JUMP_GRID : SET_GRID,
                                   borderBottom: hasRight ? "none" : "1px solid color-mix(in srgb, var(--dc-text) 8%, transparent)",
                                 }}
                               >
@@ -1037,6 +1115,49 @@ export function WorkoutSession({
                                     ) : null}
                                   </span>
                                 </span>
+                                {isJump(ex) ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="tapv text-[16px]"
+                                      onClick={() => openPad(ex.itemId, s.key, "weight", s.weight, ex.unit || "cm")}
+                                    >
+                                      {s.weight || "—"}
+                                    </button>
+                                    {ex.metrics?.contact ? (
+                                      <button
+                                        type="button"
+                                        className="tapv text-[16px]"
+                                        onClick={() => openPad(ex.itemId, s.key, "contact", s.contact, "ms")}
+                                      >
+                                        {s.contact || "—"}
+                                      </button>
+                                    ) : (
+                                      <span />
+                                    )}
+                                    {ex.metrics?.rsi ? (
+                                      (() => {
+                                        const auto = s.rsi.trim()
+                                          ? null
+                                          : computeRsi(parseDecimal(s.weight), parseDecimal(s.contact));
+                                        return (
+                                          <button
+                                            type="button"
+                                            className="tapv text-[16px]"
+                                            onClick={() => openPad(ex.itemId, s.key, "rsi", s.rsi, "")}
+                                            title={auto != null ? "Aus Höhe und Kontaktzeit berechnet" : undefined}
+                                            style={auto != null ? { color: "var(--dc-muted)" } : undefined}
+                                          >
+                                            {s.rsi || (auto != null ? String(auto).replace(".", ",") : "—")}
+                                          </button>
+                                        );
+                                      })()
+                                    ) : (
+                                      <span />
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
                                 {ex.isTest ? (
                                   <span />
                                 ) : (
@@ -1070,6 +1191,8 @@ export function WorkoutSession({
                                   <span className="pl-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 30%, transparent)" }}>
                                     —
                                   </span>
+                                )}
+                                  </>
                                 )}
                                 <button
                                   type="button"
@@ -1272,7 +1395,15 @@ export function WorkoutSession({
           >
             <div className="flex items-baseline justify-between">
               <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
-                {pad.field === "reps" ? "Wiederholungen" : pad.isTest ? "Messwert" : "Gewicht"}
+                {pad.field === "reps"
+                  ? "Wiederholungen"
+                  : pad.field === "contact"
+                    ? "Kontaktzeit"
+                    : pad.field === "rsi"
+                      ? "RSI (leer lassen = wird berechnet)"
+                      : pad.isTest
+                        ? "Messwert"
+                        : "Gewicht"}
               </span>
               <button type="button" className="btn btn-ghost" onClick={() => setPad(null)}>
                 Abbrechen

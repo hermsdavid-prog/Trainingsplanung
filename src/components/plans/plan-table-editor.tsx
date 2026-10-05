@@ -17,6 +17,7 @@ import { upsertExerciseInstructionsAction } from "@/lib/actions/exercise-instruc
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, CopyIcon, GripVerticalIcon } from "lucide-react";
 import { isPerSide, withPerSide } from "@/lib/per-side";
+import { jumpMetrics, withJumpMetric } from "@/lib/jump-metrics";
 
 type Section = "kraft" | "cardio" | "sprung" | "runden";
 type DurationMode = "reps" | "duration";
@@ -1014,6 +1015,43 @@ export function PlanTableEditor({
                         onChange={(e) => updateRow(index, "reps_or_duration", e.target.value)}
                         placeholder="cm"
                       />
+                      {/* Jump tests: extra values per attempt, and left/right. */}
+                      {(
+                        [
+                          ["contact", "Kontaktzeit", "Athleten tragen zusätzlich die Bodenkontaktzeit in ms ein"],
+                          ["rsi", "RSI", "Reactive Strength Index; wird aus Höhe und Kontaktzeit berechnet oder direkt eingetragen"],
+                        ] as const
+                      ).map(([metric, label, title]) => (
+                        <label
+                          key={metric}
+                          className="mt-1 flex items-center gap-1.5 text-xs whitespace-nowrap"
+                          style={{ color: "var(--dc-muted)", cursor: "pointer" }}
+                          title={title}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={jumpMetrics(row.reps_or_duration)[metric]}
+                            onChange={(e) =>
+                              updateRow(index, "reps_or_duration", withJumpMetric(row.reps_or_duration, metric, e.target.checked))
+                            }
+                          />
+                          {label}
+                        </label>
+                      ))}
+                      <label
+                        className="mt-1 flex items-center gap-1.5 text-xs whitespace-nowrap"
+                        style={{ color: "var(--dc-muted)", cursor: "pointer" }}
+                        title="Einbeiniger Test: jeder Versuch mit linker und rechter Seite"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isPerSide(row.reps_or_duration)}
+                          onChange={(e) =>
+                            updateRow(index, "reps_or_duration", withPerSide(row.reps_or_duration || "cm", e.target.checked))
+                          }
+                        />
+                        je Seite
+                      </label>
                     </td>
                     <td>
                       <input

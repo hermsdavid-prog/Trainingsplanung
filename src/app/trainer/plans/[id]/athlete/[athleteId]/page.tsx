@@ -76,7 +76,7 @@ export default async function TrainerAthletePlanPage({
   const { data: results } = exerciseIds.length
     ? await supabase
         .from("exercise_results")
-        .select("exercise_id, set_number, value, reps, unit, set_type, side")
+        .select("exercise_id, set_number, value, reps, unit, set_type, side, contact_ms, rsi")
         .eq("athlete_id", athleteId)
         // By plan only: sets stay visible after the training was moved.
         .eq("training_plan_id", id)
@@ -86,7 +86,16 @@ export default async function TrainerAthletePlanPage({
 
   const resultsByExercise = new Map<
     string,
-    { setNumber: number; type: string; reps: number | null; value: number; unit: string | null; side: Side | null }[]
+    {
+      setNumber: number;
+      type: string;
+      reps: number | null;
+      value: number;
+      unit: string | null;
+      side: Side | null;
+      contactMs: number | null;
+      rsi: number | null;
+    }[]
   >();
   for (const r of results ?? []) {
     const list = resultsByExercise.get(r.exercise_id) ?? [];
@@ -97,6 +106,8 @@ export default async function TrainerAthletePlanPage({
       value: r.value,
       unit: r.unit,
       side: r.side === "links" || r.side === "rechts" ? r.side : null,
+      contactMs: r.contact_ms,
+      rsi: r.rsi,
     });
     resultsByExercise.set(r.exercise_id, list);
   }
@@ -302,6 +313,16 @@ export default async function TrainerAthletePlanPage({
                       <span className="text-[15px]" style={{ color: tone }}>
                         {s.value}
                         {s.unit ? ` ${s.unit}` : ""}
+                        {s.contactMs != null || s.rsi != null ? (
+                          <span className="block text-xs" style={{ color: "var(--dc-muted)" }}>
+                            {[
+                              s.contactMs != null ? `${String(s.contactMs).replace(".", ",")} ms` : null,
+                              s.rsi != null ? `RSI ${String(s.rsi).replace(".", ",")}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 50%, transparent)" }}>
                         {ex.reps_or_duration || "—"}

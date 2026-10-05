@@ -363,12 +363,14 @@ export type Database = {
       exercise_results: {
         Row: {
           athlete_id: string
+          contact_ms: number | null
           created_at: string
           date: string
           exercise_id: string
           id: string
           reps: number | null
           rir: number | null
+          rsi: number | null
           set_number: number
           set_type: string
           side: string | null
@@ -380,12 +382,14 @@ export type Database = {
         }
         Insert: {
           athlete_id: string
+          contact_ms?: number | null
           created_at?: string
           date: string
           exercise_id: string
           id?: string
           reps?: number | null
           rir?: number | null
+          rsi?: number | null
           set_number?: number
           set_type?: string
           side?: string | null
@@ -397,12 +401,14 @@ export type Database = {
         }
         Update: {
           athlete_id?: string
+          contact_ms?: number | null
           created_at?: string
           date?: string
           exercise_id?: string
           id?: string
           reps?: number | null
           rir?: number | null
+          rsi?: number | null
           set_number?: number
           set_type?: string
           side?: string | null
