@@ -379,6 +379,8 @@ export type Database = {
           unit: string | null
           updated_at: string
           value: number
+          velocity: number | null
+          velocity_last: number | null
         }
         Insert: {
           athlete_id: string
@@ -398,6 +400,8 @@ export type Database = {
           unit?: string | null
           updated_at?: string
           value: number
+          velocity?: number | null
+          velocity_last?: number | null
         }
         Update: {
           athlete_id?: string
@@ -417,6 +421,8 @@ export type Database = {
           unit?: string | null
           updated_at?: string
           value?: number
+          velocity?: number | null
+          velocity_last?: number | null
         }
         Relationships: [
           {

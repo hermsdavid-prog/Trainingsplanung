@@ -24,6 +24,14 @@ import type { BadgeAward } from "@/lib/badges";
 import { SIDE_LABEL, countSets, isPairedRight, type Side } from "@/lib/per-side";
 import { computeRsi, parseDecimal, type JumpMetrics } from "@/lib/jump-metrics";
 import {
+  estimateOneRmFromProfile,
+  readiness,
+  suggestLoad,
+  velocityLoss,
+  type Fit,
+  type VbtSpec,
+} from "@/lib/vbt";
+import {
   browserStorage,
   enqueueSet,
   isOffline,
@@ -44,6 +52,9 @@ type SessionSet = {
   // Jump tests: ground contact time (ms) and a hand-entered RSI ("" = computed).
   contact: string;
   rsi: string;
+  // VBT: mean velocity (m/s) of the fastest and of the last rep.
+  velocity: string;
+  velocityLast: string;
   confirmed: boolean;
   // Unilateral exercises: the left/right row of one set (see lib/per-side).
   side: Side | null;
@@ -82,6 +93,9 @@ export type SessionExercise = {
   // Video/link from the plan row, shown when the exercise library has no
   // instruction video of its own.
   linkUrl?: string;
+  // Velocity-based training: target zone, loss limit and the athlete's
+  // load-velocity profile from earlier sessions.
+  vbt?: VbtSpec & { fit: Fit | null; mvt: number };
   initialSets: {
     setNumber: number;
     type: SetType;
@@ -92,6 +106,8 @@ export type SessionExercise = {
     date?: string;
     contact?: string;
     rsi?: string;
+    velocity?: string;
+    velocityLast?: string;
   }[];
   // First set number of this item's block (lib/set-numbers): 0, or 100, 200 …
   // when the same exercise appears more than once in the plan.
@@ -158,6 +174,8 @@ function notifyNewBadges(badges: BadgeAward[] | undefined) {
 // phone so "Aufwärmsatz" (number on its own line) and "100 kg" both fit
 // without truncation.
 const SET_GRID = "76px 46px minmax(0,1fr) 38px 40px 24px";
+// VBT exercise: the RIR column becomes a wider m/s column.
+const VBT_GRID = "76px 40px minmax(0,1fr) 46px 40px 24px";
 // Jump test with contact time / RSI: Versuch · Höhe · Kontakt · RSI · ✓ · ✕.
 const JUMP_GRID = "64px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 40px 24px";
 
@@ -210,6 +228,8 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
     rir: s.rir,
     contact: s.contact ?? "",
     rsi: s.rsi ?? "",
+    velocity: s.velocity ?? "",
+    velocityLast: s.velocityLast ?? "",
     confirmed: true,
     side: s.side ?? null,
     date: s.date,
@@ -234,6 +254,8 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
         rir: "",
         contact: "",
         rsi: "",
+        velocity: "",
+        velocityLast: "",
         confirmed: false,
         side: "rechts",
       });
@@ -251,6 +273,8 @@ function buildInitialSets(ex: SessionExercise): SessionSet[] {
       rir: "",
       contact: "",
       rsi: "",
+      velocity: "",
+      velocityLast: "",
       confirmed: false,
       side,
     }));
@@ -272,6 +296,99 @@ function setMembers(rows: SessionSet[], set: SessionSet): SessionSet[] {
   if (isPairedRight(rows, i)) return [rows[i - 1], rows[i]];
   if (isPairedRight(rows, i + 1)) return [rows[i], rows[i + 1]];
   return [rows[i]];
+}
+
+const fmt = (n: number, digits = 2) => n.toFixed(digits).replace(".", ",");
+
+// m/s cell of a VBT set: green inside the target zone, amber when slower
+// (too heavy) or when the velocity loss went past the limit.
+function VelocityCell({
+  set,
+  vbt,
+  onClick,
+}: {
+  set: SessionSet;
+  vbt: VbtSpec;
+  onClick: () => void;
+}) {
+  const v = parseDecimal(set.velocity);
+  const loss = velocityLoss(v, parseDecimal(set.velocityLast));
+  const belowTarget = v != null && vbt.targetMin != null && v < vbt.targetMin;
+  const inTarget = v != null && vbt.targetMin != null && vbt.targetMax != null && v >= vbt.targetMin && v <= vbt.targetMax;
+  const lossTooHigh = loss != null && vbt.lossLimit != null && loss > vbt.lossLimit;
+  return (
+    <button
+      type="button"
+      className="tapv text-[14px] leading-tight"
+      onClick={onClick}
+      title={belowTarget ? "Langsamer als der Zielbereich" : inTarget ? "Im Zielbereich" : undefined}
+      style={{ color: belowTarget ? "#b45309" : inTarget ? "#0f8a5f" : undefined }}
+    >
+      {v != null ? fmt(v) : "—"}
+      {loss != null && (
+        <span className="block whitespace-nowrap text-[10.5px]" style={{ color: lossTooHigh ? "#b45309" : "var(--dc-muted)" }}>
+          −{Math.round(loss)}%
+        </span>
+      )}
+    </button>
+  );
+}
+
+// Target zone, today's readiness and the suggested load of a VBT exercise.
+function VbtPanel({
+  vbt,
+  rows,
+  unit,
+}: {
+  vbt: VbtSpec & { fit: Fit | null; mvt: number };
+  rows: SessionSet[];
+  unit: string;
+}) {
+  // Latest set logged today with a velocity: anchors readiness and the
+  // load suggestion to today's form.
+  const today = [...rows]
+    .reverse()
+    .map((s) => ({ load: parseDecimal(s.weight), velocity: parseDecimal(s.velocity), confirmed: s.confirmed }))
+    .find((p) => p.confirmed && p.load != null && p.load > 0 && p.velocity != null && p.velocity > 0) as
+    | { load: number; velocity: number }
+    | undefined;
+  const { fit } = vbt;
+  const form = fit && today ? readiness(fit, today.load, today.velocity) : null;
+  const target = vbt.targetMin != null && vbt.targetMax != null ? (vbt.targetMin + vbt.targetMax) / 2 : null;
+  const suggestion = fit && target != null ? suggestLoad(fit, target, today ?? null) : null;
+  const oneRm = fit ? estimateOneRmFromProfile(fit, vbt.mvt) : null;
+  const line = (label: string, value: ReactNode) => (
+    <div className="flex justify-between gap-3">
+      <span style={{ color: "var(--dc-muted)" }}>{label}</span>
+      <span className="text-right">{value}</span>
+    </div>
+  );
+  return (
+    <div className="mt-2.5 flex flex-col gap-1 p-2.5 text-[13px]" style={{ background: "var(--dc-accent-100)" }}>
+      {vbt.targetMin != null &&
+        line(
+          "Zielbereich",
+          vbt.targetMin === vbt.targetMax ? `${fmt(vbt.targetMin)} m/s` : `${fmt(vbt.targetMin)}–${fmt(vbt.targetMax ?? vbt.targetMin)} m/s`
+        )}
+      {vbt.lossLimit != null && line("Satz beenden bei", `${vbt.lossLimit} % Geschwindigkeitsverlust`)}
+      {suggestion != null && line(today ? "Last für das Ziel (heute)" : "Last für das Ziel", `ca. ${fmt(suggestion, 1).replace(",0", "")} ${unit}`)}
+      {form != null &&
+        line(
+          "Tagesform",
+          <span style={{ color: form <= -8 ? "#b45309" : form >= 3 ? "#0f8a5f" : undefined }}>
+            {form > 0 ? "+" : ""}
+            {String(form).replace(".", ",")} % {form <= -8 ? "(langsamer als üblich, Last senken)" : form >= 3 ? "(schneller als üblich)" : "(normal)"}
+          </span>
+        )}
+      {oneRm != null && line("Geschätztes 1RM (Profil)", `ca. ${fmt(oneRm, 1).replace(",0", "")} ${unit}`)}
+      {!fit && (
+        <p style={{ color: "var(--dc-muted)" }}>
+          Noch kein Last-Geschwindigkeits-Profil. Es entsteht automatisch, sobald Sätze mit mindestens zwei verschiedenen
+          Lasten und Geschwindigkeit eingetragen sind (auch Aufwärmsätze zählen).
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function WorkoutSession({
@@ -493,6 +610,8 @@ export function WorkoutSession({
   // RPE below. A small fixed picker (not the numeric pad) since it's always
   // one of a handful of values.
   const [rirPad, setRirPad] = useState<{ itemId: string; setKey: string } | null>(null);
+  // VBT: velocity of the fastest and the last rep, typed from the sensor app.
+  const [vbtPad, setVbtPad] = useState<{ itemId: string; setKey: string; best: string; last: string } | null>(null);
 
   const [instrItemId, setInstrItemId] = useState<string | null>(null);
   const [rpeOpen, setRpeOpen] = useState(false);
@@ -528,7 +647,7 @@ export function WorkoutSession({
 
   const progressWidth = totals.total > 0 ? `${Math.min(100, (totals.done / totals.total) * 100)}%` : "0%";
 
-  function updateSet(itemId: string, key: string, field: PadField | "rir", value: string) {
+  function updateSet(itemId: string, key: string, field: PadField | "rir" | "velocity" | "velocityLast", value: string) {
     setSetsByItem((prev) => ({
       ...prev,
       [itemId]: prev[itemId].map((s) => (s.key === key ? { ...s, [field]: value } : s)),
@@ -554,6 +673,8 @@ export function WorkoutSession({
         rir: "",
         contact: "",
         rsi: "",
+        velocity: "",
+        velocityLast: "",
         confirmed: false,
         side,
       }));
@@ -630,7 +751,9 @@ export function WorkoutSession({
       return;
     }
     const reps = !ex.isTest && set.reps.trim() ? Number(set.reps.replace(",", ".")) : null;
-    const rir = !ex.isTest && set.type === "arbeitssatz" && set.rir.trim() ? Number(set.rir) : null;
+    const rir = !ex.isTest && !ex.vbt && set.type === "arbeitssatz" && set.rir.trim() ? Number(set.rir) : null;
+    const velocity = ex.vbt ? parseDecimal(set.velocity) : null;
+    const velocityLast = ex.vbt ? parseDecimal(set.velocityLast) : null;
     const entry: QueuedSet = {
       exerciseId: ex.exerciseId,
       date: set.date ?? planDate,
@@ -643,6 +766,8 @@ export function WorkoutSession({
       side: set.side,
       contactMs,
       rsi,
+      velocity: velocity != null && velocity > 0 ? velocity : null,
+      velocityLast,
       itemId: ex.itemId,
     };
     setPendingKey(set.key);
@@ -694,7 +819,10 @@ export function WorkoutSession({
     // Ask for RIR right after a work set is logged instead of relying on
     // the athlete to find the small RIR cell (for "je Seite" once, after
     // the right side).
-    if (opts.askRir && !ex.isTest && set.type === "arbeitssatz" && !set.rir.trim() && set.side !== "links") {
+    if (opts.askRir && ex.vbt && !set.velocity.trim() && set.side !== "links") {
+      // VBT replaces RIR: ask for the bar speed from the sensor app instead.
+      setVbtPad({ itemId: ex.itemId, setKey: set.key, best: "", last: "" });
+    } else if (opts.askRir && !ex.isTest && !ex.vbt && set.type === "arbeitssatz" && !set.rir.trim() && set.side !== "links") {
       setRirPad({ itemId: ex.itemId, setKey: set.key });
     }
     if (result) notifyNewBadges(result.newBadges);
@@ -713,7 +841,9 @@ export function WorkoutSession({
       q.rir,
       q.side,
       q.contactMs ?? null,
-      q.rsi ?? null
+      q.rsi ?? null,
+      q.velocity ?? null,
+      q.velocityLast ?? null
     );
   }
 
@@ -856,6 +986,22 @@ export function WorkoutSession({
     const current = (setsByItem[itemId] ?? []).find((s) => s.key === setKey);
     if (!ex || !current) return;
     await confirmSet(ex, { ...current, rir: rirValue }, { startRest: false });
+  }
+
+  async function saveVbt() {
+    if (!vbtPad) return;
+    const { itemId, setKey, best, last } = vbtPad;
+    setVbtPad(null);
+    const bestTrim = best.trim();
+    const lastTrim = last.trim();
+    setSetsByItem((prev) => ({
+      ...prev,
+      [itemId]: prev[itemId].map((s) => (s.key === setKey ? { ...s, velocity: bestTrim, velocityLast: lastTrim } : s)),
+    }));
+    const ex = exercises.find((e) => e.itemId === itemId);
+    const current = (setsByItem[itemId] ?? []).find((s) => s.key === setKey);
+    if (!ex || !current || !current.confirmed) return;
+    await confirmSet(ex, { ...current, velocity: bestTrim, velocityLast: lastTrim }, { startRest: false });
   }
 
   async function handleRpeSave() {
@@ -1054,11 +1200,12 @@ export function WorkoutSession({
                             {ex.note}
                           </p>
                         )}
+                        {ex.vbt && <VbtPanel vbt={ex.vbt} rows={rows} unit={ex.unit || "kg"} />}
                         <SelfNoteReminder note={notes[ex.itemId]?.self ?? null} />
                         <div
                           className="mt-3 grid gap-1 pb-1.5 text-[10.5px] font-semibold uppercase"
                           style={{
-                            gridTemplateColumns: isJump(ex) ? JUMP_GRID : SET_GRID,
+                            gridTemplateColumns: isJump(ex) ? JUMP_GRID : ex.vbt ? VBT_GRID : SET_GRID,
                             letterSpacing: ".07em",
                             color: "var(--dc-muted)",
                             borderBottom: "1px solid var(--dc-divider)",
@@ -1076,7 +1223,7 @@ export function WorkoutSession({
                               <span>{ex.isTest ? "Versuch" : "Satz"}</span>
                               <span>{ex.isTest ? "" : "Wdh."}</span>
                               <span>{ex.isTest ? `Messwert (${ex.unit})` : "Gewicht"}</span>
-                              <span>{ex.isTest ? "" : "RIR"}</span>
+                              <span>{ex.isTest ? "" : ex.vbt ? "m/s" : "RIR"}</span>
                             </>
                           )}
                           <span />
@@ -1096,7 +1243,7 @@ export function WorkoutSession({
                                 key={s.key}
                                 className={`grid items-center gap-1 ${hasRight ? "pt-2 pb-1" : isRight ? "pt-1 pb-2" : "py-2"}`}
                                 style={{
-                                  gridTemplateColumns: isJump(ex) ? JUMP_GRID : SET_GRID,
+                                  gridTemplateColumns: isJump(ex) ? JUMP_GRID : ex.vbt ? VBT_GRID : SET_GRID,
                                   borderBottom: hasRight ? "none" : "1px solid color-mix(in srgb, var(--dc-text) 8%, transparent)",
                                 }}
                               >
@@ -1179,6 +1326,18 @@ export function WorkoutSession({
                                 </button>
                                 {ex.isTest ? (
                                   <span />
+                                ) : ex.vbt && s.confirmed ? (
+                                  <VelocityCell
+                                    set={s}
+                                    vbt={ex.vbt}
+                                    onClick={() =>
+                                      setVbtPad({ itemId: ex.itemId, setKey: s.key, best: s.velocity, last: s.velocityLast })
+                                    }
+                                  />
+                                ) : ex.vbt ? (
+                                  <span className="pl-2 text-[13px]" style={{ color: "color-mix(in srgb, var(--dc-text) 30%, transparent)" }}>
+                                    —
+                                  </span>
                                 ) : s.type === "arbeitssatz" && s.confirmed ? (
                                   <button
                                     type="button"
@@ -1441,6 +1600,74 @@ export function WorkoutSession({
           </div>
         </div>
       )}
+
+      {vbtPad &&
+        (() => {
+          const ex = exercises.find((e) => e.itemId === vbtPad.itemId);
+          const loss = velocityLoss(parseDecimal(vbtPad.best), parseDecimal(vbtPad.last));
+          const limit = ex?.vbt?.lossLimit ?? null;
+          return (
+            <div
+              className="fixed inset-0 z-50 flex flex-col justify-end"
+              style={{ background: "color-mix(in srgb, #201e1d 45%, transparent)" }}
+              onClick={() => setVbtPad(null)}
+            >
+              <div
+                className="mx-auto w-full max-w-[420px] p-4.5 pb-6.5"
+                style={{ background: "var(--dc-surface)", borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
+                    Hantelgeschwindigkeit (mittlere, m/s)
+                  </span>
+                  <button type="button" className="btn btn-ghost" onClick={() => setVbtPad(null)}>
+                    Überspringen
+                  </button>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <label className="field">
+                    <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
+                      Schnellste Wdh.
+                    </span>
+                    <input
+                      className="input text-[20px]"
+                      inputMode="decimal"
+                      autoFocus
+                      placeholder="0,62"
+                      value={vbtPad.best}
+                      onChange={(e) => setVbtPad({ ...vbtPad, best: e.target.value.replace(/[^0-9.,]/g, "") })}
+                    />
+                  </label>
+                  <label className="field">
+                    <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
+                      Letzte Wdh. (optional)
+                    </span>
+                    <input
+                      className="input text-[20px]"
+                      inputMode="decimal"
+                      placeholder="0,51"
+                      value={vbtPad.last}
+                      onChange={(e) => setVbtPad({ ...vbtPad, last: e.target.value.replace(/[^0-9.,]/g, "") })}
+                    />
+                  </label>
+                </div>
+                {loss != null && (
+                  <p
+                    className="mt-2 text-[13px]"
+                    style={{ color: limit != null && loss > limit ? "#b45309" : "var(--dc-muted)" }}
+                  >
+                    Geschwindigkeitsverlust {String(loss).replace(".", ",")} %
+                    {limit != null && loss > limit ? ` · über der Grenze von ${limit} %: nächsten Satz leichter oder kürzer` : ""}
+                  </p>
+                )}
+                <button type="button" className="btn btn-primary btn-block mt-3.5" onClick={saveVbt}>
+                  Speichern
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
       {rirPad && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "color-mix(in srgb, #201e1d 45%, transparent)" }} onClick={() => setRirPad(null)}>

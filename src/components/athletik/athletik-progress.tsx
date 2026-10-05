@@ -3,6 +3,7 @@ import { AthletikFilters } from "@/components/athletik/athletik-filters";
 import { ExerciseProgressChart } from "@/components/athletik/exercise-progress-chart";
 import { formatDateShort } from "@/lib/date";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
+import { VbtProfile } from "@/components/athletik/vbt-profile";
 
 // One user's own Athletik progress per exercise (best work set per day,
 // estimated 1RM, history table) — the athlete's Athletik tab, and the
@@ -10,10 +11,13 @@ import { estimateOneRepMax } from "@/lib/one-rep-max";
 export async function AthletikProgress({
   userId,
   exerciseParam,
+  mvtParam,
   variant = "page",
 }: {
   userId: string;
   exerciseParam?: string;
+  // VBT profile: minimal velocity threshold from the URL (?mvt=).
+  mvtParam?: string;
   // "page": the exercise name is the page's h2 (athlete Athletik tab);
   // "section": a sub-section under another page heading.
   variant?: "page" | "section";
@@ -137,6 +141,9 @@ export async function AthletikProgress({
                 </table>
               </div>
             </div>
+          )}
+          {selectedExercise && (
+            <VbtProfile athleteId={userId} exerciseId={selectedExercise} exerciseName={selectedName} mvtParam={mvtParam} />
           )}
         </>
       )}

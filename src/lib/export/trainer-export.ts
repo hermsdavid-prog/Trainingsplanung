@@ -129,6 +129,8 @@ export async function buildTrainerExportWorkbook(
     { header: "Einheit", key: "unit", width: 10 },
     { header: "Kontaktzeit (ms)", key: "contactMs", width: 16 },
     { header: "RSI", key: "rsi", width: 8 },
+    { header: "Geschw. (m/s)", key: "velocity", width: 13 },
+    { header: "Geschw. letzte Wdh. (m/s)", key: "velocityLast", width: 22 },
   ]);
 
   // Paged: a single request stops at the API's row limit (1000), which cut
@@ -137,7 +139,7 @@ export async function buildTrainerExportWorkbook(
   for (let offset = 0; athleteIds.length > 0; offset += 1000) {
     const { data: page } = await supabase
       .from("exercise_results")
-      .select("athlete_id, date, set_number, value, reps, rir, unit, set_type, side, contact_ms, rsi, exercises(name)")
+      .select("athlete_id, date, set_number, value, reps, rir, unit, set_type, side, contact_ms, rsi, velocity, velocity_last, exercises(name)")
       .in("athlete_id", athleteIds)
       .gte("date", from)
       .lte("date", to)
@@ -162,6 +164,8 @@ export async function buildTrainerExportWorkbook(
       unit: r.unit ?? "",
       contactMs: r.contact_ms ?? "",
       rsi: r.rsi ?? "",
+      velocity: r.velocity ?? "",
+      velocityLast: r.velocity_last ?? "",
     });
   }
 

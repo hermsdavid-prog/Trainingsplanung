@@ -91,10 +91,15 @@ export async function createEventAction(input: CreateEventInput): Promise<Action
   return {};
 }
 
+// Longest span an athlete can propose in one go ("von/bis").
+const MAX_PROPOSAL_DAYS = 31;
+
 export async function proposeEventAction(input: {
   title: string;
   description: string;
   date: string;
+  // Optional last day (inclusive) of a multi-day proposal, e.g. a camp.
+  endDate?: string | null;
   groupId: string;
 }): Promise<ActionResult> {
   const { supabase, userId } = await requireUser();
@@ -102,19 +107,34 @@ export async function proposeEventAction(input: {
   if (!input.title.trim() || !input.date || !input.groupId) {
     return { error: "Bitte Titel, Datum und Gruppe angeben." };
   }
+  const endDate = input.endDate && input.endDate !== input.date ? input.endDate : null;
+  if (endDate && endDate < input.date) {
+    return { error: "Das Enddatum muss nach dem Startdatum liegen." };
+  }
 
-  const { error } = await supabase.from("events").insert({
-    title: input.title.trim(),
-    description: input.description.trim() || null,
-    event_type: "Vorschlag",
-    color: "#94a3b8",
-    start_at: `${input.date}T00:00:00Z`,
-    all_day: true,
-    group_id: input.groupId,
-    athlete_id: userId,
-    status: "proposed",
-    created_by: userId,
-  });
+  // Like a trainer's multi-day event: one all-day row per day, sharing a
+  // series so the trainer confirms or declines the whole span at once.
+  const dates = endDate ? dailyOccurrences(input.date, endDate) : [input.date];
+  if (dates.length > MAX_PROPOSAL_DAYS) {
+    return { error: `Ein Vorschlag kann höchstens ${MAX_PROPOSAL_DAYS} Tage umfassen.` };
+  }
+  const seriesId = dates.length > 1 ? randomUUID() : null;
+
+  const { error } = await supabase.from("events").insert(
+    dates.map((date) => ({
+      title: input.title.trim(),
+      description: input.description.trim() || null,
+      event_type: "Vorschlag",
+      color: "#94a3b8",
+      start_at: `${date}T00:00:00Z`,
+      all_day: true,
+      group_id: input.groupId,
+      athlete_id: userId,
+      series_id: seriesId,
+      status: "proposed" as const,
+      created_by: userId,
+    }))
+  );
 
   if (error) return { error: "Vorschlag konnte nicht gespeichert werden." };
 
@@ -211,11 +231,14 @@ export async function confirmEventAction(eventId: string): Promise<ActionResult>
   const role = await currentRole(supabase, userId);
   if (role !== "trainer" && role !== "admin") return { error: "Nur Trainer können Vorschläge bestätigen." };
 
-  const { data, error } = await supabase
-    .from("events")
-    .update({ status: "confirmed" })
-    .eq("id", eventId)
-    .select("id");
+  // A multi-day proposal is confirmed as a whole: every still-proposed day
+  // of its series.
+  const { data: event } = await supabase.from("events").select("series_id, status").eq("id", eventId).maybeSingle();
+  const update = supabase.from("events").update({ status: "confirmed" });
+  const { data, error } =
+    event?.series_id && event.status === "proposed"
+      ? await update.eq("series_id", event.series_id).eq("status", "proposed").select("id")
+      : await update.eq("id", eventId).select("id");
 
   if (error) return { error: "Termin konnte nicht bestätigt werden." };
   if (!data || data.length === 0) {
@@ -228,14 +251,21 @@ export async function confirmEventAction(eventId: string): Promise<ActionResult>
   return {};
 }
 
-export async function deleteEventAction(eventId: string): Promise<ActionResult> {
+export async function deleteEventAction(
+  eventId: string,
+  // Declining a multi-day proposal removes all of its still-proposed days.
+  opts: { wholeProposal?: boolean } = {}
+): Promise<ActionResult> {
   const { supabase } = await requireUser();
 
-  const { data, error } = await supabase
-    .from("events")
-    .delete()
-    .eq("id", eventId)
-    .select("id");
+  const { data: event } = opts.wholeProposal
+    ? await supabase.from("events").select("series_id, status").eq("id", eventId).maybeSingle()
+    : { data: null };
+  const remove = supabase.from("events").delete();
+  const { data, error } =
+    event?.series_id && event.status === "proposed"
+      ? await remove.eq("series_id", event.series_id).eq("status", "proposed").select("id")
+      : await remove.eq("id", eventId).select("id");
 
   if (error) return { error: "Termin konnte nicht gelöscht werden." };
   if (!data || data.length === 0) {

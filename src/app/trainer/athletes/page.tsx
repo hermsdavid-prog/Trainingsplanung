@@ -1,3 +1,4 @@
+import { VbtProfile } from "@/components/athletik/vbt-profile";
 import { createClient } from "@/lib/supabase/server";
 import { todayISO, shiftDateISO, formatDateCompact } from "@/lib/date";
 import { computeHealthStatus, HEALTH_STATUS_LABEL, type HealthLog, type HealthStatusLevel } from "@/lib/health-status";
@@ -32,7 +33,7 @@ const LEVEL_TAG: Record<HealthStatusLevel, string> = {
 export default async function TrainerAthletesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string; athlete?: string; exercise?: string }>;
+  searchParams: Promise<{ group?: string; athlete?: string; exercise?: string; mvt?: string }>;
 }) {
   const params = await searchParams;
   const today = todayISO();
@@ -291,6 +292,14 @@ export default async function TrainerAthletesPage({
                                 </strong>
                               </span>
                             )}
+                          </div>
+                          <div className="max-w-[640px]">
+                            <VbtProfile
+                              athleteId={selected.id}
+                              exerciseId={selectedExercise}
+                              exerciseName={selectedExerciseName}
+                              mvtParam={params.mvt}
+                            />
                           </div>
                         </>
                       )}

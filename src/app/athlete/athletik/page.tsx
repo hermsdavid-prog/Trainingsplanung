@@ -4,7 +4,7 @@ import { AthletikProgress } from "@/components/athletik/athletik-progress";
 export default async function AthleteAthletikPage({
   searchParams,
 }: {
-  searchParams: Promise<{ exercise?: string }>;
+  searchParams: Promise<{ exercise?: string; mvt?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -14,5 +14,5 @@ export default async function AthleteAthletikPage({
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  return <AthletikProgress userId={user.id} exerciseParam={params.exercise} />;
+  return <AthletikProgress userId={user.id} exerciseParam={params.exercise} mvtParam={params.mvt} />;
 }

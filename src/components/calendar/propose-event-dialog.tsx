@@ -13,6 +13,8 @@ export function ProposeEventDialog({
   groups: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(defaultDate);
+  const [endDate, setEndDate] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -23,13 +25,15 @@ export function ProposeEventDialog({
       const result = await proposeEventAction({
         title: String(formData.get("title") ?? ""),
         description: String(formData.get("description") ?? ""),
-        date: String(formData.get("date") ?? ""),
+        date,
+        endDate: endDate || null,
         groupId: String(formData.get("group_id") ?? ""),
       });
       if (result.error) {
         setError(result.error);
       } else {
         setOpen(false);
+        setEndDate("");
         router.refresh();
       }
     });
@@ -57,10 +61,38 @@ export function ProposeEventDialog({
               <label htmlFor="description">Beschreibung</label>
               <textarea id="description" name="description" rows={2} className="input" />
             </div>
-            <div className="field mt-3.5">
-              <label htmlFor="date">Datum</label>
-              <input id="date" name="date" type="date" defaultValue={defaultDate} required className="input" />
+            <div className="mt-3.5 flex flex-wrap gap-3">
+              <div className="field min-w-[140px] flex-1">
+                <label htmlFor="date">Von</label>
+                <input
+                  id="date"
+                  name="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    if (endDate && e.target.value > endDate) setEndDate(e.target.value);
+                  }}
+                  required
+                  className="input"
+                />
+              </div>
+              <div className="field min-w-[140px] flex-1">
+                <label htmlFor="end_date">Bis (optional)</label>
+                <input
+                  id="end_date"
+                  name="end_date"
+                  type="date"
+                  value={endDate}
+                  min={date}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="input"
+                />
+              </div>
             </div>
+            <p className="mt-1.5 text-xs" style={{ color: "var(--dc-muted)" }}>
+              Für mehrtägige Termine wie ein Trainingslager oder einen Wettkampf über mehrere Tage.
+            </p>
             <div className="field mt-3.5">
               <label htmlFor="group_id">Betrifft Gruppe</label>
               <select id="group_id" name="group_id" required className="input" defaultValue="">

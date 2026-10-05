@@ -18,6 +18,7 @@ import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components
 import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, CopyIcon, GripVerticalIcon } from "lucide-react";
 import { isPerSide, withPerSide } from "@/lib/per-side";
 import { jumpMetrics, withJumpMetric } from "@/lib/jump-metrics";
+import { vbtSpec, withVbt } from "@/lib/vbt";
 
 type Section = "kraft" | "cardio" | "sprung" | "runden";
 type DurationMode = "reps" | "duration";
@@ -757,6 +758,18 @@ export function PlanTableEditor({
                           onChange={(e) => updateRow(index, "reps_or_duration", withPerSide(row.reps_or_duration, e.target.checked))}
                         />
                         je Seite
+                      </label>
+                      <label
+                        className="mt-1 flex items-center gap-1.5 text-xs"
+                        style={{ color: "var(--dc-muted)", cursor: "pointer" }}
+                        title="Velocity-based Training: Athleten tragen pro Satz die Hantelgeschwindigkeit (m/s) ein. Zielbereich und Abbruchgrenze dahinter schreiben, z. B. „VBT 0,55-0,65 m/s · max. 20 % Verlust“."
+                      >
+                        <input
+                          type="checkbox"
+                          checked={vbtSpec(row.reps_or_duration).on}
+                          onChange={(e) => updateRow(index, "reps_or_duration", withVbt(row.reps_or_duration, e.target.checked))}
+                        />
+                        VBT (m/s)
                       </label>
                     </td>
                     <td>

@@ -1,13 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { formatDateLabel } from "@/lib/date";
+import { formatDateLabel, shiftDateISO } from "@/lib/date";
 import { signCardioScreenshots } from "@/lib/cardio-screenshots";
 import { exerciseNoteKey } from "@/lib/exercise-note-key";
 import { isPerSide, type Side } from "@/lib/per-side";
 import { occurrenceOfSet, setNumberBase } from "@/lib/set-numbers";
 import { testUnit } from "@/lib/test-unit";
 import { computeRsi, jumpMetrics } from "@/lib/jump-metrics";
+import { defaultMvt, fitLoadVelocity, vbtSpec } from "@/lib/vbt";
 import type { SessionExercise, SessionCardio, SessionKarateRow } from "@/components/athlete/workout-session";
+
+const VBT_PROFILE_DAYS = 56;
 
 // Everything the live, tap-to-log session (WorkoutSession) needs for one
 // plan, loaded for whoever is logging it — the athlete for their own
@@ -58,7 +61,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     exerciseIds.length
       ? supabase
           .from("exercise_results")
-          .select("exercise_id, date, set_number, value, reps, unit, set_type, rir, side, contact_ms, rsi")
+          .select("exercise_id, date, set_number, value, reps, unit, set_type, rir, side, contact_ms, rsi, velocity, velocity_last")
           .eq("athlete_id", userId)
           // By plan only, not by date: after a trainer moved the training
           // to another day, the sets logged before must still show up.
@@ -79,7 +82,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     exerciseIds.length
       ? supabase
           .from("exercise_results")
-          .select("exercise_id, date, value, reps, set_type")
+          .select("exercise_id, date, value, reps, set_type, velocity")
           .eq("athlete_id", userId)
           .in("exercise_id", exerciseIds)
           .lt("date", plan.date)
@@ -103,6 +106,24 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     }
   }
 
+  // VBT: the athlete's load-velocity profile per exercise from the sets of
+  // the last eight weeks before this training (today's sets adjust it live
+  // in the session).
+  const profileFrom = shiftDateISO(plan.date, -VBT_PROFILE_DAYS);
+  const pointsByExercise = new Map<string, { load: number; velocity: number }[]>();
+  for (const r of historyRows ?? []) {
+    if (r.velocity == null || r.date < profileFrom) continue;
+    const list = pointsByExercise.get(r.exercise_id) ?? [];
+    list.push({ load: Number(r.value), velocity: Number(r.velocity) });
+    pointsByExercise.set(r.exercise_id, list);
+  }
+  const vbtFor = (item: { reps_or_duration: string | null; exercise_id: string | null; exercise_name: string; section: string }) => {
+    const spec = vbtSpec(item.reps_or_duration);
+    if (!spec.on || item.section !== "kraft") return undefined;
+    const fit = item.exercise_id ? fitLoadVelocity(pointsByExercise.get(item.exercise_id) ?? []) : null;
+    return { ...spec, fit, mvt: defaultMvt(item.exercise_name) };
+  };
+
   const kraftItems = (items ?? []).filter((i) => i.section === "kraft" || i.section === "sprung");
   const cardioItems = (items ?? []).filter((i) => i.section === "cardio");
   const roundItems = (items ?? []).filter((i) => i.section === "runden");
@@ -119,6 +140,8 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
       date: string;
       contact: string;
       rsi: string;
+      velocity: string;
+      velocityLast: string;
     }[]
   >();
   for (const r of existingResults ?? []) {
@@ -132,6 +155,8 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
       side: r.side === "links" || r.side === "rechts" ? r.side : null,
       date: r.date,
       contact: r.contact_ms != null ? String(r.contact_ms) : "",
+      velocity: r.velocity != null ? String(r.velocity) : "",
+      velocityLast: r.velocity_last != null ? String(r.velocity_last) : "",
       // Only a hand-entered RSI is kept as such; one that matches height and
       // contact time is recomputed in the session (and follows corrections).
       rsi: r.rsi != null && r.rsi !== computeRsi(Number(r.value), r.contact_ms) ? String(r.rsi) : "",
@@ -213,6 +238,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
         ? testUnit(item.reps_or_duration)
         : (item.exercise_id ? exerciseUnitByExercise.get(item.exercise_id) : undefined) || "kg",
     linkUrl: item.link_url ?? "",
+    vbt: vbtFor(item),
     initialSets: setsForItem(item),
     setNumberBase: setNumberBase(occurrenceOfItem.get(item.id) ?? 0),
     ...noteFields(item.id),

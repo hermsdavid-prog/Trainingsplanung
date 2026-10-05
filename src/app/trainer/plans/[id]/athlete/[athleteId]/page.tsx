@@ -76,7 +76,7 @@ export default async function TrainerAthletePlanPage({
   const { data: results } = exerciseIds.length
     ? await supabase
         .from("exercise_results")
-        .select("exercise_id, set_number, value, reps, unit, set_type, side, contact_ms, rsi")
+        .select("exercise_id, set_number, value, reps, unit, set_type, side, contact_ms, rsi, velocity, velocity_last")
         .eq("athlete_id", athleteId)
         // By plan only: sets stay visible after the training was moved.
         .eq("training_plan_id", id)
@@ -95,6 +95,8 @@ export default async function TrainerAthletePlanPage({
       side: Side | null;
       contactMs: number | null;
       rsi: number | null;
+      velocity: number | null;
+      velocityLast: number | null;
     }[]
   >();
   for (const r of results ?? []) {
@@ -108,6 +110,8 @@ export default async function TrainerAthletePlanPage({
       side: r.side === "links" || r.side === "rechts" ? r.side : null,
       contactMs: r.contact_ms,
       rsi: r.rsi,
+      velocity: r.velocity,
+      velocityLast: r.velocity_last,
     });
     resultsByExercise.set(r.exercise_id, list);
   }
@@ -313,6 +317,14 @@ export default async function TrainerAthletePlanPage({
                       <span className="text-[15px]" style={{ color: tone }}>
                         {s.value}
                         {s.unit ? ` ${s.unit}` : ""}
+                        {s.velocity != null ? (
+                          <span className="block text-xs" style={{ color: "var(--dc-muted)" }}>
+                            {String(s.velocity).replace(".", ",")} m/s
+                            {s.velocityLast != null && s.velocity > 0
+                              ? ` · −${String(Math.round(((s.velocity - s.velocityLast) / s.velocity) * 1000) / 10).replace(".", ",")} %`
+                              : ""}
+                          </span>
+                        ) : null}
                         {s.contactMs != null || s.rsi != null ? (
                           <span className="block text-xs" style={{ color: "var(--dc-muted)" }}>
                             {[

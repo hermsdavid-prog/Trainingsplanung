@@ -11,6 +11,8 @@ export type ProposedEvent = {
   title: string;
   description: string | null;
   date: string;
+  // Last day of a multi-day proposal (same series); unset for one day.
+  endDate?: string;
   groupName: string;
   proposedBy: string;
 };
@@ -34,7 +36,7 @@ export function ProposedEventsWidget({ events }: { events: ProposedEvent[] }) {
 
   function remove(id: string) {
     startTransition(async () => {
-      const result = await deleteEventAction(id);
+      const result = await deleteEventAction(id, { wholeProposal: true });
       if (result.error) toast.error(result.error);
       else {
         toast.success("Vorschlag abgelehnt.");
@@ -58,7 +60,8 @@ export function ProposedEventsWidget({ events }: { events: ProposedEvent[] }) {
             <div className="min-w-0">
               <div className="text-[15px]">{e.title}</div>
               <div className="mt-0.5 text-xs" style={{ color: "var(--dc-muted)" }}>
-                {formatDateShort(e.date)} · {e.groupName} · vorgeschlagen von {e.proposedBy}
+                {formatDateShort(e.date)}
+                {e.endDate ? ` bis ${formatDateShort(e.endDate)}` : ""} · {e.groupName} · vorgeschlagen von {e.proposedBy}
               </div>
               {e.description && (
                 <div

@@ -10,7 +10,7 @@ import { formatDateShort } from "@/lib/date";
 export default async function TrainerOwnTrainingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ exercise?: string }>;
+  searchParams: Promise<{ exercise?: string; mvt?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -88,7 +88,7 @@ export default async function TrainerOwnTrainingPage({
       </div>
 
       <div className="mt-9 max-w-[720px]">
-        <AthletikProgress userId={user.id} exerciseParam={params.exercise} variant="section" />
+        <AthletikProgress userId={user.id} exerciseParam={params.exercise} mvtParam={params.mvt} variant="section" />
       </div>
     </div>
   );

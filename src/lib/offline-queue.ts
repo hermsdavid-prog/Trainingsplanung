@@ -17,6 +17,9 @@ export type QueuedSet = {
   // Jump tests only (older queued entries don't have them).
   contactMs?: number | null;
   rsi?: number | null;
+  // VBT only.
+  velocity?: number | null;
+  velocityLast?: number | null;
   // Session row the set belongs to, to clear its "wartet" mark after sending.
   itemId: string;
 };

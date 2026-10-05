@@ -34,7 +34,7 @@ export default async function TrainerDashboardPage() {
       .order("time", { nullsFirst: false }),
     supabase
       .from("events")
-      .select("id, title, description, start_at, groups(name), profiles!events_athlete_id_fkey(full_name)")
+      .select("id, title, description, start_at, series_id, groups(name), profiles!events_athlete_id_fkey(full_name)")
       .eq("status", "proposed")
       .order("start_at"),
     supabase.from("athlete_consents").select("athlete_id").eq("health_consent", true),
@@ -67,14 +67,28 @@ export default async function TrainerDashboardPage() {
   const plansToday = recentPlans.filter((p) => p.date === today);
   const plansYesterday = recentPlans.filter((p) => p.date !== today);
 
-  const proposedEvents: ProposedEvent[] = (proposedRows ?? []).map((e) => ({
-    id: e.id,
-    title: e.title,
-    description: e.description,
-    date: e.start_at.slice(0, 10),
-    groupName: e.groups?.name ?? "—",
-    proposedBy: e.profiles?.full_name ?? "—",
-  }));
+  // A multi-day proposal (one row per day, same series) shows up once,
+  // "von … bis …", and is confirmed or declined as a whole.
+  const proposedEvents: ProposedEvent[] = [];
+  const proposalBySeries = new Map<string, ProposedEvent>();
+  for (const e of proposedRows ?? []) {
+    const date = e.start_at.slice(0, 10);
+    const existing = e.series_id ? proposalBySeries.get(e.series_id) : undefined;
+    if (existing) {
+      existing.endDate = date;
+      continue;
+    }
+    const proposal: ProposedEvent = {
+      id: e.id,
+      title: e.title,
+      description: e.description,
+      date,
+      groupName: e.groups?.name ?? "—",
+      proposedBy: e.profiles?.full_name ?? "—",
+    };
+    proposedEvents.push(proposal);
+    if (e.series_id) proposalBySeries.set(e.series_id, proposal);
+  }
 
   const athleteMap = new Map<string, string>();
   const groupIdByAthlete = new Map<string, string>();

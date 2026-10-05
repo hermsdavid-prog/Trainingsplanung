@@ -20,7 +20,10 @@ export async function upsertExerciseResultAction(
   side: Side | null = null,
   // Jump tests (Leistungsdiagnostik): ground contact time and RSI.
   contactMs: number | null = null,
-  rsi: number | null = null
+  rsi: number | null = null,
+  // VBT: mean velocity of the fastest and of the last rep (m/s).
+  velocity: number | null = null,
+  velocityLast: number | null = null
 ): Promise<ActionResult & { newBadges?: BadgeAward[] }> {
   const supabase = await createClient();
   const {
@@ -43,6 +46,8 @@ export async function upsertExerciseResultAction(
       side,
       contact_ms: contactMs,
       rsi,
+      velocity,
+      velocity_last: velocityLast,
     },
     { onConflict: "training_plan_id,athlete_id,exercise_id,date,set_number" }
   );
