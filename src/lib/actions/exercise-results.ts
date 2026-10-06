@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/actions/plans";
-import { checkExercisePr, type BadgeAward } from "@/lib/badges";
+import { checkExercisePr, syncExercisePrBadge, type BadgeAward } from "@/lib/badges";
 import type { Side } from "@/lib/per-side";
 import { plausibleVelocity } from "@/lib/vbt";
 
@@ -69,6 +69,7 @@ export async function upsertExerciseResultAction(
   revalidatePath("/athlete/athletik");
   revalidatePath("/athlete");
 
+  await syncExercisePrBadge(supabase, user.id, exerciseId);
   if (setType === "arbeitssatz") {
     const { data: exercise } = await supabase.from("exercises").select("name").eq("id", exerciseId).maybeSingle();
     if (exercise?.name) {
@@ -101,6 +102,7 @@ export async function deleteExerciseResultSetAction(
     .eq("training_plan_id", planId);
 
   if (error) return { error: "Satz konnte nicht gelöscht werden." };
+  await syncExercisePrBadge(supabase, user.id, exerciseId);
 
   revalidatePath("/trainer/athletes");
   revalidatePath("/trainer/training");

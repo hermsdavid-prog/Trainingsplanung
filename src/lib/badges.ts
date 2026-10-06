@@ -178,6 +178,51 @@ export async function checkHealthBadges(supabase: Client, athleteId: string): Pr
   return awards;
 }
 
+// A corrected typo or a deleted set must not leave a "Bestleistung" badge
+// with a value that no longer exists (e.g. 200 kg after 200 → 20). Called
+// after every change to an exercise's results: lowers the badge to the
+// current best work set. (Athletes may update, not delete, their badges; a
+// badge whose sets are all gone stays until a trainer or admin removes it.)
+export async function syncExercisePrBadge(supabase: Client, athleteId: string, exerciseId: string): Promise<void> {
+  const badgeKey = `pr:${exerciseId}`;
+  const { data: badge } = await supabase
+    .from("athlete_badges")
+    .select("context")
+    .eq("athlete_id", athleteId)
+    .eq("badge_key", badgeKey)
+    .maybeSingle();
+  const context = (badge?.context ?? null) as { value?: number; unit?: string; exercise_name?: string } | null;
+  if (context?.value == null) return;
+
+  const { data: rows } = await supabase
+    .from("exercise_results")
+    .select("value, reps, unit")
+    .eq("athlete_id", athleteId)
+    .eq("exercise_id", exerciseId)
+    .eq("set_type", "arbeitssatz");
+  if (!rows || rows.length === 0) return;
+  const best = Math.max(...rows.map((r) => Number(r.value)));
+  if (!(context.value > best)) return;
+
+  const bestOneRm = rows.reduce<number | null>((max, r) => {
+    const oneRm = r.reps != null ? estimateOneRepMax(Number(r.value), r.reps) : null;
+    if (oneRm == null) return max;
+    return max == null || oneRm > max ? oneRm : max;
+  }, null);
+  const unit = context.unit ?? rows.find((r) => r.unit)?.unit ?? "kg";
+  await supabase
+    .from("athlete_badges")
+    .update({
+      description:
+        bestOneRm != null
+          ? `Bestwert: ${best} ${unit} (geschätztes 1RM: ${bestOneRm} ${unit})`
+          : `Bestwert: ${best} ${unit}`,
+      context: { ...context, value: best, unit, one_rm: bestOneRm },
+    })
+    .eq("athlete_id", athleteId)
+    .eq("badge_key", badgeKey);
+}
+
 // Called after a working-set result is logged. Recomputes the athlete's
 // current best for this exercise (same "Bestwert" / estimated-1RM logic as
 // src/app/trainer/athletes/page.tsx) and, if it's an improvement, upserts the
