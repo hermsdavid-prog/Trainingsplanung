@@ -14,6 +14,7 @@ import {
   ensureExerciseAction,
 } from "@/lib/actions/plans";
 import { upsertExerciseInstructionsAction } from "@/lib/actions/exercise-instructions";
+import { SuggestInput } from "@/components/ui/suggest-input";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, CopyIcon, GripVerticalIcon } from "lucide-react";
 import { isPerSide, withPerSide } from "@/lib/per-side";
@@ -58,7 +59,6 @@ const EMPTY_ROW: Omit<Row, "section"> = {
   instruction_video_url: "",
 };
 
-const EXERCISE_LIST_ID = "exercise-library-options";
 const NO_EXERCISES: { id: string; name: string }[] = [];
 
 // Monday-first, matching repeatPlanWeeklyAction's weekday index (Mo = 0).
@@ -158,19 +158,7 @@ export function PlanTableEditor({
     () => new Map(exerciseLibrary.map((e) => [e.name.toLowerCase(), e])),
     [exerciseLibrary],
   );
-  // The library can hold hundreds of exercises. Building the <datalist> once
-  // (instead of on every keystroke in any field) keeps typing smooth on iPad.
-  const exerciseDatalist = useMemo(
-    () =>
-      exerciseLibrary.length > 0 ? (
-        <datalist id={EXERCISE_LIST_ID}>
-          {exerciseLibrary.map((e) => (
-            <option key={e.id} value={e.name} />
-          ))}
-        </datalist>
-      ) : null,
-    [exerciseLibrary],
-  );
+  const exerciseNames = useMemo(() => exerciseLibrary.map((e) => e.name), [exerciseLibrary]);
 
   // Lets the "Anweisung und Link" panel (Sportartspezifisch/Karate rows) be
   // used on a brand-new exercise name immediately, instead of requiring
@@ -497,7 +485,6 @@ export function PlanTableEditor({
 
   return (
     <div className="flex flex-col gap-8">
-      {exerciseDatalist}
 
       <div>
         {backHref && (
@@ -743,16 +730,12 @@ export function PlanTableEditor({
                       </span>
                     </td>
                     <td>
-                      <input
+                      <SuggestInput
                         className="input min-w-36"
                         value={row.exercise_name}
-                        onChange={(e) => updateRow(index, "exercise_name", e.target.value)}
+                        onChange={(v) => updateRow(index, "exercise_name", v)}
                         placeholder="z. B. Kniebeuge"
-                        list={EXERCISE_LIST_ID}
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck={false}
+                        suggestions={exerciseNames}
                       />
                     </td>
                     <td>
@@ -1171,16 +1154,12 @@ export function PlanTableEditor({
                   >
                     <div className="field col-span-2 lg:col-span-1" style={{ margin: 0 }}>
                       <label>Übung</label>
-                      <input
+                      <SuggestInput
                         className="input"
                         value={row.exercise_name}
-                        onChange={(e) => updateRow(index, "exercise_name", e.target.value)}
+                        onChange={(v) => updateRow(index, "exercise_name", v)}
                         placeholder="z. B. Kihon — Gyaku-Zuki"
-                        list={EXERCISE_LIST_ID}
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck={false}
+                        suggestions={exerciseNames}
                       />
                     </div>
                     <div className="field" style={{ margin: 0 }}>

@@ -11,6 +11,7 @@ import {
 import { saveSessionRpeAction } from "@/lib/actions/sessions";
 import { addSessionExerciseAction } from "@/lib/actions/session-exercises";
 import { upsertFeedbackAction } from "@/lib/actions/feedback";
+import { SuggestInput } from "@/components/ui/suggest-input";
 import { CardioScreenshotField } from "@/components/athlete/cardio-screenshot-field";
 import { exerciseNoteKey } from "@/lib/exercise-note-key";
 import {
@@ -393,6 +394,8 @@ function VbtPanel({
   );
 }
 
+const NO_EXERCISES: { id: string; name: string }[] = [];
+
 export function WorkoutSession({
   athleteId,
   planId,
@@ -409,7 +412,7 @@ export function WorkoutSession({
   initialRpe,
   lastKnownByExercise = {},
   canAddExercises = false,
-  exerciseLibrary = [],
+  exerciseLibrary = NO_EXERCISES,
   allowCoachHint = true,
 }: {
   athleteId: string;
@@ -621,6 +624,7 @@ export function WorkoutSession({
   const [isSavingRpe, setIsSavingRpe] = useState(false);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
 
+  const exerciseNames = useMemo(() => exerciseLibrary.map((e) => e.name), [exerciseLibrary]);
   const totals = useMemo(() => {
     let total = 0;
     let done = 0;
@@ -1425,16 +1429,11 @@ export function WorkoutSession({
 
             {canAddExercises && (
               <div className="mt-6.5" style={{ marginTop: 26 }}>
-                <datalist id="session-exercise-library-options">
-                  {exerciseLibrary.map((e) => (
-                    <option key={e.id} value={e.name} />
-                  ))}
-                </datalist>
                 <div className="flex gap-2">
-                  <input
+                  <SuggestInput
                     className="input flex-1"
                     value={addExerciseName}
-                    onChange={(e) => setAddExerciseName(e.target.value)}
+                    onChange={setAddExerciseName}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -1442,11 +1441,7 @@ export function WorkoutSession({
                       }
                     }}
                     placeholder="Übung hinzufügen — z. B. Kniebeuge"
-                    list="session-exercise-library-options"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
+                    suggestions={exerciseNames}
                   />
                   <button
                     type="button"
