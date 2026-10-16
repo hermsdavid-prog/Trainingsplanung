@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -59,6 +59,7 @@ const EMPTY_ROW: Omit<Row, "section"> = {
 };
 
 const EXERCISE_LIST_ID = "exercise-library-options";
+const NO_EXERCISES: { id: string; name: string }[] = [];
 
 // Monday-first, matching repeatPlanWeeklyAction's weekday index (Mo = 0).
 const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -73,7 +74,7 @@ const SPRUNG_VORSCHLAEGE = "CMJ Sprunghöhe, Standweitsprung, 20-m-Sprint";
 export function PlanTableEditor({
   planId,
   initialItems,
-  exerciseLibrary = [],
+  exerciseLibrary = NO_EXERCISES,
   categoryLabel,
   initialTitle = "",
   initialDate = "",
@@ -153,7 +154,23 @@ export function PlanTableEditor({
   const [isSavingTemplate, startTemplateTransition] = useTransition();
   const [resolvingIndex, setResolvingIndex] = useState<number | null>(null);
 
-  const nameByLowercase = new Map(exerciseLibrary.map((e) => [e.name.toLowerCase(), e]));
+  const nameByLowercase = useMemo(
+    () => new Map(exerciseLibrary.map((e) => [e.name.toLowerCase(), e])),
+    [exerciseLibrary],
+  );
+  // The library can hold hundreds of exercises. Building the <datalist> once
+  // (instead of on every keystroke in any field) keeps typing smooth on iPad.
+  const exerciseDatalist = useMemo(
+    () =>
+      exerciseLibrary.length > 0 ? (
+        <datalist id={EXERCISE_LIST_ID}>
+          {exerciseLibrary.map((e) => (
+            <option key={e.id} value={e.name} />
+          ))}
+        </datalist>
+      ) : null,
+    [exerciseLibrary],
+  );
 
   // Lets the "Anweisung und Link" panel (Sportartspezifisch/Karate rows) be
   // used on a brand-new exercise name immediately, instead of requiring
@@ -480,13 +497,7 @@ export function PlanTableEditor({
 
   return (
     <div className="flex flex-col gap-8">
-      {exerciseLibrary.length > 0 && (
-        <datalist id={EXERCISE_LIST_ID}>
-          {exerciseLibrary.map((e) => (
-            <option key={e.id} value={e.name} />
-          ))}
-        </datalist>
-      )}
+      {exerciseDatalist}
 
       <div>
         {backHref && (
@@ -738,6 +749,10 @@ export function PlanTableEditor({
                         onChange={(e) => updateRow(index, "exercise_name", e.target.value)}
                         placeholder="z. B. Kniebeuge"
                         list={EXERCISE_LIST_ID}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
                       />
                     </td>
                     <td>
@@ -1162,6 +1177,10 @@ export function PlanTableEditor({
                         onChange={(e) => updateRow(index, "exercise_name", e.target.value)}
                         placeholder="z. B. Kihon — Gyaku-Zuki"
                         list={EXERCISE_LIST_ID}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
                       />
                     </div>
                     <div className="field" style={{ margin: 0 }}>

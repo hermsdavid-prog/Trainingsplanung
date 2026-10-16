@@ -1443,6 +1443,10 @@ export function WorkoutSession({
                     }}
                     placeholder="Übung hinzufügen — z. B. Kniebeuge"
                     list="session-exercise-library-options"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                   />
                   <button
                     type="button"

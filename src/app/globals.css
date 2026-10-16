@@ -450,3 +450,9 @@ textarea.input { min-height: 90px; resize: vertical; }
   .seg-opt { padding: 11px 16px; }
   .navbtn { padding: 11px 12px; font-size: 15px; }
 }
+
+/* Touch devices of any size (iPad included): same 16px rule, otherwise iOS
+   Safari zooms into the focused field and typing feels jumpy. */
+@media (pointer: coarse) {
+  .input, select.input, textarea.input { font-size: 16px; }
+}
