@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -38,9 +38,14 @@ export function GoalToggleList({
   const [adding, setAdding] = useState(false);
   const [newText, setNewText] = useState("");
   const router = useRouter();
+  // The tick shows at once; it falls back to the saved state if saving fails.
+  const [shownGoals, setGoalAchieved] = useOptimistic(goals, (state, change: { id: string; achieved: boolean }) =>
+    state.map((g) => (g.id === change.id ? { ...g, achievedAt: change.achieved ? new Date().toISOString() : null } : g))
+  );
 
   function toggle(id: string, next: boolean) {
     startTransition(async () => {
+      setGoalAchieved({ id, achieved: next });
       const result = await toggleMesocycleGoalAction(id, next);
       if (result.error) {
         toast.error(result.error);
@@ -82,7 +87,7 @@ export function GoalToggleList({
       {goals.length === 0 && !adding && (
         <p className="text-xs text-muted">{canAdd ? "Noch keine Ziele." : "Keine Ziele für diesen Mesozyklus."}</p>
       )}
-      {goals.map((g) => (
+      {shownGoals.map((g) => (
         <div key={g.id} className="flex items-start gap-2 text-[13.5px] leading-[1.45]" style={{ opacity: g.achievedAt ? 0.6 : 1 }}>
           {/* Goals wrap onto as many lines as they need — a long goal used
               to be cut off with "…" and couldn't be read at all. */}
