@@ -12,6 +12,7 @@ import { saveSessionRpeAction } from "@/lib/actions/sessions";
 import { addSessionExerciseAction } from "@/lib/actions/session-exercises";
 import { upsertFeedbackAction } from "@/lib/actions/feedback";
 import { SuggestInput } from "@/components/ui/suggest-input";
+import { ExerciseAnimation } from "@/components/exercises/exercise-animation";
 import { CardioScreenshotField } from "@/components/athlete/cardio-screenshot-field";
 import { exerciseNoteKey } from "@/lib/exercise-note-key";
 import {
@@ -394,7 +395,21 @@ function VbtPanel({
   );
 }
 
+function ExercisePreview({ animation }: { animation: string }) {
+  return (
+    <div className="mt-3.5 px-3 pb-2 pt-3" style={{ background: "var(--dc-surface)" }}>
+      <div className="mx-auto h-[150px] max-w-[260px]">
+        <ExerciseAnimation animation={animation} />
+      </div>
+      <div className="mt-1.5 text-center text-[11px]" style={{ color: "var(--dc-muted)" }}>
+        Schematischer Bewegungsablauf zur Erinnerung
+      </div>
+    </div>
+  );
+}
+
 const NO_EXERCISES: { id: string; name: string }[] = [];
+const NO_ANIMATIONS: Record<string, string> = {};
 
 export function WorkoutSession({
   athleteId,
@@ -409,6 +424,7 @@ export function WorkoutSession({
   cardio,
   karateRows,
   instructionsByExercise,
+  animationByExercise = NO_ANIMATIONS,
   initialRpe,
   lastKnownByExercise = {},
   canAddExercises = false,
@@ -429,6 +445,7 @@ export function WorkoutSession({
   cardio: SessionCardio[];
   karateRows: SessionKarateRow[];
   instructionsByExercise: Record<string, ExerciseInstructions>;
+  animationByExercise?: Record<string, string>;
   initialRpe: number | null;
   lastKnownByExercise?: Record<string, { weight: string; reps: string }>;
   canAddExercises?: boolean;
@@ -1761,6 +1778,7 @@ export function WorkoutSession({
           const row = karateRows.find((r) => r.itemId === instrItemId);
           const instrExerciseId = ex?.exerciseId ?? row?.exerciseId;
           const instr = instrExerciseId ? instructionsByExercise[instrExerciseId] : undefined;
+          const animation = instrExerciseId ? animationByExercise[instrExerciseId] : undefined;
           const title = ex?.name ?? row?.name ?? "";
           const steps = instr?.steps ?? [];
           const fallbackNote = ex?.note ?? row?.note ?? row?.desc ?? "";
@@ -1786,6 +1804,7 @@ export function WorkoutSession({
                     ✕
                   </button>
                 </div>
+                {animation && <ExercisePreview animation={animation} />}
                 <div className="mt-3.5">
                   {steps.length > 0 ? (
                     steps.map((s, i) => (

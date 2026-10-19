@@ -39,12 +39,17 @@ export default async function TrainerPlanWorkoutPage({
   const exerciseIds = Array.from(
     new Set((items ?? []).map((i) => i.exercise_id).filter((x): x is string => !!x))
   );
-  const { data: instructionRows } = exerciseIds.length
-    ? await supabase
-        .from("exercise_instructions")
-        .select("exercise_id, steps, video_url, video_label")
-        .in("exercise_id", exerciseIds)
-    : { data: [] };
+  const [{ data: instructionRows }, { data: animationRows }] = exerciseIds.length
+    ? await Promise.all([
+        supabase
+          .from("exercise_instructions")
+          .select("exercise_id, steps, video_url, video_label")
+          .in("exercise_id", exerciseIds),
+        supabase.from("exercises").select("id, animation").in("id", exerciseIds).not("animation", "is", null),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const animationByExercise: Record<string, string> = {};
+  for (const row of animationRows ?? []) if (row.animation) animationByExercise[row.id] = row.animation;
   const instructionsByExercise: Record<string, { steps: string[]; video_url: string | null; video_label: string | null }> = {};
   for (const row of instructionRows ?? []) {
     instructionsByExercise[row.exercise_id] = {
@@ -123,6 +128,7 @@ export default async function TrainerPlanWorkoutPage({
           cardio={cardio}
           karateRows={karateRows}
           instructionsByExercise={instructionsByExercise}
+          animationByExercise={animationByExercise}
         />
       </div>
     </div>

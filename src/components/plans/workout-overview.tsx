@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ExerciseAnimation } from "@/components/exercises/exercise-animation";
 
 export type OverviewKraft = {
   id: string;
@@ -46,12 +47,14 @@ export function WorkoutOverview({
   cardio,
   karateRows,
   instructionsByExercise,
+  animationByExercise = {},
 }: {
   isAthletik: boolean;
   kraft: OverviewKraft[];
   cardio: OverviewCardio[];
   karateRows: OverviewKarateRow[];
   instructionsByExercise: Record<string, Instructions>;
+  animationByExercise?: Record<string, string>;
 }) {
   const [instrId, setInstrId] = useState<string | null>(null);
 
@@ -62,6 +65,9 @@ export function WorkoutOverview({
     ? (kraft.find((e) => e.id === instrId)?.exerciseId ?? cardio.find((c) => c.id === instrId)?.exerciseId)
     : karateRows.find((r) => r.id === instrId)?.exerciseId;
   const instr = instrExerciseId ? instructionsByExercise[instrExerciseId] : undefined;
+  const animation = instrExerciseId ? animationByExercise[instrExerciseId] : undefined;
+  const hasGuide = (exerciseId: string) =>
+    (instructionsByExercise[exerciseId]?.steps.length ?? 0) > 0 || !!animationByExercise[exerciseId];
 
   return (
     <div>
@@ -93,7 +99,7 @@ export function WorkoutOverview({
                           </a>
                         )}
                       </div>
-                      {ex.exerciseId && instructionsByExercise[ex.exerciseId]?.steps.length > 0 && (
+                      {ex.exerciseId && hasGuide(ex.exerciseId) && (
                         <button
                           type="button"
                           onClick={() => setInstrId(ex.id)}
@@ -126,7 +132,7 @@ export function WorkoutOverview({
                           {c.restLabel && ` · Pause ${c.restLabel}`}
                         </div>
                       </div>
-                      {c.exerciseId && instructionsByExercise[c.exerciseId]?.steps.length > 0 && (
+                      {c.exerciseId && hasGuide(c.exerciseId) && (
                         <button
                           type="button"
                           onClick={() => setInstrId(c.id)}
@@ -165,7 +171,7 @@ export function WorkoutOverview({
                         {row.restLabel ? ` · Pause ${row.restLabel}` : ""}
                       </div>
                     </div>
-                    {row.exerciseId && instructionsByExercise[row.exerciseId]?.steps.length > 0 && (
+                    {row.exerciseId && hasGuide(row.exerciseId) && (
                       <button
                         type="button"
                         onClick={() => setInstrId(row.id)}
@@ -185,7 +191,7 @@ export function WorkoutOverview({
         </>
       )}
 
-      {instrId && instr && (
+      {instrId && (instr || animation) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-5"
           style={{ background: "color-mix(in srgb, #201e1d 50%, transparent)" }}
@@ -211,8 +217,15 @@ export function WorkoutOverview({
                 ✕
               </button>
             </div>
+            {animation && (
+              <div className="mt-3.5 px-3 pb-2 pt-3" style={{ background: "var(--dc-surface)" }}>
+                <div className="mx-auto h-[150px] max-w-[260px]">
+                  <ExerciseAnimation animation={animation} />
+                </div>
+              </div>
+            )}
             <div className="mt-3.5">
-              {instr.steps.map((s, i) => (
+              {(instr?.steps ?? []).map((s, i) => (
                 <div
                   key={i}
                   className="grid items-baseline gap-2.5 py-2"
@@ -225,7 +238,7 @@ export function WorkoutOverview({
                 </div>
               ))}
             </div>
-            {instr.video_url && (
+            {instr?.video_url && (
               <a
                 href={instr.video_url}
                 target="_blank"

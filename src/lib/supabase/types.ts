@@ -450,18 +450,21 @@ export type Database = {
       }
       exercises: {
         Row: {
+          animation: string | null
           created_at: string
           created_by: string | null
           id: string
           name: string
         }
         Insert: {
+          animation?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           name: string
         }
         Update: {
+          animation?: string | null
           created_at?: string
           created_by?: string | null
           id?: string

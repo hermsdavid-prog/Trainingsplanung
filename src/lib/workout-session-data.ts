@@ -52,7 +52,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
 
   const exerciseIds = Array.from(new Set((items ?? []).map((i) => i.exercise_id).filter((x): x is string => !!x)));
 
-  const [{ data: existingResults }, { data: instructions }, { data: rating }, { data: historyRows }] = await Promise.all([
+  const [{ data: existingResults }, { data: instructions }, { data: rating }, { data: historyRows }, { data: animationRows }] = await Promise.all([
     // Scoped to this plan specifically (not just user+date+exercise) —
     // without training_plan_id here, two plans on the same day that both
     // reference the same exercise would bleed into each other's set list,
@@ -87,6 +87,9 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
           .in("exercise_id", exerciseIds)
           .lt("date", plan.date)
           .order("date", { ascending: false })
+      : Promise.resolve({ data: [] }),
+    exerciseIds.length
+      ? supabase.from("exercises").select("id, animation").in("id", exerciseIds).not("animation", "is", null)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -298,6 +301,9 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     };
   }
 
+  const animationByExercise: Record<string, string> = {};
+  for (const row of animationRows ?? []) if (row.animation) animationByExercise[row.id] = row.animation;
+
   const planKicker = `${formatDateLabel(plan.date)}${trainerProfile?.full_name ? ` · ${trainerProfile.full_name}` : ""}${
     plan.scope_type === "group" && plan.groups?.name ? ` · ${plan.groups.name}` : ""
   }`;
@@ -313,6 +319,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     cardio,
     karateRows,
     instructionsByExercise,
+    animationByExercise,
     initialRpe: rating?.rpe ?? null,
     lastKnownByExercise,
     canAddExercises,
