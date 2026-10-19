@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createEventAction } from "@/lib/actions/events";
 import { formatDateLabel } from "@/lib/date";
+import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 
 const EVENT_KINDS = [
   { value: "Training", bg: "var(--dc-accent)", fg: "var(--dc-bg)" },
@@ -78,24 +79,21 @@ export function CreateEventDialog({
   }
 
   return (
-    <div>
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) reset(); }}>
       <button
         type="button"
         className="btn btn-primary"
         onClick={() => {
-          if (open) {
-            setOpen(false);
-          } else {
-            setDate(defaultDate);
-            setOpen(true);
-          }
+          setDate(defaultDate);
+          setOpen(true);
         }}
       >
-        {open ? "Schließen" : "Termin anlegen"}
+        Termin anlegen
       </button>
-
-      {open && (
-        <div className="mt-5 max-w-[880px] p-5" style={{ background: "var(--dc-surface)" }}>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogContent showCloseButton={false} className="dc-dialog dc-dialog-wide max-w-[560px] sm:max-w-[560px]">
+          <div className="flex min-w-0 flex-col">
           <div className="kicker-muted">Termin anlegen</div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -115,8 +113,7 @@ export function CreateEventDialog({
             ))}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-start gap-3.5">
-            <div className="field min-w-[220px] flex-1">
+          <div className="mt-4 field">
               <label htmlFor="ev-title">Titel</label>
               <input
                 id="ev-title"
@@ -125,8 +122,9 @@ export function CreateEventDialog({
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="z. B. Bezirksmeisterschaft"
               />
-            </div>
-            <div className="field w-[170px]">
+          </div>
+          <div className="mt-3.5 grid grid-cols-2 gap-3.5 sm:grid-cols-[1fr_1fr_110px]">
+            <div className="field">
               <label htmlFor="ev-date">Von · {formatDateLabel(date)}</label>
               <input
                 id="ev-date"
@@ -139,7 +137,7 @@ export function CreateEventDialog({
                 }}
               />
             </div>
-            <div className="field w-[170px]">
+            <div className="field">
               <label htmlFor="ev-end-date">Bis (optional)</label>
               <input
                 id="ev-end-date"
@@ -150,7 +148,7 @@ export function CreateEventDialog({
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
-            <div className="field w-[110px]">
+            <div className="field">
               <label htmlFor="ev-time">Uhrzeit</label>
               <input
                 id="ev-time"
@@ -163,7 +161,7 @@ export function CreateEventDialog({
           </div>
 
           <div className="mt-4 text-xs" style={{ color: "var(--dc-muted)" }}>
-            Für wen — Mehrfachauswahl möglich
+            Für wen · Mehrfachauswahl möglich
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
@@ -205,17 +203,23 @@ export function CreateEventDialog({
             </div>
           )}
 
-          <button
-            type="button"
-            className="btn btn-primary mt-4.5"
-            disabled={isPending || !title.trim() || !date}
-            onClick={handleSave}
-          >
-            {isPending ? "Wird gespeichert…" : "Termin speichern"}
-          </button>
-        </div>
-      )}
-    </div>
+          <div className="dc-dialog-actions">
+            <button type="button" className="btn btn-ghost" onClick={() => { setOpen(false); reset(); }}>
+              Abbrechen
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={isPending || !title.trim() || !date}
+              onClick={handleSave}
+            >
+              {isPending ? "Wird gespeichert…" : "Termin speichern"}
+            </button>
+          </div>
+          </div>
+        </DialogContent>
+      </DialogPortal>
+    </Dialog>
   );
 }
 

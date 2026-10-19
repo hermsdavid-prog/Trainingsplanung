@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   updateMesocycleGoalTextAction,
   deleteMesocycleGoalAction,
@@ -30,7 +31,8 @@ export function GoalList({
 
   function toggle(id: string, next: boolean) {
     startTransition(async () => {
-      await toggleMesocycleGoalAction(id, next);
+      const result = await toggleMesocycleGoalAction(id, next);
+      if (result.error) toast.error(result.error);
       router.refresh();
     });
   }
@@ -43,15 +45,27 @@ export function GoalList({
   function saveEdit(id: string) {
     if (!editText.trim()) return;
     startTransition(async () => {
-      await updateMesocycleGoalTextAction(id, editText);
+      const result = await updateMesocycleGoalTextAction(id, editText);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       setEditingId(null);
+      toast.success("Ziel gespeichert.");
       router.refresh();
     });
   }
 
-  function remove(id: string) {
+  // Permanent, and often a goal the athlete wrote themselves: ask first.
+  function remove(goal: TrainerGoal) {
+    const owner = goal.selfAuthored ? "vom Athleten gesetzte " : "";
+    if (!window.confirm(`Das ${owner}Ziel „${goal.text}“ endgültig löschen?`)) return;
     startTransition(async () => {
-      await deleteMesocycleGoalAction(id);
+      const result = await deleteMesocycleGoalAction(goal.id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -122,7 +136,7 @@ export function GoalList({
                       type="button"
                       className="btn btn-ghost shrink-0"
                       disabled={isPending}
-                      onClick={() => remove(g.id)}
+                      onClick={() => remove(g)}
                       aria-label="Ziel löschen"
                     >
                       ✕

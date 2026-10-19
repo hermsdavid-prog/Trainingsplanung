@@ -399,10 +399,13 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* — dialog — */
 .dialog-backdrop { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--dc-space-4); background: color-mix(in srgb, var(--dc-neutral-900) 50%, transparent); }
 .dc-dialog {
-  width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--dc-space-3);
+  /* 1rem gutter on phones: the max-w-[…] on each dialog replaces the
+     gutter DialogContent's own max-w would otherwise keep. */
+  width: min(440px, calc(100vw - 2rem)); display: flex; flex-direction: column; gap: var(--dc-space-3);
   padding: var(--dc-space-4); border-radius: var(--dc-radius-lg);
   background: var(--dc-surface); box-shadow: var(--dc-shadow-lg);
 }
+.dc-dialog.dc-dialog-wide { width: min(560px, calc(100vw - 2rem)); }
 .dc-dialog-title { font-family: var(--dc-font-heading); font-weight: var(--dc-font-heading-weight); font-size: 20px; }
 .dc-dialog-body { font-size: 14px; opacity: 0.85; }
 .dc-dialog-actions { display: flex; justify-content: flex-end; gap: var(--dc-space-2); margin-top: var(--dc-space-2); }
