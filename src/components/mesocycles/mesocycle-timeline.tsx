@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { formatDateCompact } from "@/lib/date";
 import { MesocyclePlanList } from "@/components/mesocycles/mesocycle-plan-list";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
@@ -70,6 +70,7 @@ export function MesocycleTimeline({
   viewerAthleteId?: string;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const scrolledToToday = useRef(false);
   const openMesocycle = mesocycles.find((m) => m.id === openId) ?? null;
 
   if (mesocycles.length === 0) {
@@ -99,7 +100,15 @@ export function MesocycleTimeline({
   const todayOffset = todayIso >= rangeStart && todayIso < rangeEnd ? daysBetween(rangeStart, todayIso) : null;
 
   return (
-    <div className="mt-3 overflow-x-auto">
+    <div
+      className="mt-3 overflow-x-auto"
+      ref={(el) => {
+        // On mount, scroll so today is visible instead of the first month.
+        if (!el || scrolledToToday.current || todayOffset == null) return;
+        scrolledToToday.current = true;
+        el.scrollLeft = Math.max(0, todayOffset * DAY_PX - 40);
+      }}
+    >
       <div style={{ width: Math.max(totalDays * DAY_PX, 600) }}>
         <div style={{ position: "relative", height: 22 }}>
           {months.map((mo) => (

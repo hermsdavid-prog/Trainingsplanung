@@ -138,7 +138,7 @@ export async function createPlanAction(
   const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
   const title = String(formData.get("title") ?? "").trim();
   const date = String(formData.get("date") ?? "");
-  const time = String(formData.get("time") ?? "").trim() || null;
+  const time = normalizePlanTime(String(formData.get("time") ?? ""));
   const scopeType = String(formData.get("scope_type") ?? "") as PlanScope;
   const groupIds = formData.getAll("group_ids").map(String).filter(Boolean);
   const athleteIds = formData.getAll("athlete_ids").map(String).filter(Boolean);
@@ -217,7 +217,7 @@ export async function createOwnPlanAction(
   const categoryLabel = isValidPlanType(categoryLabelRaw) ? categoryLabelRaw : PLAN_TYPES[0];
   const title = String(formData.get("title") ?? "").trim();
   const date = String(formData.get("date") ?? "");
-  const time = String(formData.get("time") ?? "").trim() || null;
+  const time = normalizePlanTime(String(formData.get("time") ?? ""));
   const templateId = String(formData.get("template_id") ?? "") || null;
 
   if (!title) {
@@ -354,7 +354,7 @@ export async function updatePlanMetaAction(
 
   const title = meta.title.trim();
   const date = meta.date;
-  const time = meta.time.trim() || null;
+  const time = normalizePlanTime(meta.time);
 
   if (!title) {
     return { error: "Bitte einen Titel angeben." };
@@ -402,6 +402,8 @@ export async function updatePlanMetaAction(
 }
 
 type PlanItemInput = {
+  // Existing training_plan_items.id, so saving updates the row in place.
+  id?: string | null;
   exercise_name: string;
   reps_or_duration: string;
   sets: string;
@@ -509,12 +511,62 @@ async function resolveOrCreateExerciseId(
   return { error: "Übung konnte nicht angelegt werden." };
 }
 
-export type SavedPlanItem = { position: number; exercise_id: string | null };
+// Times are free text (ranges like "18:30 - 19:30" are common) and sorted as
+// strings, so "9:00" or "9" would land after "17:30". Pad hours to HH:MM.
+function normalizePlanTime(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/(^|[^\d])(\d{1,2})(?:[:.](\d{2}))?(?=$|[^\d])/g, (_m, pre: string, h: string, m?: string) =>
+    Number(h) <= 23 ? `${pre}${h.padStart(2, "0")}:${m ?? "00"}` : _m
+  );
+}
+
+export type SavedPlanItem = { id: string; position: number; exercise_id: string | null };
+
+// The columns that make up a plan's exercise table (everything but ids).
+const ITEM_CONTENT_COLUMNS =
+  "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes, description, duration_mode";
+
+type ItemContent = {
+  exercise_name: string;
+  section: string | null;
+  reps_or_duration: string | null;
+  sets: string | null;
+  rest_time: string | null;
+  round_rest: string | null;
+  heart_rate_on: string | null;
+  heart_rate_off: string | null;
+  link_url: string | null;
+  notes: string | null;
+  description: string | null;
+  duration_mode: string | null;
+};
+
+// Compares exercise tables by content, to tell a still-identical copy of a
+// series week from one the trainer customised (e.g. a planned progression).
+function itemsSignature(items: ItemContent[]): string {
+  return JSON.stringify(
+    items.map((i) => [
+      i.exercise_name.trim().toLowerCase(),
+      i.section ?? "",
+      i.reps_or_duration ?? "",
+      i.sets ?? "",
+      i.rest_time ?? "",
+      i.round_rest ?? "",
+      i.heart_rate_on ?? "",
+      i.heart_rate_off ?? "",
+      i.link_url ?? "",
+      i.notes ?? "",
+      i.description ?? "",
+      i.duration_mode ?? "",
+    ])
+  );
+}
 
 export async function savePlanItemsAction(
   planId: string,
   items: PlanItemInput[]
-): Promise<ActionResult & { items?: SavedPlanItem[] }> {
+): Promise<ActionResult & { items?: SavedPlanItem[]; previousSignature?: string }> {
   const access = await requirePlanEditAccess(planId);
   if ("error" in access) return { error: access.error };
   const { supabase, userId } = access;
@@ -601,16 +653,56 @@ export async function savePlanItemsAction(
     duration_mode: item.duration_mode ?? null,
   }));
 
-  // Replaces the plan's items in a single database transaction (delete old +
-  // insert new) via an RPC, so a failure partway through can't leave the
-  // plan's exercise table wiped out with nothing restored — the old
-  // delete-then-insert-as-two-calls version could do exactly that.
-  const { data: savedRows, error: saveError } = await supabase.rpc(
-    "replace_training_plan_items",
-    { p_plan_id: planId, p_items: rows }
-  );
+  // Rows that still exist keep their id and are updated in place. Deleting
+  // and re-inserting everything (the old replace_training_plan_items path)
+  // cascaded to athlete_feedback and plan_item_overrides, so fixing a typo
+  // in an already trained plan wiped the athletes' results and notes.
+  const { data: existingRows, error: existingError } = await supabase
+    .from("training_plan_items")
+    .select(`id, ${ITEM_CONTENT_COLUMNS}`)
+    .eq("training_plan_id", planId)
+    .order("position");
+  if (existingError) return { error: "Speichern fehlgeschlagen." };
+  const previousSignature = itemsSignature(existingRows ?? []);
+  const existingIds = new Set((existingRows ?? []).map((r) => r.id));
+  const keptIds = new Set<string>();
+  const updates: (typeof rows[number] & { id: string })[] = [];
+  const inserts: typeof rows = [];
+  filteredItems.forEach((item, index) => {
+    const id = item.id ?? null;
+    // A duplicated row can carry the same id twice; only the first keeps it.
+    if (id && existingIds.has(id) && !keptIds.has(id)) {
+      keptIds.add(id);
+      updates.push({ ...rows[index], id });
+    } else {
+      inserts.push(rows[index]);
+    }
+  });
+  if (updates.length > 0) {
+    const { error } = await supabase.from("training_plan_items").upsert(updates, { onConflict: "id" });
+    if (error) return { error: "Speichern fehlgeschlagen." };
+  }
+  if (inserts.length > 0) {
+    const { error } = await supabase.from("training_plan_items").insert(inserts);
+    if (error) return { error: "Speichern fehlgeschlagen." };
+  }
+  const removedIds = [...existingIds].filter((id) => !keptIds.has(id));
+  if (removedIds.length > 0) {
+    const { error } = await supabase
+      .from("training_plan_items")
+      .delete()
+      .eq("training_plan_id", planId)
+      .in("id", removedIds);
+    if (error) return { error: "Entfernte Übungen konnten nicht gelöscht werden." };
+  }
+  const { data: savedRows, error: saveError } = await supabase
+    .from("training_plan_items")
+    .select("id, position, exercise_id")
+    .eq("training_plan_id", planId)
+    .order("position");
   if (saveError) return { error: "Speichern fehlgeschlagen." };
   const savedItems: SavedPlanItem[] = (savedRows ?? []).map((r) => ({
+    id: r.id,
     position: r.position,
     exercise_id: r.exercise_id,
   }));
@@ -640,7 +732,7 @@ export async function savePlanItemsAction(
   revalidatePath(`/trainer/plans/${planId}/edit`);
   revalidatePath("/trainer/plans");
   revalidatePath(`/athlete/plans/${planId}`);
-  return { items: savedItems };
+  return { previousSignature, items: savedItems };
 }
 
 // "Wöchentlich wiederholen" for an already existing training: adds a copy
@@ -748,8 +840,11 @@ export async function repeatPlanWeeklyAction(
 // Date and Mesozyklus are per occurrence and never touched here.
 export async function applyToFollowingOccurrencesAction(
   planId: string,
-  changed: { title?: string; time?: string } = {}
-): Promise<ActionResult & { updated?: number; skipped?: number }> {
+  changed: { title?: string; time?: string } = {},
+  // Exercise table of this plan before the save. Following weeks whose table
+  // differs from it were customised and keep their own exercises.
+  previousSignature?: string
+): Promise<ActionResult & { updated?: number; skipped?: number; customized?: number }> {
   const access = await requirePlanEditAccess(planId);
   if ("error" in access) return { error: access.error };
   const { supabase } = access;
@@ -772,7 +867,11 @@ export async function applyToFollowingOccurrencesAction(
   const [{ data: resultRows }, { data: ratingRows }, { data: itemRows }] = await Promise.all([
     supabase.from("exercise_results").select("training_plan_id").in("training_plan_id", followingIds),
     supabase.from("session_ratings").select("training_plan_id").in("training_plan_id", followingIds),
-    supabase.from("training_plan_items").select("id, training_plan_id").in("training_plan_id", followingIds),
+    supabase
+      .from("training_plan_items")
+      .select(`id, training_plan_id, ${ITEM_CONTENT_COLUMNS}`)
+      .in("training_plan_id", followingIds)
+      .order("position"),
   ]);
   const planByItem = new Map((itemRows ?? []).map((i) => [i.id, i.training_plan_id]));
   const { data: feedbackRows } = planByItem.size
@@ -783,25 +882,41 @@ export async function applyToFollowingOccurrencesAction(
     ...(ratingRows ?? []).map((r) => r.training_plan_id),
     ...(feedbackRows ?? []).map((r) => planByItem.get(r.training_plan_item_id) as string),
   ]);
-  const targetIds = followingIds.filter((id) => !trained.has(id));
-  const skipped = followingIds.length - targetIds.length;
-  if (targetIds.length === 0) return { updated: 0, skipped };
+  const untrainedIds = followingIds.filter((id) => !trained.has(id));
+  const skipped = followingIds.length - untrainedIds.length;
+  const itemsByPlan = new Map<string, ItemContent[]>();
+  for (const item of itemRows ?? []) {
+    const list = itemsByPlan.get(item.training_plan_id) ?? [];
+    list.push(item);
+    itemsByPlan.set(item.training_plan_id, list);
+  }
+  const { data: sourceItems } = await supabase
+    .from("training_plan_items")
+    .select(ITEM_CONTENT_COLUMNS)
+    .eq("training_plan_id", planId)
+    .order("position");
+  // Weeks still identical to this plan (before the save, or already equal
+  // to it, e.g. just filled by the save) follow; others were customised.
+  const currentSignature = itemsSignature(sourceItems ?? []);
+  const targetIds =
+    previousSignature === undefined
+      ? untrainedIds
+      : untrainedIds.filter((id) => {
+          const items = itemsByPlan.get(id) ?? [];
+          const signature = itemsSignature(items);
+          return items.length === 0 || signature === previousSignature || signature === currentSignature;
+        });
+  const customized = untrainedIds.length - targetIds.length;
 
   const metaPatch: { title?: string; time?: string | null } = {};
   if (changed.title !== undefined && changed.title.trim()) metaPatch.title = changed.title.trim();
-  if (changed.time !== undefined) metaPatch.time = changed.time.trim() || null;
+  if (changed.time !== undefined) metaPatch.time = normalizePlanTime(changed.time);
   if (Object.keys(metaPatch).length > 0) {
-    const { error } = await supabase.from("training_plans").update(metaPatch).in("id", targetIds);
+    // Title/time also go to customised weeks; only their exercises stay.
+    const { error } = await supabase.from("training_plans").update(metaPatch).in("id", untrainedIds);
     if (error) return { error: "Folgetermine konnten nicht aktualisiert werden." };
   }
-
-  const { data: sourceItems } = await supabase
-    .from("training_plan_items")
-    .select(
-      "position, exercise_name, exercise_id, section, reps_or_duration, sets, rest_time, round_rest, heart_rate_on, heart_rate_off, link_url, notes, description, duration_mode"
-    )
-    .eq("training_plan_id", planId)
-    .order("position");
+  if (targetIds.length === 0) return { updated: 0, skipped, customized };
 
   // One transaction per occurrence (same RPC as a normal save), so a failure
   // can never leave an occurrence with its exercise table wiped.
@@ -821,7 +936,7 @@ export async function applyToFollowingOccurrencesAction(
   if (failed > 0) {
     return { error: `${failed} von ${targetIds.length} Folgeterminen konnten nicht aktualisiert werden.` };
   }
-  return { updated: targetIds.length, skipped };
+  return { updated: targetIds.length, skipped, customized };
 }
 
 // Every page a plan's date or existence shows up on, for trainers and athletes.
@@ -937,10 +1052,13 @@ export async function duplicatePlanToDateAction(
 // scope (group_id/athlete_id) exactly like duplicatePlanToDateAction does
 // for a single plan; training_plans_select RLS already limits sourcePlans
 // to ones this trainer manages, so no separate per-plan access check is
-// needed here.
+// needed here. Only planIds (the plans visible in the calendar, which may be
+// filtered to one group or athlete) are copied, and athletes' own
+// "Selbst trainieren" plans never are.
 export async function duplicateDayToDateAction(
   sourceDate: string,
-  targetDate: string
+  targetDate: string,
+  planIds: string[]
 ): Promise<ActionResult & { count?: number }> {
   const access = await requireTrainerOrAdmin();
   if ("error" in access) return { error: access.error };
@@ -949,13 +1067,20 @@ export async function duplicateDayToDateAction(
   if (!sourceDate || !targetDate) {
     return { error: "Bitte ein Zieldatum angeben." };
   }
+  if (planIds.length === 0) {
+    return { error: "Für diesen Tag sind keine Trainingspläne vorhanden." };
+  }
 
-  const { data: sourcePlans } = await supabase
+  const { data: readablePlans } = await supabase
     .from("training_plans")
-    .select("id, title, category_label, time, scope_type, group_id, athlete_id, mesocycle_id")
-    .eq("date", sourceDate);
+    .select("id, title, category_label, time, scope_type, group_id, athlete_id, mesocycle_id, created_by")
+    .eq("date", sourceDate)
+    .in("id", planIds);
+  const sourcePlans = (readablePlans ?? []).filter(
+    (p) => !(p.athlete_id && p.created_by === p.athlete_id)
+  );
 
-  if (!sourcePlans || sourcePlans.length === 0) {
+  if (sourcePlans.length === 0) {
     return { error: "Für diesen Tag sind keine Trainingspläne vorhanden." };
   }
 

@@ -89,7 +89,7 @@ export function CreatePlanForm({
       {repeats && (
         <div className="field mt-3.5">
           <label htmlFor="repeat_until">Wiederholen bis</label>
-          <input id="repeat_until" name="repeat_until" type="date" className="input" />
+          <input id="repeat_until" name="repeat_until" type="date" className="input" required />
           <p className="mt-1.5 text-xs text-muted">
             Legt für jede Woche bis zu diesem Datum einen eigenen Entwurf an. Die
             Übungstabelle, die du als Nächstes ausfüllst, wird automatisch auf alle noch leeren

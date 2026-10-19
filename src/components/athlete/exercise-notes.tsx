@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { saveExerciseNotesAction } from "@/lib/actions/feedback";
-import { formatDateCompact } from "@/lib/date";
+import { formatDateCompact, utcISOToAppDateString } from "@/lib/date";
 
 export type SelfNote = { text: string; updatedAt: string };
 export type ExerciseNoteState = { self: SelfNote | null; coach: string };
@@ -15,7 +15,7 @@ export function SelfNoteReminder({ note }: { note: SelfNote | null }) {
   return (
     <div className="mt-2.5 px-2.5 py-2 text-[13.5px] leading-[1.45]" style={{ background: "var(--dc-accent-100)" }}>
       <span className="font-semibold">📝 Deine Notiz</span>
-      <span style={{ color: "var(--dc-muted)" }}> · {formatDateCompact(note.updatedAt.slice(0, 10))}</span>
+      <span style={{ color: "var(--dc-muted)" }}> · {formatDateCompact(utcISOToAppDateString(note.updatedAt))}</span>
       <div style={{ overflowWrap: "anywhere" }}>{note.text}</div>
     </div>
   );
@@ -73,11 +73,18 @@ export function ExerciseNotesPanel({
 
   async function save() {
     setSaving(true);
-    const result = await saveExerciseNotesAction(itemId, noteKey, {
-      selfNote: selfText,
-      ...(allowCoachHint ? { coachNote: coachText } : {}),
-    });
-    setSaving(false);
+    let result: Awaited<ReturnType<typeof saveExerciseNotesAction>>;
+    try {
+      result = await saveExerciseNotesAction(itemId, noteKey, {
+        selfNote: selfText,
+        ...(allowCoachHint ? { coachNote: coachText } : {}),
+      });
+    } catch {
+      toast.error("Keine Verbindung. Bitte später erneut versuchen.");
+      return;
+    } finally {
+      setSaving(false);
+    }
     if (result.error) {
       toast.error(result.error);
       return;

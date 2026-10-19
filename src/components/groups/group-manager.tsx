@@ -115,6 +115,16 @@ export function GroupManager({
 
   function toggleTrainer(trainerId: string, assign: boolean) {
     if (!group) return;
+    if (!assign) {
+      // Only the head trainer (or an admin) may remove trainers, and a group
+      // has one head trainer: removing them would leave it without one.
+      if (trainerId === headTrainerId) {
+        toast.error("Erst einen anderen Trainer zum Haupttrainer machen, dann entfernen.");
+        return;
+      }
+      const t = trainers.find((x) => x.id === trainerId);
+      if (!confirm(`${t?.full_name ?? "Trainer"} wirklich aus der Gruppe "${group.name}" entfernen?`)) return;
+    }
     startTransition(async () => {
       const result = await setGroupTrainerAction(group.id, trainerId, assign);
       if (result.error) {
@@ -140,6 +150,10 @@ export function GroupManager({
 
   function toggleAthlete(athleteId: string, assign: boolean) {
     if (!group) return;
+    if (!assign) {
+      const a = athletes.find((x) => x.id === athleteId);
+      if (!confirm(`${a?.full_name ?? "Athlet"} wirklich aus der Gruppe "${group.name}" entfernen?`)) return;
+    }
     startTransition(async () => {
       const result = await setGroupAthleteAction(group.id, athleteId, assign);
       if (result.error) {

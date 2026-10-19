@@ -32,12 +32,13 @@ export async function upsertHealthLogAction(input: {
     return { error: "Bitte Wohlbefinden auf einer Skala von 1-10 angeben." };
   }
 
-  const hrv = input.hrv.trim() ? Number(input.hrv) : null;
+  // German iOS keypads type a decimal comma.
+  const hrv = input.hrv.trim() ? Number(input.hrv.trim().replace(",", ".")) : null;
   if (hrv !== null && (!Number.isFinite(hrv) || hrv < 0)) {
     return { error: "Bitte einen gültigen HRV-Wert angeben." };
   }
 
-  const restingHr = input.restingHr.trim() ? Number(input.restingHr) : null;
+  const restingHr = input.restingHr.trim() ? Number(input.restingHr.trim().replace(",", ".")) : null;
   if (restingHr !== null && (!Number.isFinite(restingHr) || restingHr < 0)) {
     return { error: "Bitte einen gültigen Ruhepuls angeben." };
   }

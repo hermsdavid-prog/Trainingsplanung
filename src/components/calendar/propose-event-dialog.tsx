@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { proposeEventAction } from "@/lib/actions/events";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 
@@ -32,6 +33,7 @@ export function ProposeEventDialog({
       if (result.error) {
         setError(result.error);
       } else {
+        toast.success("Vorschlag gesendet.");
         setOpen(false);
         setEndDate("");
         router.refresh();
@@ -115,6 +117,9 @@ export function ProposeEventDialog({
 
             <button type="submit" disabled={isPending} className="btn btn-primary btn-block">
               {isPending ? "Wird gesendet…" : "Vorschlag senden"}
+            </button>
+            <button type="button" disabled={isPending} className="btn btn-ghost btn-block" onClick={() => setOpen(false)}>
+              Abbrechen
             </button>
           </form>
         </DialogContent>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
+import { OfflineSync } from "@/components/athlete/offline-sync";
 import { House, CalendarDays, Dumbbell, Layers, CirclePlus, HeartPulse, UserRound } from "lucide-react";
 
 const TABS = [
@@ -66,6 +67,8 @@ export function AthleteShell({
           <ThemeToggle variant="tab" />
         </nav>
       </header>
+
+      <OfflineSync />
 
       <main
         className="flex-1 px-4 pt-4 pb-28 sm:px-6"

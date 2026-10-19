@@ -6,10 +6,18 @@ import { toast } from "sonner";
 import { upsertHealthLogAction } from "@/lib/actions/health";
 import { useCheckinSkip } from "@/components/health/checkin-gate";
 
-export function HealthCheckinCard({ date }: { date: string }) {
-  const [hrv, setHrv] = useState("");
-  const [restingHr, setRestingHr] = useState("");
-  const [wellbeing, setWellbeing] = useState<number | null>(null);
+// `initial` prefills today's saved entry, so it can be corrected without
+// the empty fields overwriting the stored HRV / resting heart rate.
+export function HealthCheckinCard({
+  date,
+  initial,
+}: {
+  date: string;
+  initial?: { hrv: number | null; restingHr: number | null; wellbeing: number | null };
+}) {
+  const [hrv, setHrv] = useState(initial?.hrv != null ? String(initial.hrv).replace(".", ",") : "");
+  const [restingHr, setRestingHr] = useState(initial?.restingHr != null ? String(initial.restingHr).replace(".", ",") : "");
+  const [wellbeing, setWellbeing] = useState<number | null>(initial?.wellbeing ?? null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const skip = useCheckinSkip();

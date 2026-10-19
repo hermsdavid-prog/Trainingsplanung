@@ -15,6 +15,7 @@ import {
 } from "@/lib/actions/plans";
 import { upsertExerciseInstructionsAction } from "@/lib/actions/exercise-instructions";
 import { SuggestInput } from "@/components/ui/suggest-input";
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { Trash2Icon, NotebookTextIcon, LinkIcon, PlusIcon, CopyIcon, GripVerticalIcon } from "lucide-react";
 import { isPerSide, withPerSide } from "@/lib/per-side";
@@ -25,6 +26,8 @@ type Section = "kraft" | "cardio" | "sprung" | "runden";
 type DurationMode = "reps" | "duration";
 
 type Row = {
+  // training_plan_items.id once saved; keeps athlete feedback attached.
+  id?: string | null;
   exercise_name: string;
   reps_or_duration: string;
   sets: string;
@@ -43,6 +46,7 @@ type Row = {
 };
 
 const EMPTY_ROW: Omit<Row, "section"> = {
+  id: null,
   exercise_name: "",
   reps_or_duration: "",
   sets: "",
@@ -141,6 +145,21 @@ export function PlanTableEditor({
   // Title/time as last saved — only a changed one is passed on to the
   // following occurrences, so a time moved in a single week isn't reset.
   const [savedMeta, setSavedMeta] = useState({ title: initialTitle, time: initialTime ?? "" });
+  // What was last saved, to warn before leaving with unsaved edits. Ids and
+  // resolved exercise ids change on save, instructions save on their own.
+  const editorSnapshot = (r: Row[], t: string, d: string, tm: string, m: string) =>
+    JSON.stringify({
+      r: r
+        .filter((x) => x.exercise_name.trim())
+        .map((x) => [x.exercise_name, x.reps_or_duration, x.sets, x.rest_time, x.notes, x.link_url, x.section, x.round_rest, x.heart_rate_on, x.heart_rate_off, x.description, x.duration_mode]),
+      t,
+      d,
+      tm,
+      m,
+    });
+  const [savedSnapshot, setSavedSnapshot] = useState(() => editorSnapshot(rows, title, date, time, mesocycleId));
+  const currentSnapshot = editorSnapshot(rows, title, date, time, mesocycleId);
+  useUnsavedGuard(currentSnapshot !== savedSnapshot);
   const selectedMesocycle = mesocycles?.find((m) => m.id === mesocycleId) ?? null;
   const effectiveWeekday = repeatWeekday ?? (date ? weekdayOfDate(date) : 0);
   const effectiveUntil = selectedMesocycle && untilMode === "meso" ? selectedMesocycle.endDate : repeatUntil;
@@ -246,10 +265,20 @@ export function PlanTableEditor({
     // exercise once renamed — the trigger behind several real mislinked
     // rows in production. Leaving it null defers to the same
     // create-or-find resolution a brand-new row gets.
-    setRows((prev) => [...prev, { ...prev[last.index], exercise_id: null }]);
+    setRows((prev) => [...prev, { ...prev[last.index], id: null, exercise_id: null }]);
+  }
+
+  // Open panels and step drafts are tracked by row index, which shifts when
+  // rows move or go away: close them so they never show another exercise.
+  function resetRowPanels() {
+    setNotesOpenIndex(null);
+    setLinkOpenIndex(null);
+    setInstrOpenIndex(null);
+    setStepDraftByIndex({});
   }
 
   function removeRow(index: number) {
+    resetRowPanels();
     setRows((prev) => prev.filter((_, i) => i !== index));
   }
 
@@ -259,6 +288,7 @@ export function PlanTableEditor({
   // every other section's relative order untouched.
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   function moveRow(fromIndex: number, toIndex: number) {
+    resetRowPanels();
     setRows((prev) => {
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
@@ -345,11 +375,13 @@ export function PlanTableEditor({
         return;
       }
 
+      const rowsAtSave = rows;
       const result = await savePlanItemsAction(planId, rows);
       if (result.error) {
         toast.error(result.error);
         return;
       }
+      setSavedSnapshot(currentSnapshot);
 
       const savedItems = result.items;
       if (savedItems) {
@@ -358,12 +390,16 @@ export function PlanTableEditor({
           return acc;
         }, []);
         setRows((prev) => {
+          // Edited while saving (row moved/removed/added): positions no longer
+          // match, so leave ids unset rather than attach them to wrong rows.
+          if (prev !== rowsAtSave) return prev;
           const next = [...prev];
           for (const item of savedItems) {
             const rowIndex = nonEmptyIndices[item.position];
             if (rowIndex === undefined) continue;
             next[rowIndex] = {
               ...next[rowIndex],
+              id: item.id,
               exercise_id: item.exercise_id ?? next[rowIndex].exercise_id ?? null,
             };
           }
@@ -373,10 +409,14 @@ export function PlanTableEditor({
 
       let followingNote = "";
       if (followingCount > 0 && applyToFollowing) {
-        const followResult = await applyToFollowingOccurrencesAction(planId, {
-          ...(title.trim() !== savedMeta.title.trim() ? { title } : {}),
-          ...(time.trim() !== savedMeta.time.trim() ? { time } : {}),
-        });
+        const followResult = await applyToFollowingOccurrencesAction(
+          planId,
+          {
+            ...(title.trim() !== savedMeta.title.trim() ? { title } : {}),
+            ...(time.trim() !== savedMeta.time.trim() ? { time } : {}),
+          },
+          result.previousSignature
+        );
         if (followResult.error) {
           toast.error(followResult.error);
           return;
@@ -388,6 +428,10 @@ export function PlanTableEditor({
         }
         if (skipped > 0) {
           followingNote += ` ${skipped} ${skipped === 1 ? "Termin wurde" : "Termine wurden"} schon trainiert und ${skipped === 1 ? "bleibt" : "bleiben"} unverändert.`;
+        }
+        const customized = followResult.customized ?? 0;
+        if (customized > 0) {
+          followingNote += ` ${customized} ${customized === 1 ? "Termin hat" : "Termine haben"} eigene Übungen (z. B. eine Progression) und ${customized === 1 ? "bleibt" : "bleiben"} unverändert.`;
         }
       }
       setSavedMeta({ title, time });

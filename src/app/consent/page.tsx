@@ -1,9 +1,12 @@
+import Link from "next/link";
 import { getMyConsentAction } from "@/lib/actions/consent";
 import { ConsentForm } from "@/components/auth/consent-form";
 
 export default async function ConsentPage() {
   const consent = await getMyConsentAction();
   const isAthlete = consent.role === "athlete";
+  // Reached again from Konto/Einstellungen to change an existing consent.
+  const editing = consent.termsAccepted;
 
   return (
     <div
@@ -14,9 +17,14 @@ export default async function ConsentPage() {
         className="w-full max-w-[560px] p-6 sm:p-10"
         style={{ background: "var(--dc-bg)", boxShadow: "var(--dc-shadow-md)" }}
       >
-        <div className="kicker">Bevor es losgeht</div>
+        {editing && (
+          <Link href={isAthlete ? "/athlete/settings" : "/trainer/settings"} className="btn btn-ghost mb-3 -ml-2">
+            ← Zurück
+          </Link>
+        )}
+        <div className="kicker">{editing ? "Datenschutz" : "Bevor es losgeht"}</div>
         <h2 className="mt-2.5 text-[28px] leading-[1.06] sm:text-[30px] sm:leading-[1.05]">
-          Datenschutz
+          {editing ? "Einwilligung ändern" : "Datenschutz"}
         </h2>
         <p
           className="mt-2.5 text-sm leading-[1.6]"
@@ -30,6 +38,7 @@ export default async function ConsentPage() {
           isAthlete={isAthlete}
           initialTermsAccepted={consent.termsAccepted}
           initialHealthConsent={consent.healthConsent}
+          editing={editing}
         />
       </div>
     </div>

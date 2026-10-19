@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-export type ArmedItem = { id: string; kind: "plan" | "event"; title: string } | null;
+// `ids`: every row a merged event card stands for (one per group).
+export type ArmedItem = { id: string; ids?: string[]; kind: "plan" | "event"; title: string } | null;
 
 type ArmedItemCtx = {
   armedItem: ArmedItem;

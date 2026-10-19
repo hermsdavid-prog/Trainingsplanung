@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { markAthleteNoteReadAction, deleteAthleteNoteAction } from "@/lib/actions/athlete-notes";
 
 export type CoachNote = {
@@ -22,14 +23,23 @@ export function CoachNotesBanner({ notes }: { notes: CoachNote[] }) {
 
   function markRead(id: string) {
     startTransition(async () => {
-      await markAthleteNoteReadAction(id);
+      const result = await markAthleteNoteReadAction(id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }
 
   function remove(id: string) {
+    if (!confirm("Hinweis endgültig löschen?")) return;
     startTransition(async () => {
-      await deleteAthleteNoteAction(id);
+      const result = await deleteAthleteNoteAction(id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }

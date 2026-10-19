@@ -8,7 +8,9 @@ import { ReportAbsenceDialog } from "@/components/calendar/report-absence-dialog
 import { WeekBoard, type WeekItem } from "@/components/calendar/week-board";
 import { CalendarArmedProvider } from "@/components/calendar/armed-item-context";
 
-const INDIVIDUAL_PLAN_COLOR = "#4b3793";
+// Mixed with the text colour so the violet stays readable on the dark
+// surface in dark mode (and only darkens slightly on white).
+const INDIVIDUAL_PLAN_COLOR = "color-mix(in srgb, #4b3793 60%, var(--dc-text))";
 
 export default async function TrainerCalendarPage({
   searchParams,
@@ -128,7 +130,7 @@ export default async function TrainerCalendarPage({
   // entries stacked on one day, so only the first row per (date, series_id)
   // becomes a calendar card; the week board's card folds the extra groups'
   // names into one combined "who" instead of dropping them silently.
-  const seenMonthEventKeysByDate = new Map<string, Set<string>>();
+  const monthEventItemByKey = new Map<string, CalendarItem>();
   const weekEventItemByKey = new Map<string, WeekItem>();
   const weekEventWhoSetByKey = new Map<string, Set<string>>();
 
@@ -141,23 +143,25 @@ export default async function TrainerCalendarPage({
         : "Alle";
     const mergeKey = event.series_id ?? event.id;
     if (days.includes(date)) {
-      const seen = seenMonthEventKeysByDate.get(date) ?? new Set<string>();
-      if (!seen.has(mergeKey)) {
-        seen.add(mergeKey);
-        seenMonthEventKeysByDate.set(date, seen);
-        itemsByDate[date] = [
-          ...(itemsByDate[date] ?? []),
-          {
-            id: event.id,
-            title: event.title,
-            color: event.color,
-            href: `/trainer/calendar?month=${date.slice(0, 7)}`,
-            status: event.status,
-            subtitle: event.event_type,
-            description: event.description,
-            kind: "event" as const,
-          },
-        ];
+      const monthKey = `${date}::${mergeKey}`;
+      const existingMonthItem = monthEventItemByKey.get(monthKey);
+      if (existingMonthItem) {
+        // Deleting the card removes every merged row, not just the first.
+        existingMonthItem.ids = [...(existingMonthItem.ids ?? [existingMonthItem.id]), event.id];
+      } else {
+        const item: CalendarItem = {
+          id: event.id,
+          ids: [event.id],
+          title: event.title,
+          color: event.color,
+          href: `/trainer/calendar?month=${date.slice(0, 7)}`,
+          status: event.status,
+          subtitle: event.event_type,
+          description: event.description,
+          kind: "event" as const,
+        };
+        monthEventItemByKey.set(monthKey, item);
+        itemsByDate[date] = [...(itemsByDate[date] ?? []), item];
       }
     }
     if (weekDaySet.has(date)) {
@@ -171,6 +175,7 @@ export default async function TrainerCalendarPage({
       const weekKey = `${date}::${mergeKey}`;
       const existingItem = weekEventItemByKey.get(weekKey);
       if (existingItem) {
+        existingItem.ids = [...(existingItem.ids ?? [existingItem.id]), event.id];
         const whoSet = weekEventWhoSetByKey.get(weekKey)!;
         if (!whoSet.has(who)) {
           whoSet.add(who);
@@ -180,6 +185,7 @@ export default async function TrainerCalendarPage({
       }
       const item: WeekItem = {
         id: event.id,
+        ids: [event.id],
         kind: "event",
         title: event.title,
         href: null,

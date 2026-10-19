@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { currentMonthStr, formatMonthLabel, getMonthGridDays, getWeekDays, shiftMonthStr, todayISO, utcISOToAppDateString, appWallTimeToUTCISOString, shiftDateISO } from "@/lib/date";
+import { currentMonthStr, formatMonthLabel, formatWeekdayShort, getMonthGridDays, getWeekDays, shiftMonthStr, todayISO, utcISOToAppDateString, appWallTimeToUTCISOString, shiftDateISO } from "@/lib/date";
 import { CalendarGrid, type CalendarItem } from "@/components/calendar/calendar-grid";
 import { ProposeEventDialog } from "@/components/calendar/propose-event-dialog";
 
@@ -11,6 +11,8 @@ type AgendaItem = {
   title: string;
   href: string;
   time: string;
+  // Sort key within a day: all-day first, then by time, untimed last.
+  sortKey: string;
   meta: string;
   tone: string;
 };
@@ -85,7 +87,8 @@ export default async function AthleteCalendarPage({
           id: plan.id,
           title: plan.title,
           href: `/athlete/plans/${plan.id}`,
-          time: plan.time ?? "",
+          time: plan.time ? plan.time.slice(0, 5) : "",
+          sortKey: plan.time ? plan.time.slice(0, 5) : "99",
           meta: who,
           tone: color,
         },
@@ -143,6 +146,7 @@ export default async function AthleteCalendarPage({
           title: event.title,
           href: `/athlete/calendar?month=${date.slice(0, 7)}`,
           time,
+          sortKey: event.all_day ? "" : time,
           meta: event.event_type,
           tone: event.color,
         },
@@ -150,7 +154,12 @@ export default async function AthleteCalendarPage({
     }
   }
 
-  const myAgenda = weekDays.flatMap((day) => agendaByDate[day] ?? []);
+  const agendaDays = weekDays
+    .map((day) => ({
+      day,
+      items: [...(agendaByDate[day] ?? [])].sort((a, b) => a.sortKey.localeCompare(b.sortKey)),
+    }))
+    .filter((d) => d.items.length > 0);
 
   return (
     <div>
@@ -177,21 +186,29 @@ export default async function AthleteCalendarPage({
 
       <div className="kicker mt-6.5">Diese Woche</div>
       <div className="mt-3">
-        {myAgenda.length === 0 && <p className="text-sm text-muted">Keine Einträge diese Woche.</p>}
-        {myAgenda.map((item) => (
-          <Link key={item.id} href={item.href} className="exrow block" style={{ padding: 0 }}>
-            <div className="mb-2.5 w-full p-3.5" style={{ background: "var(--dc-surface)", borderLeft: `2px solid ${item.tone}` }}>
-              <div className="flex items-baseline justify-between gap-2.5">
-                <span className="text-[17px] leading-[1.2]">{item.title}</span>
-                <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
-                  {item.time}
-                </span>
-              </div>
-              <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
-                {item.meta}
-              </div>
+        {agendaDays.length === 0 && <p className="text-sm text-muted">Keine Einträge diese Woche.</p>}
+        {agendaDays.map(({ day, items }) => (
+          <div key={day} className="mb-3">
+            <div className="mb-1.5 text-xs font-semibold" style={{ color: day === today ? "var(--dc-text)" : "var(--dc-muted)" }}>
+              {formatWeekdayShort(day)}
+              {day === today ? " · Heute" : ""}
             </div>
-          </Link>
+            {items.map((item) => (
+              <Link key={item.id} href={item.href} className="exrow block" style={{ padding: 0 }}>
+                <div className="mb-2.5 w-full p-3.5" style={{ background: "var(--dc-surface)", borderLeft: `2px solid ${item.tone}` }}>
+                  <div className="flex items-baseline justify-between gap-2.5">
+                    <span className="text-[17px] leading-[1.2]">{item.title}</span>
+                    <span className="text-xs" style={{ color: "var(--dc-muted)" }}>
+                      {item.time}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
+                    {item.meta}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
         ))}
       </div>
     </div>

@@ -1,13 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createOwnPlanAction, type ActionResult } from "@/lib/actions/plans";
 import { PLAN_TYPES } from "@/lib/plan-type";
+import { todayISO } from "@/lib/date";
 
 // PLAN_TYPES[0] is "Sportartspezifisch" (its historical/display order), but
 // athletes creating their own training overwhelmingly mean an Athletik
 // session — default the picker to that instead.
 const DEFAULT_OWN_PLAN_CATEGORY = "Athletik";
+
+// Athletes know "Sportartspezifisch" as Karate; the stored value stays the same.
+const PLAN_TYPE_LABEL: Record<string, string> = { Sportartspezifisch: "Karate" };
 
 const initialState: ActionResult = {};
 
@@ -21,6 +25,8 @@ export function CreateOwnPlanForm({
   defaultCategory?: string;
 } = {}) {
   const [state, formAction, isPending] = useActionState(createOwnPlanAction, initialState);
+  // Today in Berlin as the default date, fixed at mount.
+  const [defaultDate] = useState(() => todayISO());
 
   return (
     <form action={formAction} className="flex flex-col">
@@ -49,7 +55,7 @@ export function CreateOwnPlanForm({
         >
           {PLAN_TYPES.map((t) => (
             <option key={t} value={t}>
-              {t}
+              {PLAN_TYPE_LABEL[t] ?? t}
             </option>
           ))}
         </select>
@@ -63,11 +69,11 @@ export function CreateOwnPlanForm({
       <div className="mt-3.5 flex flex-wrap gap-3.5">
         <div className="field" style={{ flex: "1 1 170px" }}>
           <label htmlFor="date">Datum</label>
-          <input id="date" name="date" type="date" required className="input" />
+          <input id="date" name="date" type="date" required className="input" defaultValue={defaultDate} />
         </div>
         <div className="field" style={{ flex: "1 1 110px" }}>
           <label htmlFor="time">Uhrzeit</label>
-          <input id="time" name="time" className="input" placeholder="18:00" />
+          <input id="time" name="time" type="time" className="input" />
         </div>
       </div>
 

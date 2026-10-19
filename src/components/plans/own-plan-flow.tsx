@@ -84,8 +84,8 @@ export function OwnPlanFlow({ templates }: { templates: PlanTemplateSummary[] })
       <div className="kicker mt-3.5">Schritt 2 von 2</div>
       <h2 className="mt-2.5 text-[27px] leading-[1.08]">Rahmendaten</h2>
       <p className="mt-2.5 text-sm leading-[1.55]" style={{ color: "var(--dc-muted)" }}>
-        Lege die Rahmendaten fest — die Übungstabelle folgt im nächsten Schritt. Dein Trainer
-        kann dieses Training einsehen.
+        Lege die Rahmendaten fest, danach trägst du die Übungen in die Übungstabelle ein. Dein
+        Trainer kann dieses Training einsehen.
       </p>
       <div className="mt-6">
         <CreateOwnPlanForm templateId={templateId} defaultTitle={templateTitle} defaultCategory={templateCategory} />

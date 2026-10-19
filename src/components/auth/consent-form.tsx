@@ -8,10 +8,14 @@ export function ConsentForm({
   isAthlete,
   initialTermsAccepted = false,
   initialHealthConsent = false,
+  editing = false,
 }: {
   isAthlete: boolean;
   initialTermsAccepted?: boolean;
   initialHealthConsent?: boolean;
+  // Changing an existing consent: one "Speichern" that stores the checkbox
+  // state as shown, instead of the two onboarding start buttons.
+  editing?: boolean;
 }) {
   const [termsAccepted, setTermsAccepted] = useState(initialTermsAccepted);
   const [healthConsent, setHealthConsent] = useState(initialHealthConsent);
@@ -38,6 +42,8 @@ export function ConsentForm({
     <div>
       <button
         type="button"
+        role="checkbox"
+        aria-checked={termsAccepted}
         onClick={() => {
           setTermsAccepted((v) => !v);
           setError("");
@@ -71,6 +77,8 @@ export function ConsentForm({
       {isAthlete && (
         <button
           type="button"
+          role="checkbox"
+          aria-checked={healthConsent}
           onClick={() => {
             setHealthConsent((v) => !v);
             setError("");
@@ -109,15 +117,26 @@ export function ConsentForm({
         </div>
       )}
 
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={() => submit(true)}
-        className="btn btn-primary btn-block mt-5"
-      >
-        {isPending ? "Wird gespeichert…" : "Zustimmen und starten"}
-      </button>
-      {isAthlete && (
+      {editing ? (
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => submit(isAthlete && healthConsent)}
+          className="btn btn-primary btn-block mt-5"
+        >
+          {isPending ? "Wird gespeichert…" : "Speichern"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => submit(true)}
+          className="btn btn-primary btn-block mt-5"
+        >
+          {isPending ? "Wird gespeichert…" : "Zustimmen und starten"}
+        </button>
+      )}
+      {isAthlete && !editing && (
         <button
           type="button"
           disabled={isPending}

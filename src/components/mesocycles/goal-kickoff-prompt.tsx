@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { todayISO } from "@/lib/date";
 import {
   saveKickoffGoalsAction,
   skipKickoffGoalsAction,
@@ -29,11 +30,29 @@ function recapMessage(r: KickoffRecap, achieved: number) {
   return `Neuer Block, neue Chance. Aus „${r.title}“ ist noch nichts abgehakt — vielleicht hast du ja doch schon etwas erreicht?`;
 }
 
+// Closing the window (X/backdrop) means "later": remembered on this device
+// for the rest of the day (localStorage, like CheckinGate), so it doesn't
+// pop up again on every visit to the Startseite.
+const LATER_KEY_PREFIX = "goal-kickoff-later:";
+
+function readLaterToday(mesocycleId: string): boolean {
+  try {
+    return window.localStorage.getItem(LATER_KEY_PREFIX + mesocycleId) === todayISO();
+  } catch {
+    return false;
+  }
+}
+
+function subscribe(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+
 // Opens on the athlete's Startseite in the first week of a new Mesozyklus
 // they haven't set own goals for yet: a positive look back at the last
 // block's goals (still-open ones can be ticked right here) and three fields
 // for this block's goals. "Überspringen" stops asking for this block;
-// closing the window just asks again on the next visit.
+// closing the window asks again the next day.
 export function GoalKickoffPrompt({
   mesocycleId,
   mesocycleTitle,
@@ -49,6 +68,7 @@ export function GoalKickoffPrompt({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(true);
+  const laterStored = useSyncExternalStore(subscribe, () => readLaterToday(mesocycleId), () => false);
   const [texts, setTexts] = useState(["", "", ""]);
   const [achieved, setAchieved] = useState(recap?.achieved ?? 0);
   const [ticked, setTicked] = useState<Set<string>>(new Set());
@@ -101,8 +121,18 @@ export function GoalKickoffPrompt({
     });
   }
 
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) return;
+    try {
+      window.localStorage.setItem(LATER_KEY_PREFIX + mesocycleId, todayISO());
+    } catch {
+      // private mode etc.: closing still works for this page view
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open && !laterStored} onOpenChange={handleOpenChange}>
       <DialogContent className="dc-dialog max-h-[calc(100dvh-2rem)] max-w-[480px] overflow-y-auto">
         <div className="min-w-0">
           <div className="kicker">Neuer Mesozyklus</div>

@@ -61,9 +61,10 @@ export default async function TrainerPlansPage({
   // into a single row with all of its dates shown together.
   const groupsByKey = new Map<string, PlanGroup>();
   for (const plan of plans ?? []) {
-    const key =
-      plan.series_id ??
-      `adhoc:${plan.title}::${plan.scope_type}::${plan.group_id ?? plan.athlete_id ?? ""}`;
+    // A plan created for several groups/athletes shares one series_id, so
+    // the target is part of the key: each group/athlete gets its own row.
+    const target = `${plan.scope_type}::${plan.group_id ?? plan.athlete_id ?? ""}`;
+    const key = plan.series_id ? `${plan.series_id}::${target}` : `adhoc:${plan.title}::${target}`;
     const forLabel =
       plan.scope_type === "group" ? (plan.groups?.name ?? "—") : (plan.profiles?.full_name ?? "—");
     const occurrence = { id: plan.id, date: plan.date, created_by: plan.created_by };

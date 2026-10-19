@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   toggleMesocycleGoalAction,
   createMesocycleGoalAction,
@@ -40,14 +41,22 @@ export function GoalToggleList({
 
   function toggle(id: string, next: boolean) {
     startTransition(async () => {
-      await toggleMesocycleGoalAction(id, next);
+      const result = await toggleMesocycleGoalAction(id, next);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }
 
   function remove(id: string) {
     startTransition(async () => {
-      await deleteMesocycleGoalAction(id);
+      const result = await deleteMesocycleGoalAction(id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -55,7 +64,12 @@ export function GoalToggleList({
   function addGoal() {
     if (!newText.trim()) return;
     startTransition(async () => {
-      await createMesocycleGoalAction({ mesocycleId, athleteId, text: newText });
+      const result = await createMesocycleGoalAction({ mesocycleId, athleteId, text: newText });
+      if (result.error) {
+        // Keep the typed text so the athlete can retry.
+        toast.error(result.error);
+        return;
+      }
       setNewText("");
       setAdding(false);
       router.refresh();
@@ -72,10 +86,11 @@ export function GoalToggleList({
         <div key={g.id} className="flex items-start gap-2 text-[13.5px] leading-[1.45]" style={{ opacity: g.achievedAt ? 0.6 : 1 }}>
           {/* Goals wrap onto as many lines as they need — a long goal used
               to be cut off with "…" and couldn't be read at all. */}
-          <label className="flex min-w-0 flex-1 items-start gap-2">
+          {/* 44px tall row with a 24px checkbox so it is easy to hit on touch. */}
+          <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2.5">
             <input
               type="checkbox"
-              className="mt-[3px] flex-none"
+              className="size-6 flex-none"
               checked={g.achievedAt != null}
               disabled={isPending}
               onChange={(e) => toggle(g.id, e.target.checked)}

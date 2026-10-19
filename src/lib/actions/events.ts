@@ -257,29 +257,47 @@ export async function confirmEventAction(eventId: string): Promise<ActionResult>
 }
 
 export async function deleteEventAction(
-  eventId: string,
+  // Several ids when the calendar merged one event's per-group rows (same
+  // series, same day) into a single card; every row is checked and deleted.
+  eventIds: string | string[],
   // A multi-day proposal goes as a whole (like confirming it); confirmed
   // events, including days of a trainer's series, are deleted one by one.
   opts: { wholeProposal?: boolean } = {}
 ): Promise<ActionResult> {
   const { supabase } = await requireUser();
+  const ids = Array.isArray(eventIds) ? eventIds : [eventIds];
+  if (ids.length === 0) return { error: "Termin nicht gefunden." };
+  const deleted = new Set<string>();
+  const revalidate = () => {
+    revalidatePath("/trainer");
+    revalidatePath("/trainer/calendar");
+    revalidatePath("/athlete/calendar");
+  };
 
-  const { data: event } = opts.wholeProposal
-    ? await supabase.from("events").select("series_id, status").eq("id", eventId).maybeSingle()
-    : { data: null };
-  const remove = supabase.from("events").delete();
-  const { data, error } =
-    event?.series_id && event.status === "proposed"
-      ? await remove.eq("series_id", event.series_id).eq("status", "proposed").select("id")
-      : await remove.eq("id", eventId).select("id");
+  for (const eventId of ids) {
+    // Already gone with an earlier id's whole proposal series.
+    if (deleted.has(eventId)) continue;
+    const { data: event } = opts.wholeProposal
+      ? await supabase.from("events").select("series_id, status").eq("id", eventId).maybeSingle()
+      : { data: null };
+    const remove = supabase.from("events").delete();
+    const { data, error } =
+      event?.series_id && event.status === "proposed"
+        ? await remove.eq("series_id", event.series_id).eq("status", "proposed").select("id")
+        : await remove.eq("id", eventId).select("id");
 
-  if (error) return { error: "Termin konnte nicht gelöscht werden." };
-  if (!data || data.length === 0) {
-    return { error: "Keine Berechtigung, diesen Termin zu löschen." };
+    // Rows deleted before a failure stay deleted: refresh the views anyway.
+    if (error) {
+      if (deleted.size > 0) revalidate();
+      return { error: "Termin konnte nicht gelöscht werden." };
+    }
+    if (!data || data.length === 0) {
+      if (deleted.size > 0) revalidate();
+      return { error: "Keine Berechtigung, diesen Termin zu löschen." };
+    }
+    for (const row of data) deleted.add(row.id);
   }
 
-  revalidatePath("/trainer");
-  revalidatePath("/trainer/calendar");
-  revalidatePath("/athlete/calendar");
+  revalidate();
   return {};
 }

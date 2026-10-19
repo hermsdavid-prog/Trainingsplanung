@@ -24,14 +24,29 @@ export async function AthletikProgress({
 }) {
   const supabase = await createClient();
 
-  const { data: exerciseRows } = await supabase
-    .from("exercise_results")
-    .select("exercise_id, exercises(id, name)")
-    .eq("athlete_id", userId);
+  // PostgREST caps a response at ~1000 rows, so page through the athlete's
+  // results (ids only) to collect every distinct exercise, then load names.
+  const PAGE_SIZE = 1000;
+  const exerciseIds = new Set<string>();
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data: page } = await supabase
+      .from("exercise_results")
+      .select("exercise_id")
+      .eq("athlete_id", userId)
+      .order("date", { ascending: false })
+      .order("id")
+      .range(offset, offset + PAGE_SIZE - 1);
+    for (const row of page ?? []) exerciseIds.add(row.exercise_id);
+    if (!page || page.length < PAGE_SIZE) break;
+  }
+
+  const { data: exerciseRows } = exerciseIds.size
+    ? await supabase.from("exercises").select("id, name").in("id", Array.from(exerciseIds))
+    : { data: [] };
 
   const exerciseMap = new Map<string, string>();
   for (const row of exerciseRows ?? []) {
-    if (row.exercises?.name) exerciseMap.set(row.exercise_id, row.exercises.name);
+    if (row.name) exerciseMap.set(row.id, row.name);
   }
   const exercises = Array.from(exerciseMap.entries())
     .map(([id, name]) => ({ id, name }))

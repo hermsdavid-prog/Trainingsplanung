@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { todayISO, shiftDateISO, formatDateLabel, formatDateCompact, isMesocycleCurrent } from "@/lib/date";
+import { todayISO, shiftDateISO, formatDateLabel, formatDateCompact, formatDateShort, isMesocycleCurrent } from "@/lib/date";
 import { GoalKickoffPrompt, type KickoffRecap } from "@/components/mesocycles/goal-kickoff-prompt";
 
 function daysBetween(a: string, b: string): number {
@@ -243,9 +243,41 @@ export default async function AthleteTodayPage({
 
   const showCheckin = healthConsent && date === today && !healthLog;
 
+  // Wording for the selected day (?date= lets the athlete browse other days).
+  const dayWord =
+    date === today
+      ? "heute"
+      : date === shiftDateISO(today, 1)
+        ? "morgen"
+        : date === shiftDateISO(today, -1)
+          ? "gestern"
+          : `den ${formatDateShort(date)}`;
+  const trainingHeading = dayWord.startsWith("den ") ? `Training am ${formatDateShort(date)}` : `Training ${dayWord}`;
+  const noTrainingText = date < today
+    ? `Für ${dayWord} war kein Training geplant.`
+    : `Für ${dayWord} ist kein Training geplant.`;
+
   return (
     <div>
-      <div className="kicker">{formatDateLabel(date)}</div>
+      <div className="flex items-center justify-between gap-2">
+        <Link href={`/athlete?date=${shiftDateISO(date, -1)}`} className="btn btn-ghost btn-icon" aria-label="Vorheriger Tag">
+          ←
+        </Link>
+        <div className="kicker text-center">
+          {formatDateLabel(date)}
+          {date !== today && (
+            <>
+              {" · "}
+              <Link href="/athlete" className="underline">
+                zu heute
+              </Link>
+            </>
+          )}
+        </div>
+        <Link href={`/athlete?date=${shiftDateISO(date, 1)}`} className="btn btn-ghost btn-icon" aria-label="Nächster Tag">
+          →
+        </Link>
+      </div>
 
       <CoachNotesBanner notes={unreadNotes} />
 
@@ -264,7 +296,7 @@ export default async function AthleteTodayPage({
         }
         main={
         <>
-          <h2 className="mt-1.5 text-[27px] leading-[1.08]">Training heute</h2>
+          <h2 className="mt-1.5 text-[27px] leading-[1.08]">{trainingHeading}</h2>
           {!healthConsent && date === today && (
             <p className="mt-2 text-[13px] leading-[1.5]" style={{ color: "var(--dc-muted)" }}>
               Der tägliche Check-in ist aus, weil keine Einwilligung für Gesundheitswerte vorliegt.{" "}
@@ -277,7 +309,7 @@ export default async function AthleteTodayPage({
           <div className="mt-4">
             {(!plans || plans.length === 0) && (
               <div className="p-3.5 text-[13px] leading-[1.5]" style={{ background: "var(--dc-surface)", color: "var(--dc-muted)" }}>
-                Für heute ist kein Training geplant.
+                {noTrainingText}
               </div>
             )}
             {(plans ?? []).map((plan) => (
@@ -378,25 +410,6 @@ export default async function AthleteTodayPage({
         }
       />
 
-      <div className="mt-6 flex items-center justify-between gap-3 p-2" style={{ background: "var(--dc-surface)" }}>
-        <Link href={`/athlete?date=${shiftDateISO(date, -1)}`} className="btn btn-ghost" aria-label="Vorheriger Tag">
-          ←
-        </Link>
-        <span className="text-sm">
-          {date === today ? "Heute" : formatDateLabel(date)}
-          {date !== today && (
-            <>
-              {" · "}
-              <Link href="/athlete" className="underline">
-                zu heute
-              </Link>
-            </>
-          )}
-        </span>
-        <Link href={`/athlete?date=${shiftDateISO(date, 1)}`} className="btn btn-ghost" aria-label="Nächster Tag">
-          →
-        </Link>
-      </div>
     </div>
   );
 }

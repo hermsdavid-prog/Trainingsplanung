@@ -29,7 +29,7 @@ export default async function TrainerDashboardPage() {
     supabase.from("group_athletes").select("group_id, athlete_id, profiles(full_name)"),
     supabase
       .from("training_plans")
-      .select("id, date, title, time, category_label, scope_type, group_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
+      .select("id, date, title, time, category_label, scope_type, group_id, athlete_id, groups(name), profiles!training_plans_athlete_id_fkey(full_name)")
       .in("date", [shiftDateISO(today, -1), today])
       .order("time", { nullsFirst: false }),
     supabase
@@ -46,7 +46,7 @@ export default async function TrainerDashboardPage() {
   const { data: ratingRows } = recentPlans.length
     ? await supabase
         .from("session_ratings")
-        .select("training_plan_id, rpe")
+        .select("training_plan_id, athlete_id, rpe")
         .in(
           "training_plan_id",
           recentPlans.map((p) => p.id)
@@ -54,9 +54,18 @@ export default async function TrainerDashboardPage() {
     : { data: [] };
   const groupSize = new Map<string, number>();
   for (const row of groupAthleteRows ?? []) groupSize.set(row.group_id, (groupSize.get(row.group_id) ?? 0) + 1);
+  // Only ratings by the plan's own athletes count; a trainer who trained
+  // along ("Selbst trainieren") must not show up as a finished athlete.
+  const groupAthleteKeys = new Set((groupAthleteRows ?? []).map((row) => `${row.group_id}:${row.athlete_id}`));
+  const planById = new Map(recentPlans.map((p) => [p.id, p]));
   const ratingsByPlan = new Map<string, number[]>();
   for (const r of ratingRows ?? []) {
-    if (r.rpe != null) ratingsByPlan.set(r.training_plan_id, [...(ratingsByPlan.get(r.training_plan_id) ?? []), r.rpe]);
+    const plan = planById.get(r.training_plan_id);
+    const isPlanAthlete =
+      plan?.scope_type === "group"
+        ? groupAthleteKeys.has(`${plan.group_id}:${r.athlete_id}`)
+        : plan?.athlete_id === r.athlete_id;
+    if (r.rpe != null && isPlanAthlete) ratingsByPlan.set(r.training_plan_id, [...(ratingsByPlan.get(r.training_plan_id) ?? []), r.rpe]);
   }
   const progressLabel = (plan: { id: string; scope_type: string; group_id: string | null }) => {
     const ratings = ratingsByPlan.get(plan.id) ?? [];

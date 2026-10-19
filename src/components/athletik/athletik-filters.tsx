@@ -103,7 +103,9 @@ export function ExerciseTypeahead({
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [open, selected?.name]);
 
-  const q = query.trim().toLowerCase();
+  // While the field still shows the selected exercise's name, list all
+  // exercises instead of just that one.
+  const q = query === selected?.name ? "" : query.trim().toLowerCase();
   const matches = q ? exercises.filter((e) => e.name.toLowerCase().includes(q)) : exercises;
 
   function pick(exercise: { id: string; name: string }) {
@@ -123,7 +125,10 @@ export function ExerciseTypeahead({
           setQuery(e.target.value);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={(e) => {
+          e.target.select();
+          setOpen(true);
+        }}
         placeholder="Buchstaben tippen …"
         autoComplete="off"
       />

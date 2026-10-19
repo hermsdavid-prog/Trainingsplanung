@@ -37,11 +37,13 @@ import {
 import {
   browserStorage,
   enqueueSet,
+  flushQueuedSets,
   isOffline,
   readQueue,
   removeQueuedSet,
   type QueuedSet,
 } from "@/lib/offline-queue";
+import { sendQueuedSet, sentToast } from "@/components/athlete/offline-sync";
 
 type SetType = "aufwaermsatz" | "arbeitssatz";
 
@@ -175,12 +177,18 @@ function notifyNewBadges(badges: BadgeAward[] | undefined) {
 
 // Set row columns: label · reps · weight · RIR · ✓ · ✕. Sized for a 375px
 // phone so "Aufwärmsatz" (number on its own line) and "100 kg" both fit
-// without truncation.
-const SET_GRID = "76px 46px minmax(0,1fr) 38px 40px 24px";
+// without truncation, with a 36px ✕ so it isn't hit instead of ✓.
+const SET_GRID = "76px 42px minmax(0,1fr) 38px 40px 36px";
 // VBT exercise: the RIR column becomes a wider m/s column.
-const VBT_GRID = "76px 40px minmax(0,1fr) 46px 40px 24px";
+const VBT_GRID = "76px 38px minmax(0,1fr) 46px 40px 36px";
 // Jump test with contact time / RSI: Versuch · Höhe · Kontakt · RSI · ✓ · ✕.
-const JUMP_GRID = "64px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 40px 24px";
+const JUMP_GRID = "64px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 40px 36px";
+
+// Bottom sheets: clear of the iPhone home indicator, scrollable on short screens.
+const SHEET_STYLE = {
+  background: "var(--dc-surface)",
+  paddingBottom: "max(26px, calc(env(safe-area-inset-bottom) + 12px))",
+};
 
 type PadField = "reps" | "weight" | "contact" | "rsi";
 
@@ -301,6 +309,11 @@ function setMembers(rows: SessionSet[], set: SessionSet): SessionSet[] {
   return [rows[i]];
 }
 
+// Status text colours, mixed toward the theme's text colour so they stay
+// readable on the light and the dark background.
+const WARN_TEXT = "color-mix(in srgb, #b45309 70%, var(--dc-text))";
+const OK_TEXT = "color-mix(in srgb, #0f8a5f 70%, var(--dc-text))";
+
 const fmt = (n: number, digits = 2) => n.toFixed(digits).replace(".", ",");
 
 // m/s cell of a VBT set: green inside the target zone, amber when slower
@@ -325,12 +338,14 @@ function VelocityCell({
       className="tapv text-[14px] leading-tight"
       onClick={onClick}
       title={belowTarget ? "Langsamer als der Zielbereich" : inTarget ? "Im Zielbereich" : undefined}
-      style={{ color: belowTarget ? "#b45309" : inTarget ? "#0f8a5f" : undefined }}
+      style={{ color: belowTarget ? WARN_TEXT : inTarget ? OK_TEXT : undefined }}
     >
       {v != null ? fmt(v) : "—"}
+      {/* Not by colour alone: ↓ too slow, ✓ in the target zone. */}
+      {belowTarget ? <span className="text-[11px]"> ↓</span> : inTarget ? <span className="text-[11px]"> ✓</span> : null}
       {loss != null && (
-        <span className="block whitespace-nowrap text-[10.5px]" style={{ color: lossTooHigh ? "#b45309" : "var(--dc-muted)" }}>
-          −{Math.round(loss)}%
+        <span className="block whitespace-nowrap text-[10.5px]" style={{ color: lossTooHigh ? WARN_TEXT : "var(--dc-muted)" }}>
+          −{Math.round(loss)}%{lossTooHigh ? " !" : ""}
         </span>
       )}
     </button>
@@ -378,7 +393,7 @@ function VbtPanel({
       {form != null &&
         line(
           "Tagesform",
-          <span style={{ color: form <= -8 ? "#b45309" : form >= 3 ? "#0f8a5f" : undefined }}>
+          <span style={{ color: form <= -8 ? WARN_TEXT : form >= 3 ? OK_TEXT : undefined }}>
             {form > 0 ? "+" : ""}
             {String(form).replace(".", ",")} % {form <= -8 ? "(langsamer als üblich, Last senken)" : form >= 3 ? "(schneller als üblich)" : "(normal)"}
           </span>
@@ -532,8 +547,15 @@ export function WorkoutSession({
     const value = (cardioResults[itemId] ?? "").trim();
     if (value === (savedCardioResults[itemId] ?? "")) return;
     setSavingCardioId(itemId);
-    const result = await upsertFeedbackAction(itemId, { actual_value: value });
-    setSavingCardioId(null);
+    let result: Awaited<ReturnType<typeof upsertFeedbackAction>>;
+    try {
+      result = await upsertFeedbackAction(itemId, { actual_value: value });
+    } catch {
+      toast.error("Keine Verbindung. Bitte später erneut versuchen.");
+      return;
+    } finally {
+      setSavingCardioId(null);
+    }
     if (result.error) {
       toast.error(result.error);
       return;
@@ -549,8 +571,15 @@ export function WorkoutSession({
     const name = addExerciseName.trim();
     if (!name) return;
     setIsAddingExercise(true);
-    const result = await addSessionExerciseAction(planId, name);
-    setIsAddingExercise(false);
+    let result: Awaited<ReturnType<typeof addSessionExerciseAction>>;
+    try {
+      result = await addSessionExerciseAction(planId, name);
+    } catch {
+      toast.error("Keine Verbindung. Bitte später erneut versuchen.");
+      return;
+    } finally {
+      setIsAddingExercise(false);
+    }
     if (result.error || !result.item) {
       toast.error(result.error ?? "Übung konnte nicht hinzugefügt werden.");
       return;
@@ -590,10 +619,13 @@ export function WorkoutSession({
   const [now, setNow] = useState(0);
   const restRemaining = restEndsAt ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // iPhones can't vibrate: a visible "Pause vorbei" banner for a few seconds.
+  const [restOver, setRestOver] = useState(false);
 
   function startRest(seconds: number) {
     const t = currentTimeMs();
     setNow(t);
+    setRestOver(false);
     setRestEndsAt(t + seconds * 1000);
   }
 
@@ -604,6 +636,7 @@ export function WorkoutSession({
       setNow(t);
       if (t >= restEndsAt) {
         setRestEndsAt(null);
+        setRestOver(true);
         try {
           navigator.vibrate?.([200, 100, 200]);
         } catch {
@@ -615,6 +648,12 @@ export function WorkoutSession({
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [restEndsAt]);
+
+  useEffect(() => {
+    if (!restOver) return;
+    const t = setTimeout(() => setRestOver(false), 4000);
+    return () => clearTimeout(t);
+  }, [restOver]);
 
   const [pad, setPad] = useState<{
     itemId: string;
@@ -639,7 +678,16 @@ export function WorkoutSession({
   const [rpeOpen, setRpeOpen] = useState(false);
   const [rpeValue, setRpeValue] = useState<number | null>(initialRpe);
   const [isSavingRpe, setIsSavingRpe] = useState(false);
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  // Sets being saved right now (several can be in flight at once).
+  const [pendingKeys, setPendingKeys] = useState<Set<string>>(() => new Set());
+  function setPending(key: string, on: boolean) {
+    setPendingKeys((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
 
   const exerciseNames = useMemo(() => exerciseLibrary.map((e) => e.name), [exerciseLibrary]);
   const totals = useMemo(() => {
@@ -667,6 +715,17 @@ export function WorkoutSession({
     }
     return { total, done, tonnage: Math.round(tonnage), tonnageUnit };
   }, [exercises, setsByItem]);
+
+  // Rows with a value that were never confirmed with ✓ (prefilled reps
+  // alone don't count): pointed out when ending the training.
+  const unconfirmedWithValues = exercises.reduce(
+    (n, ex) =>
+      n +
+      (setsByItem[ex.itemId] ?? []).filter(
+        (r) => !r.confirmed && (r.weight.trim() || (ex.isTest && (r.contact.trim() || r.rsi.trim())))
+      ).length,
+    0
+  );
 
   const progressWidth = totals.total > 0 ? `${Math.min(100, (totals.done / totals.total) * 100)}%` : "0%";
 
@@ -730,16 +789,16 @@ export function WorkoutSession({
         if (q) setQueuedCount(removeQueuedSet(browserStorage(), planId, q).length);
         continue;
       }
-      setPendingKey(set.key);
+      setPending(set.key, true);
       let result: Awaited<ReturnType<typeof deleteExerciseResultSetAction>>;
       try {
         result = await deleteExerciseResultSetAction(ex.exerciseId, m.date ?? planDate, m.setNumber, planId);
       } catch {
-        setPendingKey(null);
+        setPending(set.key, false);
         toast.error("Keine Verbindung — Löschen geht erst wieder mit Netz.");
         return;
       }
-      setPendingKey(null);
+      setPending(set.key, false);
       if (result.error) {
         toast.error(result.error);
         return;
@@ -799,7 +858,7 @@ export function WorkoutSession({
       velocityLast,
       itemId: ex.itemId,
     };
-    setPendingKey(set.key);
+    setPending(set.key, true);
     let result: Awaited<ReturnType<typeof upsertExerciseResultAction>> | null = null;
     if (!isOffline()) {
       try {
@@ -808,7 +867,7 @@ export function WorkoutSession({
         result = null; // no connection — queued below
       }
     }
-    setPendingKey(null);
+    setPending(set.key, false);
     if (result?.error) {
       toast.error(result.error);
       return;
@@ -859,71 +918,40 @@ export function WorkoutSession({
   }
 
   function sendSet(q: QueuedSet) {
-    return upsertExerciseResultAction(
-      q.exerciseId,
-      q.date,
-      q.setNumber,
-      q.weight,
-      q.reps,
-      q.unit,
-      planId,
-      q.setType,
-      q.rir,
-      q.side,
-      q.contactMs ?? null,
-      q.rsi ?? null,
-      q.velocity ?? null,
-      q.velocityLast ?? null
-    );
+    return sendQueuedSet(planId, q);
   }
 
-  // Sends everything logged offline, oldest first. Stops at the first
-  // failure — no connection (tried again on the next "online") or a refusal
-  // such as an expired login (reported, the sets stay queued).
-  const flushingRef = useRef(false);
+  // Sends everything logged offline (lib/offline-queue). The app shell may
+  // already be flushing this plan; then this waits for it and only syncs
+  // the "wartet" marks with what is still queued.
   async function flushQueue() {
-    if (flushingRef.current) return;
     const storage = browserStorage();
     if (isOffline()) {
       setQueuedCount(readQueue(storage, planId).length);
       return;
     }
+    setQueuedCount(readQueue(storage, planId).length);
+    const res = await flushQueuedSets(storage, planId, sendSet, (_q, remaining) => setQueuedCount(remaining));
     const queue = readQueue(storage, planId);
     setQueuedCount(queue.length);
-    if (queue.length === 0) return;
-    flushingRef.current = true;
-    let sent = 0;
-    try {
-      for (const q of queue) {
-        let res: Awaited<ReturnType<typeof upsertExerciseResultAction>>;
-        try {
-          res = await sendSet(q);
-        } catch {
-          break;
-        }
-        if (res.error) {
-          // Kept on the device (e.g. the login ran out meanwhile): nothing
-          // logged is thrown away; the athlete can retry after signing in
-          // or remove the set with ✕.
-          toast.error(`Offline eingetragene Sätze konnten nicht gespeichert werden: ${res.error}`);
-          break;
-        }
-        setQueuedCount(removeQueuedSet(storage, planId, q).length);
-        sent += 1;
-        setSetsByItem((prev) => {
-          const rows = prev[q.itemId];
-          if (!rows) return prev;
-          return {
-            ...prev,
-            [q.itemId]: rows.map((r) => (r.setNumber === q.setNumber && r.waiting ? { ...r, waiting: false } : r)),
-          };
-        });
+    setSetsByItem((prev) => {
+      const next = { ...prev };
+      for (const [itemId, rows] of Object.entries(prev)) {
+        if (!rows.some((r) => r.waiting)) continue;
+        next[itemId] = rows.map((r) =>
+          r.waiting && !queue.some((q) => q.itemId === itemId && q.setNumber === r.setNumber) ? { ...r, waiting: false } : r
+        );
       }
-    } finally {
-      flushingRef.current = false;
+      return next;
+    });
+    if (res?.error) {
+      // Kept on the device (e.g. the login ran out meanwhile): nothing
+      // logged is thrown away; the athlete can retry after signing in
+      // or remove the set with ✕.
+      toast.error(`Offline eingetragene Sätze konnten nicht gespeichert werden: ${res.error}`);
     }
-    if (sent > 0) {
-      toast.success(`${sent} offline eingetragene${sent === 1 ? "r Satz" : " Sätze"} gespeichert.`);
+    if (res && res.sent > 0) {
+      sentToast(res.sent);
       router.refresh();
     }
   }
@@ -940,6 +968,18 @@ export function WorkoutSession({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId]);
+
+  // Closing the tab is fine (the queue survives in localStorage), but the
+  // athlete should know the sets haven't reached the trainer yet.
+  useEffect(() => {
+    if (queuedCount === 0) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [queuedCount]);
 
   // The field to fill in always starts empty (or with whatever the athlete
   // already entered) — the last-known value is shown only as a reference
@@ -981,13 +1021,15 @@ export function WorkoutSession({
   function padStepBy(delta: number) {
     if (!pad) return;
     const current = Number(pad.buffer.replace(",", ".")) || 0;
-    const next = Math.max(0, current + delta);
+    // Rounded to the step's decimals: 0.1 + 0.05 is 0.15000000000000002.
+    const decimals = String(pad.step).split(".")[1]?.length ?? 0;
+    const next = Math.max(0, Number((current + delta).toFixed(decimals)));
     setPad({ ...pad, buffer: String(next).replace(".", ",") });
   }
 
-  // Auto-save whenever there's a weight to save: a fresh set becomes
-  // confirmed as soon as it has one (reps stay optional, matching
-  // confirmSet's own validation), and editing an ALREADY-confirmed set
+  // Auto-save whenever there's something to save: a fresh set becomes
+  // confirmed as soon as it has a weight or reps (bodyweight sets have no
+  // weight, matching confirmSet's own validation), and editing an ALREADY-confirmed set
   // (e.g. fixing a typo after the session) re-saves it immediately too.
   // This used to only fire for brand-new sets — a correction to a
   // confirmed set only updated local state and silently never reached the
@@ -1001,10 +1043,16 @@ export function WorkoutSession({
     const current = (setsByItem[itemId] ?? []).find((s) => s.key === setKey);
     if (!current) return;
     const updated = { ...current, [field]: buffer };
-    if (updated.weight.trim() || (exercises.find((e) => e.itemId === itemId)?.isTest && (updated.contact.trim() || updated.rsi.trim()))) {
-      const ex = exercises.find((e) => e.itemId === itemId);
-      if (ex) confirmSet(ex, updated, { askRir: !current.confirmed });
-    }
+    const ex = exercises.find((e) => e.itemId === itemId);
+    if (!ex) return;
+    // A new row saves once it has its measured value (the weight; for tests
+    // also contact time or RSI): reps alone are prefilled from the plan and
+    // would log a 0 kg set before the weight is typed. Confirmed sets save
+    // on every correction, including reps-only bodyweight sets.
+    const hasValue = ex.isTest
+      ? updated.weight.trim() || updated.contact.trim() || updated.rsi.trim()
+      : updated.weight.trim();
+    if (current.confirmed || hasValue) confirmSet(ex, updated, { askRir: !current.confirmed });
   }
 
   // RIR is picked after the set is already logged, so this always re-saves
@@ -1079,7 +1127,7 @@ export function WorkoutSession({
             <div className="flex items-center gap-2.5 p-4" style={{ background: "var(--dc-surface)" }}>
               <span
                 className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[15px]"
-                style={{ background: "#10b981", color: "var(--dc-bg)" }}
+                style={{ background: "#047857", color: "#fff" }}
               >
                 ✓
               </span>
@@ -1152,6 +1200,16 @@ export function WorkoutSession({
               </div>
             )}
 
+            {restOver && restRemaining === 0 && (
+              <div
+                className="mt-3.5 px-3.5 py-2.5 text-sm font-semibold"
+                style={{ background: "var(--dc-accent)", color: "var(--dc-bg)", position: "sticky", top: 56, zIndex: 25, boxShadow: "var(--dc-shadow-md)" }}
+                role="status"
+              >
+                Pause vorbei: weiter mit dem nächsten Satz
+              </div>
+            )}
+
             <div className="mt-5 flex flex-col gap-2.5">
               {exercises.map((ex) => {
                 const rows = setsByItem[ex.itemId] ?? [];
@@ -1197,7 +1255,7 @@ export function WorkoutSession({
                         <span className="flex flex-none items-center gap-2.5">
                           <span
                             className="text-[13px] tabular-nums"
-                            style={{ color: complete ? "#0f8a5f" : "var(--dc-muted)", fontWeight: complete ? 600 : 400 }}
+                            style={{ color: complete ? OK_TEXT : "var(--dc-muted)", fontWeight: complete ? 600 : 400 }}
                           >
                             {complete ? "✓ " : ""}
                             {done}/{planned}
@@ -1267,7 +1325,7 @@ export function WorkoutSession({
                             const isRight = isPairedRight(rows, si);
                             const hasRight = isPairedRight(rows, si + 1);
                             if (!isRight) typeCounts[s.type] = (typeCounts[s.type] ?? 0) + 1;
-                            const pending = pendingKey === s.key;
+                            const pending = pendingKeys.has(s.key);
                             return (
                               <div
                                 key={s.key}
@@ -1391,8 +1449,8 @@ export function WorkoutSession({
                                   title={s.waiting ? "Wartet auf Verbindung" : undefined}
                                   className="flex h-10 w-10 items-center justify-center rounded-sm text-[17px]"
                                   style={{
-                                    border: `1px solid ${s.waiting ? "#d97706" : s.confirmed ? "#10b981" : "var(--dc-divider)"}`,
-                                    background: s.waiting ? "#fef3c7" : s.confirmed ? "#10b981" : "transparent",
+                                    border: `1px solid ${s.waiting ? "#d97706" : s.confirmed ? "#047857" : "var(--dc-divider)"}`,
+                                    background: s.waiting ? "#fef3c7" : s.confirmed ? "#047857" : "transparent",
                                     color: s.waiting ? "#92400e" : s.confirmed ? "#fff" : "var(--dc-text)",
                                   }}
                                 >
@@ -1406,7 +1464,7 @@ export function WorkoutSession({
                                     onClick={() => removeSet(ex, s)}
                                     disabled={pending}
                                     aria-label={hasRight ? "Satz (beide Seiten) entfernen" : "Satz entfernen"}
-                                    className="h-10 w-6 text-[15px]"
+                                    className="h-10 w-9 text-[15px]"
                                     style={{ color: "color-mix(in srgb, var(--dc-text) 40%, transparent)" }}
                                   >
                                     ✕
@@ -1573,8 +1631,8 @@ export function WorkoutSession({
       {pad && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "color-mix(in srgb, #201e1d 45%, transparent)" }} onClick={() => setPad(null)}>
           <div
-            className="mx-auto w-full max-w-[420px] p-4.5 pb-6.5"
-            style={{ background: "var(--dc-surface)", borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
+            className="mx-auto w-full max-h-[90dvh] max-w-[420px] overflow-y-auto p-4.5"
+            style={{ ...SHEET_STYLE, borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-baseline justify-between">
@@ -1638,8 +1696,8 @@ export function WorkoutSession({
               onClick={() => setVbtPad(null)}
             >
               <div
-                className="mx-auto w-full max-w-[420px] p-4.5 pb-6.5"
-                style={{ background: "var(--dc-surface)", borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
+                className="mx-auto w-full max-h-[90dvh] max-w-[420px] overflow-y-auto p-4.5"
+                style={{ ...SHEET_STYLE, borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-baseline justify-between">
@@ -1680,7 +1738,7 @@ export function WorkoutSession({
                 {loss != null && (
                   <p
                     className="mt-2 text-[13px]"
-                    style={{ color: limit != null && loss > limit ? "#b45309" : "var(--dc-muted)" }}
+                    style={{ color: limit != null && loss > limit ? WARN_TEXT : "var(--dc-muted)" }}
                   >
                     Geschwindigkeitsverlust {String(loss).replace(".", ",")} %
                     {limit != null && loss > limit ? ` · über der Grenze von ${limit} %: nächsten Satz leichter oder kürzer` : ""}
@@ -1697,8 +1755,8 @@ export function WorkoutSession({
       {rirPad && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "color-mix(in srgb, #201e1d 45%, transparent)" }} onClick={() => setRirPad(null)}>
           <div
-            className="mx-auto w-full max-w-[420px] p-4.5 pb-6.5"
-            style={{ background: "var(--dc-surface)", borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
+            className="mx-auto w-full max-h-[90dvh] max-w-[420px] overflow-y-auto p-4.5"
+            style={{ ...SHEET_STYLE, borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-baseline justify-between">
@@ -1728,8 +1786,8 @@ export function WorkoutSession({
       {rpeOpen && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "color-mix(in srgb, #201e1d 50%, transparent)" }} onClick={() => setRpeOpen(false)}>
           <div
-            className="mx-auto w-full max-w-[420px] p-5 pb-6.5"
-            style={{ background: "var(--dc-surface)", borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
+            className="mx-auto w-full max-h-[90dvh] max-w-[420px] overflow-y-auto p-5"
+            style={{ ...SHEET_STYLE, borderRadius: "14px 14px 0 0", boxShadow: "var(--dc-shadow-lg)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
@@ -1742,8 +1800,15 @@ export function WorkoutSession({
               </button>
             </div>
             <div className="mt-2 text-[13px] leading-[1.5]" style={{ color: "var(--dc-muted)" }}>
-              Belastungsempfinden für das ganze Training — {RPE_WORDS[rpeValue ?? 5]}.
+              Belastungsempfinden für das ganze Training{rpeValue ? `: ${RPE_WORDS[rpeValue]}` : ""}.
             </div>
+            {unconfirmedWithValues > 0 && (
+              <div className="mt-2.5 px-3 py-2 text-[13px]" style={{ background: "#fef3c7", color: "#78350f" }} role="status">
+                {unconfirmedWithValues === 1
+                  ? "1 Satz mit Werten ist noch nicht bestätigt (✓)."
+                  : `${unconfirmedWithValues} Sätze mit Werten sind noch nicht bestätigt (✓).`}
+              </div>
+            )}
             <div className="mt-3.5 grid grid-cols-5 gap-2">
               {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                 <button

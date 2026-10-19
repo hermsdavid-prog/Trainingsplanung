@@ -6,21 +6,15 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatWeekdayShort, todayISO } from "@/lib/date";
 import { getBerlinCalendarMark } from "@/lib/berlin-holidays";
-import {
-  reschedulePlanAction,
-  duplicatePlanToDateAction,
-  deletePlanAction,
-} from "@/lib/actions/plans";
-import {
-  rescheduleEventAction,
-  duplicateEventToDateAction,
-  deleteEventAction,
-  confirmEventAction,
-} from "@/lib/actions/events";
+import { deletePlanAction } from "@/lib/actions/plans";
+import { deleteEventAction, confirmEventAction } from "@/lib/actions/events";
+import { moveOrCopyCalendarItem } from "@/components/calendar/move-items";
 import { useArmedItem } from "@/components/calendar/armed-item-context";
 
 export type WeekItem = {
   id: string;
+  // All event rows merged into this card (one per group); deleted together.
+  ids?: string[];
   kind: "plan" | "event";
   title: string;
   href: string | null;
@@ -33,7 +27,7 @@ export type WeekItem = {
 };
 
 const DEFAULT_DRAG_HINT =
-  "Trainings und Termine lassen sich per Drag & Drop verschieben (mit gedrückter Strg-Taste, Mac: Cmd, wird stattdessen eine Kopie angelegt). Auf dem Handy: Termin antippen, dann bei einem Tag „Hierhin kopieren“ wählen.";
+  "Trainings und Termine lassen sich per Drag & Drop verschieben (mit gedrückter Strg-Taste, Mac: Cmd, wird stattdessen eine Kopie angelegt). Auf dem Handy oder Tablet: ⠿ antippen, dann bei einem Tag „Hierhin kopieren“ oder „Hierhin verschieben“ wählen.";
 
 function subscribeNoop() {
   return () => {};
@@ -62,7 +56,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
   const dragActive = armedItem !== null || draggingItem !== null;
   const today = todayISO();
   const dragHint = armedItem
-    ? `„${armedItem.title}“ ausgewählt — bei einem Tag auf „Hierhin kopieren“ tippen, oder unten im Monatskalender auf einen Tag tippen.`
+    ? `„${armedItem.title}“ ausgewählt: bei einem Tag auf „Hierhin kopieren“ oder „Hierhin verschieben“ tippen, oder unten im Monatskalender auf einen Tag tippen.`
     : draggingItem
       ? `„${draggingItem.title}“ wird verschoben — auf einen Tag ziehen (mit Strg/Cmd: kopieren).`
       : DEFAULT_DRAG_HINT;
@@ -76,12 +70,12 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
     if (armedItem?.id === item.id) {
       clearArmed();
     } else {
-      arm({ id: item.id, kind: item.kind, title: item.title });
+      arm({ id: item.id, ids: item.ids, kind: item.kind, title: item.title });
     }
   }
 
   function handleDragStart(e: React.DragEvent, item: WeekItem) {
-    e.dataTransfer.setData("application/json", JSON.stringify({ id: item.id, kind: item.kind }));
+    e.dataTransfer.setData("application/json", JSON.stringify({ id: item.id, ids: item.ids, kind: item.kind }));
     e.dataTransfer.effectAllowed = "copyMove";
     setDraggingItem(item);
   }
@@ -91,19 +85,14 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
     setDragOverDate(null);
   }
 
-  function runMove(id: string, kind: "plan" | "event", day: string, copy: boolean) {
+  function runMove(ids: string[], kind: "plan" | "event", day: string, copy: boolean) {
     startTransition(async () => {
-      const result = copy
-        ? kind === "plan"
-          ? await duplicatePlanToDateAction(id, day)
-          : await duplicateEventToDateAction(id, day)
-        : kind === "plan"
-          ? await reschedulePlanAction(id, day)
-          : await rescheduleEventAction(id, day);
+      const result = await moveOrCopyCalendarItem(kind, ids, day, copy);
       if (result.error) {
         toast.error(result.error);
       } else {
-        toast.success(copy ? "Termin kopiert." : "Termin verschoben.");
+        const noun = kind === "plan" ? "Training" : "Termin";
+        toast.success(copy ? `${noun} kopiert.` : `${noun} verschoben.`);
         router.refresh();
       }
     });
@@ -116,13 +105,13 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
     const raw = e.dataTransfer.getData("application/json");
     setDraggingItem(null);
     if (!raw) return;
-    const { id, kind } = JSON.parse(raw) as { id: string; kind: "plan" | "event" };
-    runMove(id, kind, day, isCopy);
+    const { id, ids, kind } = JSON.parse(raw) as { id: string; ids?: string[]; kind: "plan" | "event" };
+    runMove(ids ?? [id], kind, day, isCopy);
   }
 
-  function handleTapCopy(day: string) {
+  function handleTapMove(day: string, copy: boolean) {
     if (!armedItem) return;
-    runMove(armedItem.id, armedItem.kind, day, true);
+    runMove(armedItem.ids ?? [armedItem.id], armedItem.kind, day, copy);
     clearArmed();
   }
 
@@ -131,7 +120,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
     if (!confirm(`${label} "${item.title}" wirklich löschen?`)) return;
     startTransition(async () => {
       const result =
-        item.kind === "plan" ? await deletePlanAction(item.id) : await deleteEventAction(item.id, { wholeProposal: true });
+        item.kind === "plan" ? await deletePlanAction(item.id) : await deleteEventAction(item.ids ?? item.id, { wholeProposal: true });
       if (result.error) {
         toast.error(result.error);
       } else {
@@ -263,9 +252,11 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                         <button
                           type="button"
                           onClick={() => toggleArmed(item)}
-                          aria-label="Zum Kopieren auswählen"
-                          className="text-xs"
+                          aria-label="Zum Kopieren oder Verschieben auswählen"
+                          className="-my-2.5 -mr-2.5 inline-flex shrink-0 items-center justify-center text-xs"
                           style={{
+                            minWidth: 44,
+                            minHeight: 44,
                             background: "transparent",
                             border: 0,
                             cursor: "pointer",
@@ -328,7 +319,7 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                             className="btn btn-ghost"
                             onClick={() => handleRemove(item)}
                             aria-label="Termin entfernen"
-                            style={{ color: "var(--dc-muted)", minHeight: 32, padding: "4px 8px" }}
+                            style={{ color: "var(--dc-muted)", minHeight: 44, minWidth: 44, padding: "4px 8px" }}
                           >
                             ✕
                           </button>
@@ -338,9 +329,14 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                   );
                 })}
                 {armedItem && (
-                  <button type="button" className="btn btn-secondary" onClick={() => handleTapCopy(day)}>
-                    Hierhin kopieren
-                  </button>
+                  <>
+                    <button type="button" className="btn btn-secondary" onClick={() => handleTapMove(day, true)}>
+                      Hierhin kopieren
+                    </button>
+                    <button type="button" className="btn btn-secondary" onClick={() => handleTapMove(day, false)}>
+                      Hierhin verschieben
+                    </button>
+                  </>
                 )}
               </div>
             </div>

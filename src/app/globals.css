@@ -452,7 +452,10 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 
 /* Touch devices of any size (iPad included): same 16px rule, otherwise iOS
-   Safari zooms into the focused field and typing feels jumpy. */
+   Safari zooms into the focused field and typing feels jumpy, and the same
+   44px touch targets as on phones. */
 @media (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .btn-icon { width: 44px; height: 44px; }
   .input, select.input, textarea.input { font-size: 16px; }
 }

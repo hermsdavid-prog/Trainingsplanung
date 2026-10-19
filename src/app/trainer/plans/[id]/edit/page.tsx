@@ -29,7 +29,7 @@ export default async function EditPlanPage({
       supabase
         .from("training_plan_items")
         .select(
-          "exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id, section, round_rest, heart_rate_on, heart_rate_off, description, duration_mode"
+          "id, exercise_name, reps_or_duration, sets, rest_time, notes, link_url, exercise_id, section, round_rest, heart_rate_on, heart_rate_off, description, duration_mode"
         )
         .eq("training_plan_id", id)
         .order("position"),
@@ -44,6 +44,7 @@ export default async function EditPlanPage({
   if (!plan) notFound();
 
   const isAthletik = plan.category_label?.trim().toLowerCase() === "athletik";
+  const isSelfMade = !!plan.athlete_id && plan.created_by === plan.athlete_id;
 
   // Gruppenplan → Mesozyklen der Gruppe; Einzeltraining → persönliche
   // Mesozyklen des Athleten plus die seiner Gruppen.
@@ -187,8 +188,9 @@ export default async function EditPlanPage({
               Für: {targetLabel ?? "—"} ({plan.scope_type === "group" ? "Gruppe" : "Einzelplan"})
             </p>
             <p className="mt-1 text-xs text-muted">
-              Dieses Training wurde vom Athleten selbst erstellt. Du kannst es einsehen, aber
-              nicht bearbeiten.
+              {isSelfMade
+                ? "Dieses Training wurde vom Athleten selbst erstellt. Du kannst es einsehen, aber nicht bearbeiten."
+                : "Du kannst dieses Training einsehen, aber nicht bearbeiten."}
             </p>
             <p className="mt-1.5 text-sm">
               Belastungsempfinden: <strong>{rpeRow?.rpe ?? "—"}</strong>
@@ -230,7 +232,7 @@ export default async function EditPlanPage({
             seriesLastDate={seriesCount && seriesCount > 1 ? (seriesLast?.date ?? null) : null}
             followingCount={followingCount ?? 0}
             subtitle={`Für: ${targetLabel ?? "—"} (${plan.scope_type === "group" ? "Gruppe" : "Einzelplan"})${
-              plan.scope_type === "athlete" ? " · Vom Athleten selbst erstellt" : ""
+              isSelfMade ? " · Vom Athleten selbst erstellt" : ""
             }`}
             badges={
               (plan.series_id && seriesCount && seriesCount > 1) || plan.scope_type === "athlete" ? (
@@ -265,7 +267,13 @@ export default async function EditPlanPage({
                     redirectTo={`/trainer/plans?type=${isAthletik ? "Athletik" : "Sportartspezifisch"}`}
                   />
                 )}
-                <CopyPlanDialog planId={plan.id} groups={groups ?? []} athletes={athletes} />
+                <CopyPlanDialog
+                  planId={plan.id}
+                  groups={groups ?? []}
+                  athletes={athletes}
+                  defaultGroupId={plan.scope_type === "group" ? plan.group_id : null}
+                  defaultAthleteId={plan.scope_type === "athlete" ? plan.athlete_id : null}
+                />
               </>
             }
             initialItems={(items ?? []).map((item) => {
@@ -278,6 +286,7 @@ export default async function EditPlanPage({
                     ? "sprung"
                     : "kraft";
               return {
+                id: item.id,
                 exercise_name: item.exercise_name,
                 reps_or_duration: item.reps_or_duration ?? "",
                 sets: item.sets ?? "",
@@ -331,7 +340,7 @@ export default async function EditPlanPage({
                         </td>
                         <td className="text-right">
                           <Link href={`/trainer/plans/${plan.id}/athlete/${row.athlete_id}`} className="btn btn-ghost">
-                            Sätze ansehen
+                            {isAthletik ? "Sätze ansehen" : "Rückmeldung ansehen"}
                           </Link>
                         </td>
                       </tr>

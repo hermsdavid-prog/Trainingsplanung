@@ -15,13 +15,22 @@ export function CopyPlanDialog({
   planId,
   groups,
   athletes,
+  defaultGroupId = null,
+  defaultAthleteId = null,
 }: {
   planId: string;
   groups: { id: string; name: string }[];
   athletes: { id: string; full_name: string }[];
+  // The plan's own group / athlete, preselected as the copy target.
+  defaultGroupId?: string | null;
+  defaultAthleteId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [scopeType, setScopeType] = useState<"group" | "athlete">("group");
+  const [scopeType, setScopeType] = useState<"group" | "athlete">(
+    defaultAthleteId && !defaultGroupId ? "athlete" : "group"
+  );
+  const initialGroupId = groups.some((g) => g.id === defaultGroupId) ? defaultGroupId! : "";
+  const initialAthleteId = athletes.some((a) => a.id === defaultAthleteId) ? defaultAthleteId! : "";
   const [state, formAction, isPending] = useActionState(copyPlanAction, initialState);
 
   return (
@@ -75,7 +84,7 @@ export function CopyPlanDialog({
             {scopeType === "group" ? (
               <div className="field mt-3.5">
                 <label htmlFor="copy-group">Gruppe</label>
-                <select id="copy-group" name="group_id" required className="input" defaultValue="">
+                <select id="copy-group" name="group_id" required className="input" defaultValue={initialGroupId}>
                   <option value="" disabled>
                     Gruppe wählen
                   </option>
@@ -89,7 +98,7 @@ export function CopyPlanDialog({
             ) : (
               <div className="field mt-3.5">
                 <label htmlFor="copy-athlete">Athlet</label>
-                <select id="copy-athlete" name="athlete_id" required className="input" defaultValue="">
+                <select id="copy-athlete" name="athlete_id" required className="input" defaultValue={initialAthleteId}>
                   <option value="" disabled>
                     Athlet wählen
                   </option>

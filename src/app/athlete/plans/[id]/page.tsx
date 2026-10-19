@@ -96,6 +96,7 @@ export default async function AthletePlanPage({
                     ? "sprung"
                     : "kraft";
               return {
+                id: item.id,
                 exercise_name: item.exercise_name,
                 reps_or_duration: item.reps_or_duration ?? "",
                 sets: item.sets ?? "",

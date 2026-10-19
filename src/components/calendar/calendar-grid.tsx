@@ -5,13 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatDateLabel, formatDateShort } from "@/lib/date";
-import { reschedulePlanAction, duplicatePlanToDateAction, duplicateDayToDateAction } from "@/lib/actions/plans";
-import {
-  rescheduleEventAction,
-  duplicateEventToDateAction,
-  confirmEventAction,
-  deleteEventAction,
-} from "@/lib/actions/events";
+import { duplicateDayToDateAction } from "@/lib/actions/plans";
+import { moveOrCopyCalendarItem } from "@/components/calendar/move-items";
+import { confirmEventAction, deleteEventAction } from "@/lib/actions/events";
 import { getBerlinCalendarMark } from "@/lib/berlin-holidays";
 import { Dialog, DialogPortal, DialogOverlay, DialogContent } from "@/components/ui/dialog";
 import { CopyIcon } from "lucide-react";
@@ -19,6 +15,8 @@ import { useArmedItem } from "@/components/calendar/armed-item-context";
 
 export type CalendarItem = {
   id: string;
+  // All event rows merged into this card (one per group); deleted together.
+  ids?: string[];
   title: string;
   color: string;
   href: string;
@@ -63,12 +61,17 @@ export function CalendarGrid({
   const [showCopyDayPicker, setShowCopyDayPicker] = useState(false);
   const [copyDayTargetDate, setCopyDayTargetDate] = useState("");
   const [isCopyingDay, setIsCopyingDay] = useState(false);
+  // Whether tapping a day with an armed item moves it instead of copying.
+  // Tied to the armed item, so it resets whenever another item is armed or
+  // the week board clears the selection.
+  const [armedMoveFor, setArmedMoveFor] = useState<string | null>(null);
   // Native HTML5 drag-and-drop doesn't reliably support touch (this is a
   // long-standing WebKit/iPadOS limitation, not specific to this app —
   // dragstart/dragover/drop don't fire reliably even on an iPad Pro with a
   // trackpad), so on touch devices dropping onto month cells is disabled.
   // armedItem below is the tap-to-copy replacement: pick an item via the
-  // "kopieren" button in the day-detail dialog, then tap the target day.
+  // "kopieren" button in the day-detail dialog, then tap the target day
+  // (or switch the banner to "Verschieben" first to move it there).
   const isCoarsePointer = useSyncExternalStore(
     subscribeNoop,
     getCoarsePointerSnapshot,
@@ -76,10 +79,12 @@ export function CalendarGrid({
   );
   const dragDropActive = enableDragDrop && !isCoarsePointer;
   const { armedItem, arm, clear: clearArmed } = useArmedItem();
+  const armedMove = armedItem !== null && armedMoveFor === armedItem.id;
+  const setArmedMove = (on: boolean) => setArmedMoveFor(on && armedItem ? armedItem.id : null);
   const selectedItems = selectedDate ? (itemsByDate[selectedDate] ?? []) : [];
 
   function armItem(item: CalendarItem) {
-    arm({ id: item.id, kind: item.kind, title: item.title });
+    arm({ id: item.id, ids: item.ids, kind: item.kind, title: item.title });
     setSelectedDate(null);
     setShowCreatePicker(false);
     setExpandedEventId(null);
@@ -87,18 +92,18 @@ export function CalendarGrid({
 
   function handleDayTap(day: string) {
     if (armedItem) {
+      const move = armedMove;
       startTransition(async () => {
-        const result =
-          armedItem.kind === "plan"
-            ? await duplicatePlanToDateAction(armedItem.id, day)
-            : await duplicateEventToDateAction(armedItem.id, day);
+        const result = await moveOrCopyCalendarItem(armedItem.kind, armedItem.ids ?? [armedItem.id], day, !move);
         if (result.error) {
           toast.error(result.error);
         } else {
-          toast.success("Termin kopiert.");
+          const noun = armedItem.kind === "plan" ? "Training" : "Termin";
+          toast.success(move ? `${noun} verschoben.` : `${noun} kopiert.`);
           router.refresh();
         }
         clearArmed();
+        setArmedMove(false);
       });
       return;
     }
@@ -123,8 +128,10 @@ export function CalendarGrid({
   function copyDay() {
     if (!selectedDate || !copyDayTargetDate) return;
     setIsCopyingDay(true);
+    // Only the plans shown for this day (the calendar may be filtered).
+    const planIds = selectedItems.filter((i) => i.kind === "plan").map((i) => i.id);
     startTransition(async () => {
-      const result = await duplicateDayToDateAction(selectedDate, copyDayTargetDate);
+      const result = await duplicateDayToDateAction(selectedDate, copyDayTargetDate, planIds);
       setIsCopyingDay(false);
       if (result.error) {
         toast.error(result.error);
@@ -155,9 +162,10 @@ export function CalendarGrid({
     });
   }
 
-  function removeEvent(id: string) {
+  function removeEvent(item: CalendarItem) {
+    if (!confirm(`Termin "${item.title}" wirklich löschen?`)) return;
     startTransition(async () => {
-      const result = await deleteEventAction(id, { wholeProposal: true });
+      const result = await deleteEventAction(item.ids ?? item.id, { wholeProposal: true });
       if (result.error) {
         toast.error(result.error);
       } else {
@@ -174,20 +182,15 @@ export function CalendarGrid({
     setDragOverDate(null);
     const raw = e.dataTransfer.getData("application/json");
     if (!raw) return;
-    const { id, kind } = JSON.parse(raw) as { id: string; kind: "plan" | "event" };
+    const { id, ids, kind } = JSON.parse(raw) as { id: string; ids?: string[]; kind: "plan" | "event" };
 
     startTransition(async () => {
-      const result = isCopy
-        ? kind === "plan"
-          ? await duplicatePlanToDateAction(id, day)
-          : await duplicateEventToDateAction(id, day)
-        : kind === "plan"
-          ? await reschedulePlanAction(id, day)
-          : await rescheduleEventAction(id, day);
+      const result = await moveOrCopyCalendarItem(kind, ids ?? [id], day, isCopy);
       if (result.error) {
         toast.error(result.error);
       } else {
-        toast.success(isCopy ? "Termin kopiert." : "Termin verschoben.");
+        const noun = kind === "plan" ? "Training" : "Termin";
+        toast.success(isCopy ? `${noun} kopiert.` : `${noun} verschoben.`);
         router.refresh();
       }
     });
@@ -201,11 +204,37 @@ export function CalendarGrid({
           style={{ padding: "9px 12px", background: "var(--dc-accent-100)" }}
         >
           <span className="text-[13px] leading-[1.4]">
-            „{armedItem.title}“ ausgewählt — auf einen Tag tippen, um dorthin zu kopieren.
+            „{armedItem.title}“ ausgewählt: auf einen Tag tippen, um dorthin zu{" "}
+            {armedMove ? "verschieben" : "kopieren"}.
           </span>
-          <button type="button" className="btn btn-ghost shrink-0" onClick={clearArmed}>
-            Abbrechen
-          </button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <button
+              type="button"
+              className={armedMove ? "btn btn-ghost" : "btn btn-secondary"}
+              aria-pressed={!armedMove}
+              onClick={() => setArmedMove(false)}
+            >
+              Kopieren
+            </button>
+            <button
+              type="button"
+              className={armedMove ? "btn btn-secondary" : "btn btn-ghost"}
+              aria-pressed={armedMove}
+              onClick={() => setArmedMove(true)}
+            >
+              Verschieben
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                clearArmed();
+                setArmedMove(false);
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
         </div>
       )}
       <div
@@ -436,7 +465,7 @@ export function CalendarGrid({
                               type="button"
                               className="btn btn-ghost mr-1.5 shrink-0"
                               onClick={() => armItem(item)}
-                              aria-label="Zum Kopieren auswählen"
+                              aria-label="Zum Kopieren oder Verschieben auswählen"
                             >
                               <CopyIcon />
                             </button>
@@ -503,7 +532,7 @@ export function CalendarGrid({
                                   <button type="button" className="btn btn-ghost" onClick={() => armItem(item)}>
                                     <CopyIcon /> Kopieren
                                   </button>
-                                  <button type="button" className="btn btn-ghost" onClick={() => removeEvent(item.id)}>
+                                  <button type="button" className="btn btn-ghost" onClick={() => removeEvent(item)}>
                                     Löschen
                                   </button>
                                 </div>
