@@ -54,7 +54,7 @@ export function CreateGroupDialog() {
             </div>
             <div className="field mt-3.5">
               <label htmlFor="short_name">Kürzel (optional)</label>
-              <input id="short_name" name="short_name" maxLength={8} className="input w-24" placeholder="z. B. KU" />
+              <input id="short_name" name="short_name" maxLength={8} className="input max-w-24" placeholder="z. B. KU" />
               <p className="mt-1.5 text-xs text-muted">Erscheint im Kalender statt des vollen Gruppennamens.</p>
             </div>
             <div className="field mt-3.5">

@@ -731,7 +731,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <SuggestInput
-                        className="input min-w-36"
+                        className="input min-w-48"
                         value={row.exercise_name}
                         onChange={(v) => updateRow(index, "exercise_name", v)}
                         placeholder="z. B. Kniebeuge"
@@ -772,7 +772,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-20"
+                        className="input min-w-16"
                         value={row.sets}
                         onChange={(e) => updateRow(index, "sets", e.target.value)}
                         placeholder="z. B. 4"
@@ -780,7 +780,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-28"
+                        className="input min-w-20"
                         value={row.rest_time}
                         onChange={(e) => updateRow(index, "rest_time", e.target.value)}
                         placeholder="z. B. 60 Sek."
@@ -886,7 +886,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-24"
+                        className="input min-w-24"
                         value={row.rest_time}
                         onChange={(e) => updateRow(index, "rest_time", e.target.value)}
                         placeholder="z. B. 60 Sek."
@@ -894,7 +894,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-20"
+                        className="input min-w-20"
                         value={row.sets}
                         onChange={(e) => updateRow(index, "sets", e.target.value)}
                         placeholder="z. B. 4"
@@ -902,7 +902,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-24"
+                        className="input min-w-24"
                         value={row.round_rest}
                         onChange={(e) => updateRow(index, "round_rest", e.target.value)}
                         placeholder="z. B. 90 Sek."
@@ -910,7 +910,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-24"
+                        className="input min-w-24"
                         value={row.heart_rate_on}
                         onChange={(e) => updateRow(index, "heart_rate_on", e.target.value)}
                         placeholder="z. B. 160"
@@ -918,7 +918,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-24"
+                        className="input min-w-24"
                         value={row.heart_rate_off}
                         onChange={(e) => updateRow(index, "heart_rate_off", e.target.value)}
                         placeholder="z. B. 120"
@@ -1013,7 +1013,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-20"
+                        className="input min-w-16"
                         value={row.sets}
                         onChange={(e) => updateRow(index, "sets", e.target.value)}
                         placeholder="3"
@@ -1021,7 +1021,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-24"
+                        className="input min-w-28"
                         value={row.reps_or_duration}
                         onChange={(e) => updateRow(index, "reps_or_duration", e.target.value)}
                         placeholder="cm"
@@ -1066,7 +1066,7 @@ export function PlanTableEditor({
                     </td>
                     <td>
                       <input
-                        className="input w-24"
+                        className="input min-w-24"
                         value={row.rest_time}
                         onChange={(e) => updateRow(index, "rest_time", e.target.value)}
                         placeholder="0:45"

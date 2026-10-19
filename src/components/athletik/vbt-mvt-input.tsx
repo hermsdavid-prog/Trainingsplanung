@@ -22,7 +22,7 @@ export function VbtMvtInput({ value }: { value: number }) {
       Geschwindigkeit bei 1RM (MVT)
       <input
         key={value}
-        className="input w-20"
+        className="input max-w-20"
         inputMode="decimal"
         defaultValue={value.toFixed(2).replace(".", ",")}
         onBlur={(e) => apply(e.target.value)}

@@ -212,7 +212,7 @@ export function GroupManager({
             <label htmlFor="group-short-name">Kürzel</label>
             <input
               id="group-short-name"
-              className="input w-24"
+              className="input max-w-24"
               maxLength={8}
               value={shortName}
               onChange={(e) => setShortName(e.target.value)}

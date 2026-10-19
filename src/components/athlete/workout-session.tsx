@@ -1109,7 +1109,7 @@ export function WorkoutSession({
                     {totals.done} von {totals.total} Sätzen
                   </span>
                   <span style={{ color: "var(--dc-muted)" }}>
-                    {totals.tonnage > 0 ? `${totals.tonnage.toLocaleString("de-DE")} ${totals.tonnageUnit}` : "—"}
+                    {totals.tonnage > 0 ? `${totals.tonnage.toLocaleString("de-DE")} ${totals.tonnageUnit} Volumen` : "—"}
                   </span>
                 </div>
                 <div className="mt-2 h-[3px]" style={{ background: "color-mix(in srgb, var(--dc-text) 12%, transparent)" }}>
@@ -1457,7 +1457,7 @@ export function WorkoutSession({
                         addExercise();
                       }
                     }}
-                    placeholder="Übung hinzufügen — z. B. Kniebeuge"
+                    placeholder="Übung hinzufügen"
                     suggestions={exerciseNames}
                   />
                   <button
