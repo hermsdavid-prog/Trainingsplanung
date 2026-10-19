@@ -1658,9 +1658,16 @@ export function WorkoutSession({
               </span>
             </div>
             {pad.suggestion && (
-              <div className="mt-1 text-xs" style={{ color: "var(--dc-muted)" }}>
-                {pad.isTest ? "Bisher bester Wert" : "Letztes Training"}: {pad.suggestion} {pad.unit}
-              </div>
+              // One tap copies the reference value into the field; it is
+              // still only saved with "Übernehmen".
+              <button
+                type="button"
+                className="mt-1 text-xs underline-offset-2 hover:underline"
+                style={{ color: "var(--dc-accent-700)", background: "transparent", border: 0, padding: "6px 0", cursor: "pointer" }}
+                onClick={() => setPad({ ...pad, buffer: String(pad.suggestion).replace(".", ",") })}
+              >
+                {pad.isTest ? "Bisher bester Wert" : "Letztes Training"}: {String(pad.suggestion).replace(".", ",")} {pad.unit} · übernehmen
+              </button>
             )}
             <div className="mt-3 flex gap-2">
               <button type="button" className="btn btn-secondary" onClick={() => padStepBy(-pad.step)}>

@@ -91,7 +91,7 @@ export function CreatePlanForm({
           <label htmlFor="repeat_until">Wiederholen bis</label>
           <input id="repeat_until" name="repeat_until" type="date" className="input" required />
           <p className="mt-1.5 text-xs text-muted">
-            Legt für jede Woche bis zu diesem Datum einen eigenen Entwurf an. Die
+            Legt für jede Woche bis zu diesem Datum ein eigenes Training an. Die
             Übungstabelle, die du als Nächstes ausfüllst, wird automatisch auf alle noch leeren
             Termine der Serie übertragen.
           </p>

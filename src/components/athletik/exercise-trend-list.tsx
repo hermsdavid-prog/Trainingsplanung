@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ExerciseTrend } from "@/lib/exercise-trend";
+import { formatNumber } from "@/lib/format";
 
 export function ExerciseTrendList({
   trends,
@@ -31,10 +32,10 @@ export function ExerciseTrendList({
                       : "var(--dc-muted)",
                 }}
               >
-                {trend.latestValue}
+                {formatNumber(trend.latestValue)}
                 {trend.unit ? ` ${trend.unit}` : ""}
                 {trend.delta != null && (
-                  <> · {trend.delta > 0 ? "+" : ""}{trend.delta}{trend.unit ? ` ${trend.unit}` : ""}</>
+                  <> · {trend.delta > 0 ? "+" : ""}{formatNumber(trend.delta)}{trend.unit ? ` ${trend.unit}` : ""}</>
                 )}
               </span>
             </div>

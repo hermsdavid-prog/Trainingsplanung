@@ -44,7 +44,7 @@ export function CopyPlanDialog({
           <form action={formAction} className="flex flex-col">
             <div className="kicker-muted">Plan kopieren</div>
             <p className="mt-2 text-[13px]" style={{ color: "var(--dc-muted)" }}>
-              Erstellt eine Kopie dieses Plans (als Entwurf) auf ein neues Datum.
+              Erstellt eine Kopie dieses Trainings am neuen Datum. Sie ist sofort für die gewählte Gruppe bzw. den Athleten sichtbar.
             </p>
             <input type="hidden" name="source_plan_id" value={planId} />
 

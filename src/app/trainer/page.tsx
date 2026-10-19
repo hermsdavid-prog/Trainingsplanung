@@ -176,13 +176,15 @@ export default async function TrainerDashboardPage() {
       levelLabel: HEALTH_STATUS_LABEL[level],
       levelTagClass: LEVEL_TAG[level],
       todayLabel: `Wohlbefinden ${todayLog!.wellbeing ?? "—"}${
-        todayLog!.hrv != null ? ` · HRV ${todayLog!.hrv}` : ""
-      }${todayLog!.resting_hr != null ? ` · Ruhe-HF ${todayLog!.resting_hr}` : ""}`,
+        todayLog!.hrv != null ? ` · HRV ${Number(todayLog!.hrv).toLocaleString("de-DE")}` : ""
+      }${todayLog!.resting_hr != null ? ` · Ruhe-HF ${Number(todayLog!.resting_hr).toLocaleString("de-DE")}` : ""}`,
     }));
 
   // Who could check in (consented to health data) but hasn't yet today —
   // before training that's exactly the list a trainer wants.
   const consented = new Set((consentRows ?? []).map((c) => c.athlete_id));
+  // Only athletes who consented to health data can check in at all.
+  const canCheckInCount = athletes.filter((a) => consented.has(a.id)).length;
   const notCheckedIn = rows
     .filter((r) => !r.todayLog && consented.has(r.athlete.id))
     .map((r) => r.athlete.full_name)
@@ -195,7 +197,7 @@ export default async function TrainerDashboardPage() {
         Übersicht
       </h2>
       <p className="mt-3 text-sm" style={{ color: "var(--dc-muted)" }}>
-        {plansToday.length} {plansToday.length === 1 ? "Training" : "Trainings"} heute geplant · {checkedInCount} von {athletes.length}{" "}
+        {plansToday.length} {plansToday.length === 1 ? "Training" : "Trainings"} heute geplant · {checkedInCount} von {canCheckInCount}{" "}
         Athleten eingecheckt{redCount > 0 ? ` · ${redCount} rote Bereitschaft${redCount > 1 ? "en" : ""}` : ""}
       </p>
 

@@ -62,7 +62,7 @@ export function TrendChart({
             {hoverIndex === null && active.date === todayDate ? " · heute" : ""}
           </span>
           <span className="font-semibold text-[22px] leading-none" style={{ fontFamily: "var(--dc-font-heading)" }}>
-            {active.value}
+            {typeof active.value === "number" ? active.value.toLocaleString("de-DE") : active.value}
           </span>
         </div>
       </div>

@@ -103,10 +103,13 @@ export function MesocycleTimeline({
     <div
       className="mt-3 overflow-x-auto"
       ref={(el) => {
-        // On mount, scroll so today is visible instead of the first month.
+        // On mount, scroll only when today would be off-screen (long
+        // history), and keep a third of the width before it so the current
+        // block's name stays readable.
         if (!el || scrolledToToday.current || todayOffset == null) return;
         scrolledToToday.current = true;
-        el.scrollLeft = Math.max(0, todayOffset * DAY_PX - 40);
+        const todayX = todayOffset * DAY_PX;
+        if (todayX > el.clientWidth - 40) el.scrollLeft = Math.max(0, todayX - el.clientWidth / 3);
       }}
     >
       <div style={{ width: Math.max(totalDays * DAY_PX, 600) }}>

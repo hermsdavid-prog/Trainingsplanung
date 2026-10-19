@@ -382,8 +382,8 @@ export default async function AthleteTodayPage({
             <p className="mt-1.5 text-[13px] leading-[1.5]">
               {readiness.today
                 ? `Heute: Wohlbefinden ${readiness.today.wellbeing ?? "—"}${
-                    readiness.today.hrv != null ? ` · HRV ${readiness.today.hrv}` : ""
-                  }${readiness.today.resting_hr != null ? ` · Ruhe-HF ${readiness.today.resting_hr}` : ""}`
+                    readiness.today.hrv != null ? ` · HRV ${Number(readiness.today.hrv).toLocaleString("de-DE")}` : ""
+                  }${readiness.today.resting_hr != null ? ` · Ruhe-HF ${Number(readiness.today.resting_hr).toLocaleString("de-DE")}` : ""}`
                 : "Noch keine Eingabe für heute."}
             </p>
           </div>

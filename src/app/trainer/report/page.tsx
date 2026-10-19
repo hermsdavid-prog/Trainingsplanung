@@ -10,6 +10,7 @@ import {
 import { computeHealthStatus, HEALTH_STATUS_LABEL, type HealthLog, type HealthStatusLevel } from "@/lib/health-status";
 import { HealthGroupFilter } from "@/components/health/health-group-filter";
 import { PrintButton } from "@/components/health/print-button";
+import { formatNumber } from "@/lib/format";
 
 const LEVEL_TAG: Record<HealthStatusLevel, string> = {
   red: "tag-accent-2",
@@ -310,7 +311,7 @@ export default async function TrainerReportPage({
       progress: assigned > 0 ? `${documented} von ${assigned} dokumentiert` : "kein Training",
       ready: HEALTH_STATUS_LABEL[readyLevel],
       readyClass: LEVEL_TAG[readyLevel],
-      top: top ? `${top.exerciseName} ${top.value}${top.unit ? ` ${top.unit}` : ""}` : "—",
+      top: top ? `${top.exerciseName} ${formatNumber(top.value)}${top.unit ? ` ${top.unit}` : ""}` : "—",
       note,
     };
   });

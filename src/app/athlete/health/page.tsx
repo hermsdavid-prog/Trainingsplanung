@@ -52,8 +52,8 @@ export default async function AthleteHealthPage() {
         <span className="text-[13px]" style={{ color: "var(--dc-muted)" }}>
           {todayLog
             ? `Heute: Wohlbefinden ${todayLog.wellbeing ?? "—"}${
-                todayLog.hrv != null ? ` · HRV ${todayLog.hrv}` : ""
-              }${todayLog.resting_hr != null ? ` · Ruhe-HF ${todayLog.resting_hr}` : ""}`
+                todayLog.hrv != null ? ` · HRV ${Number(todayLog.hrv).toLocaleString("de-DE")}` : ""
+              }${todayLog.resting_hr != null ? ` · Ruhe-HF ${Number(todayLog.resting_hr).toLocaleString("de-DE")}` : ""}`
             : "Noch keine Eingabe für heute"}
         </span>
       </div>

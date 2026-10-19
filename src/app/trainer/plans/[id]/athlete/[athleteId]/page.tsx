@@ -6,6 +6,7 @@ import { formatDateLabel } from "@/lib/date";
 import { signCardioScreenshots } from "@/lib/cardio-screenshots";
 import { SIDE_LABEL, countSets, isPairedRight, type Side } from "@/lib/per-side";
 import { occurrenceOfSet } from "@/lib/set-numbers";
+import { formatNumber } from "@/lib/format";
 
 const SET_TYPE_LABEL: Record<string, string> = {
   aufwaermsatz: "Aufwärmsatz",
@@ -316,7 +317,7 @@ export default async function TrainerAthletePlanPage({
                         {ex.section === "sprung" ? "" : (s.reps ?? "—")}
                       </span>
                       <span className="text-[15px]" style={{ color: tone }}>
-                        {s.value}
+                        {formatNumber(s.value)}
                         {s.unit ? ` ${s.unit}` : ""}
                         {s.velocity != null ? (
                           <span className="block text-xs" style={{ color: "var(--dc-muted)" }}>

@@ -301,6 +301,18 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                           {item.description}
                         </div>
                       )}
+                      {/* Own full-width row: next to the type label and ✕ it
+                          was cut off in the narrow day columns on tablets. */}
+                      {item.status === "proposed" && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary mt-2 w-full"
+                          style={{ fontSize: 12, padding: "4px 6px" }}
+                          onClick={() => handleConfirm(item)}
+                        >
+                          Bestätigen
+                        </button>
+                      )}
                       <div className="mt-1 flex items-center justify-between gap-1.5">
                         <span
                           className="text-[10px] uppercase"
@@ -309,11 +321,6 @@ export function WeekBoard({ days, itemsByDate }: { days: string[]; itemsByDate: 
                           {item.typeLabel}
                         </span>
                         <div className="flex items-center gap-1">
-                          {item.status === "proposed" && (
-                            <button type="button" className="btn btn-ghost" onClick={() => handleConfirm(item)}>
-                              Bestätigen
-                            </button>
-                          )}
                           <button
                             type="button"
                             className="btn btn-ghost"

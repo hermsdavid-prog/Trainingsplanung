@@ -45,7 +45,7 @@ export function CoachNotesBanner({ notes }: { notes: CoachNote[] }) {
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-2">
+    <div className="mt-4 mb-6 flex flex-col gap-2">
       {notes.map((n) => (
         <div key={n.id} className="p-3.5" style={{ background: "var(--dc-accent-100)", borderLeft: "2px solid var(--dc-accent)" }}>
           <div className="flex items-start justify-between gap-3">

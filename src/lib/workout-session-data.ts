@@ -103,7 +103,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     const existing = lastKnownByExercise[r.exercise_id];
     if (!existing || Number(r.value) > Number(existing.weight)) {
       lastKnownByExercise[r.exercise_id] = {
-        weight: String(r.value),
+        weight: String(r.value).replace(".", ","),
         reps: r.reps != null ? String(r.reps) : "",
       };
     }
@@ -153,7 +153,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
       setNumber: r.set_number,
       type: r.set_type === "aufwaermsatz" ? "aufwaermsatz" : "arbeitssatz",
       reps: r.reps != null ? String(r.reps) : "",
-      weight: String(r.value),
+      weight: String(r.value).replace(".", ","),
       rir: r.rir != null ? String(r.rir) : "",
       side: r.side === "links" || r.side === "rechts" ? r.side : null,
       date: r.date,

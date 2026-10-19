@@ -56,17 +56,15 @@ export function PlanFeedbackTable({
 
   const notesItem = items.find((i) => i.id === notesOpenId);
 
-  const kraftItems = items.filter((i) => !isAthletik || i.section !== "cardio");
+  // Leistungsdiagnostik (sprung) tests get their own table, like in the editor.
+  const sprungItems = items.filter((i) => isAthletik && i.section === "sprung");
+  const kraftItems = items.filter((i) => !isAthletik || (i.section !== "cardio" && i.section !== "sprung"));
   const cardioItems = items.filter((i) => isAthletik && i.section === "cardio");
 
-  if (items.length === 0) {
-    return <p className="text-sm text-muted">Für diesen Plan wurden noch keine Übungen eingetragen.</p>;
-  }
-
-  return (
-    <div className="flex flex-col gap-8">
-      <div>
-        {isAthletik && <div className="kicker-muted mb-2">Kraft</div>}
+  function renderTable(list: typeof items, label: string | null) {
+    return (
+      <div key={label ?? "items"}>
+        {label && <div className="kicker-muted mb-2">{label}</div>}
         <div className="overflow-x-auto">
         <table className="table" style={{ minWidth: 640 }}>
           <thead>
@@ -80,7 +78,7 @@ export function PlanFeedbackTable({
             </tr>
           </thead>
           <tbody>
-            {kraftItems.map((item) => {
+            {list.map((item) => {
               const row = getRow(item.id);
               return (
                 <tr key={item.id}>
@@ -119,6 +117,23 @@ export function PlanFeedbackTable({
         </table>
         </div>
       </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return <p className="text-sm text-muted">Für diesen Plan wurden noch keine Übungen eingetragen.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      {isAthletik ? (
+        <>
+          {sprungItems.length > 0 && renderTable(sprungItems, "Leistungsdiagnostik")}
+          {kraftItems.length > 0 && renderTable(kraftItems, "Kraft")}
+        </>
+      ) : (
+        renderTable(kraftItems, null)
+      )}
 
       {isAthletik && cardioItems.length > 0 && (
         <div>

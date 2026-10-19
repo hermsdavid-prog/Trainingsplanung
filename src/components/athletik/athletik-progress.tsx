@@ -4,6 +4,7 @@ import { ExerciseProgressChart } from "@/components/athletik/exercise-progress-c
 import { formatDateShort } from "@/lib/date";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
 import { VbtProfile } from "@/components/athletik/vbt-profile";
+import { formatNumber } from "@/lib/format";
 
 // One user's own Athletik progress per exercise (best work set per day,
 // estimated 1RM, history table) — the athlete's Athletik tab, and the
@@ -103,7 +104,7 @@ export async function AthletikProgress({
             <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2">
               <div className="flex items-baseline gap-2.5">
                 <span className="text-[28px] leading-none font-semibold" style={{ fontFamily: "var(--dc-font-heading)" }}>
-                  {best}
+                  {formatNumber(best)}
                   {resultUnit ? ` ${resultUnit}` : ""}
                 </span>
                 <span className="text-sm" style={{ color: "var(--dc-muted)" }}>
@@ -145,11 +146,11 @@ export async function AthletikProgress({
                         <tr key={r.date}>
                           <td>{formatDateShort(r.date)}</td>
                           <td>
-                            {r.value}
+                            {formatNumber(r.value)}
                             {r.unit ? ` ${r.unit}` : ""}
                           </td>
                           <td style={{ color: "color-mix(in srgb, var(--dc-text) 65%, transparent)" }}>{r.reps ?? "—"}</td>
-                          <td>{r.oneRm != null ? `${r.oneRm} ${r.unit ?? ""}` : "—"}</td>
+                          <td>{r.oneRm != null ? `${formatNumber(r.oneRm)} ${r.unit ?? ""}` : "—"}</td>
                         </tr>
                       ))}
                   </tbody>
