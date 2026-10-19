@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExerciseAnimation } from "@/components/exercises/exercise-animation";
+import { ExerciseAnimation, hasExerciseAnimation } from "@/components/exercises/exercise-animation";
 
 export type OverviewKraft = {
   id: string;
@@ -65,9 +65,10 @@ export function WorkoutOverview({
     ? (kraft.find((e) => e.id === instrId)?.exerciseId ?? cardio.find((c) => c.id === instrId)?.exerciseId)
     : karateRows.find((r) => r.id === instrId)?.exerciseId;
   const instr = instrExerciseId ? instructionsByExercise[instrExerciseId] : undefined;
-  const animation = instrExerciseId ? animationByExercise[instrExerciseId] : undefined;
+  const animationKey = instrExerciseId ? animationByExercise[instrExerciseId] : undefined;
+  const animation = hasExerciseAnimation(animationKey) ? animationKey : undefined;
   const hasGuide = (exerciseId: string) =>
-    (instructionsByExercise[exerciseId]?.steps.length ?? 0) > 0 || !!animationByExercise[exerciseId];
+    (instructionsByExercise[exerciseId]?.steps.length ?? 0) > 0 || hasExerciseAnimation(animationByExercise[exerciseId]);
 
   return (
     <div>

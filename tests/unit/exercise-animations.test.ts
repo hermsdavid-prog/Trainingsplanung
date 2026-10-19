@@ -15,7 +15,7 @@ describe("exercise animations", () => {
       for (const p of Object.values(j)) {
         expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true);
       }
-      if (!anim.frames.some((f) => f.lift)) {
+      if (!anim.frames.some((f) => f.lift || f.shift)) {
         expect(j[anim.anchor].x).toBeCloseTo(anim.anchorAt.x, 6);
         expect(j[anim.anchor].y).toBeCloseTo(anim.anchorAt.y, 6);
       }

@@ -12,7 +12,7 @@ import { saveSessionRpeAction } from "@/lib/actions/sessions";
 import { addSessionExerciseAction } from "@/lib/actions/session-exercises";
 import { upsertFeedbackAction } from "@/lib/actions/feedback";
 import { SuggestInput } from "@/components/ui/suggest-input";
-import { ExerciseAnimation } from "@/components/exercises/exercise-animation";
+import { ExerciseAnimation, hasExerciseAnimation } from "@/components/exercises/exercise-animation";
 import { CardioScreenshotField } from "@/components/athlete/cardio-screenshot-field";
 import { exerciseNoteKey } from "@/lib/exercise-note-key";
 import {
@@ -1804,7 +1804,7 @@ export function WorkoutSession({
                     ✕
                   </button>
                 </div>
-                {animation && <ExercisePreview animation={animation} />}
+                {hasExerciseAnimation(animation) && <ExercisePreview animation={animation} />}
                 <div className="mt-3.5">
                   {steps.length > 0 ? (
                     steps.map((s, i) => (

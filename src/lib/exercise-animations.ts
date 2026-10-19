@@ -21,7 +21,7 @@ export type Joint =
   | "elbow" | "wrist"
   | "elbow2" | "wrist2";
 
-export type Pose = Partial<Record<Seg, number>> & { lift?: number };
+export type Pose = Partial<Record<Seg, number>> & { lift?: number; shift?: number };
 export type Point = { x: number; y: number };
 export type Joints = Record<Joint, Point>;
 
@@ -46,13 +46,15 @@ export type ExerciseAnimation = {
   // Contact points that must not slide (hands on the floor, back foot on the
   // bench). The middle joint (elbow / knee) is solved so the end lands here.
   pins?: { wrist?: Point; ankle2?: Point };
+  // Per-segment length factors, e.g. a forearm pointing at the viewer.
+  scale?: Partial<Record<Seg, number>>;
   props?: (j: Joints) => Shape[];
 };
 
 export const LEN = { trunk: 50, neck: 15, thigh: 44, shin: 43, foot: 13, upper: 29, fore: 27 } as const;
 export const HEAD_R = 8.5;
 
-const STAND: Required<Omit<Pose, "lift">> = {
+const STAND: Required<Omit<Pose, "lift" | "shift">> = {
   trunk: 0, neck: 0,
   thigh: 180, shin: 180, foot: 92,
   thigh2: 180, shin2: 180, foot2: 92,
@@ -66,7 +68,7 @@ function dir(deg: number, len: number): Point {
 }
 const add = (a: Point, b: Point): Point => ({ x: a.x + b.x, y: a.y + b.y });
 
-export function fullPose(p: Pose): Required<Omit<Pose, "lift">> {
+export function fullPose(p: Pose): Required<Omit<Pose, "lift" | "shift">> {
   const s = { ...STAND, ...p };
   // Unless given separately, the far limbs mirror the near ones.
   if (p.thigh2 === undefined) s.thigh2 = s.thigh;
@@ -79,22 +81,23 @@ export function fullPose(p: Pose): Required<Omit<Pose, "lift">> {
 
 export function solve(anim: ExerciseAnimation, pose: Pose): Joints {
   const a = fullPose(pose);
+  const k = (seg: Seg) => anim.scale?.[seg] ?? 1;
   const hip = { x: 0, y: 0 };
-  const shoulder = add(hip, dir(a.trunk, LEN.trunk));
+  const shoulder = add(hip, dir(a.trunk, LEN.trunk * k("trunk")));
   const head = add(shoulder, dir(a.neck, LEN.neck));
-  const knee = add(hip, dir(a.thigh, LEN.thigh));
-  const ankle = add(knee, dir(a.shin, LEN.shin));
+  const knee = add(hip, dir(a.thigh, LEN.thigh * k("thigh")));
+  const ankle = add(knee, dir(a.shin, LEN.shin * k("shin")));
   const toe = add(ankle, dir(a.foot, LEN.foot));
-  const knee2 = add(hip, dir(a.thigh2, LEN.thigh));
-  const ankle2 = add(knee2, dir(a.shin2, LEN.shin));
+  const knee2 = add(hip, dir(a.thigh2, LEN.thigh * k("thigh2")));
+  const ankle2 = add(knee2, dir(a.shin2, LEN.shin * k("shin2")));
   const toe2 = add(ankle2, dir(a.foot2, LEN.foot));
-  const elbow = add(shoulder, dir(a.upper, LEN.upper));
-  const wrist = add(elbow, dir(a.fore, LEN.fore));
-  const elbow2 = add(shoulder, dir(a.upper2, LEN.upper));
-  const wrist2 = add(elbow2, dir(a.fore2, LEN.fore));
+  const elbow = add(shoulder, dir(a.upper, LEN.upper * k("upper")));
+  const wrist = add(elbow, dir(a.fore, LEN.fore * k("fore")));
+  const elbow2 = add(shoulder, dir(a.upper2, LEN.upper * k("upper2")));
+  const wrist2 = add(elbow2, dir(a.fore2, LEN.fore * k("fore2")));
   const j: Joints = { hip, shoulder, head, knee, ankle, toe, knee2, ankle2, toe2, elbow, wrist, elbow2, wrist2 };
   const ref = j[anim.anchor];
-  const dx = anim.anchorAt.x - ref.x;
+  const dx = anim.anchorAt.x - ref.x + (pose.shift ?? 0);
   const dy = anim.anchorAt.y - ref.y - (pose.lift ?? 0);
   for (const k of Object.keys(j) as Joint[]) j[k] = { x: j[k].x + dx, y: j[k].y + dy };
   if (anim.pins?.wrist) {
@@ -153,7 +156,10 @@ export function poseAt(anim: ExerciseAnimation, t: number): Pose {
       const k = ease(rest / move);
       const out: Pose = {};
       for (const key of Object.keys(from) as Seg[]) out[key] = from[key] + (to[key] - from[key]) * k;
-      out.lift = (anim.frames[i].lift ?? 0) + ((anim.frames[(i + 1) % n].lift ?? 0) - (anim.frames[i].lift ?? 0)) * k;
+      const a = anim.frames[i];
+      const b = anim.frames[(i + 1) % n];
+      out.lift = (a.lift ?? 0) + ((b.lift ?? 0) - (a.lift ?? 0)) * k;
+      out.shift = (a.shift ?? 0) + ((b.shift ?? 0) - (a.shift ?? 0)) * k;
       return out;
     }
     rest -= move;
@@ -168,6 +174,11 @@ const floor = (x1: number, x2: number): Shape => ({ kind: "line", a: { x: x1, y:
 const plate = (c: Point, r = 19): Shape[] => [
   { kind: "circle", c, r, tone: "equip" },
   { kind: "circle", c, r: 2.5, tone: "equip", fill: true },
+];
+// Kettlebell held at its handle: bell hangs `drop` units below the grip.
+const kettlebell = (grip: Point, drop = 9): Shape[] => [
+  { kind: "line", a: { x: grip.x - 4, y: grip.y }, b: { x: grip.x + 4, y: grip.y }, tone: "equip", width: 3 },
+  { kind: "circle", c: { x: grip.x, y: grip.y + drop }, r: 7.5, tone: "equip" },
 ];
 const box = (x: number, y: number, w: number, h: number): Shape => ({ kind: "rect", x, y, w, h, tone: "equip" });
 
@@ -389,6 +400,232 @@ export const EXERCISE_ANIMATIONS: Record<string, ExerciseAnimation> = {
       line({ x: -58, y: -150 }, { x: -58, y: FLOOR }, "ground", 6),
       line({ x: -58, y: j.shoulder.y + 8 }, j.wrist, "equip", 1.5),
       dot({ x: -58, y: j.shoulder.y + 8 }, 4.5),
+      dot(j.wrist, 3),
+    ],
+  },
+  "goblet-squat": {
+    label: "Goblet Squat",
+    anchor: "ankle",
+    anchorAt: ANKLE_UP,
+    frames: [
+      { trunk: 4, thigh: 180, shin: 181, upper: 165, fore: 22 },
+      { trunk: 24, thigh: 97, shin: 214, upper: 185, fore: 42 },
+    ],
+    moves: [1.4, 1.0],
+    holds: [0.5, 0.15],
+    props: (j) => [floor(-55, 60), ...kettlebell(j.wrist, 8)],
+  },
+  "einarmiges-rudern": {
+    label: "Einarmiges Rudern mit Handstütz",
+    anchor: "ankle",
+    anchorAt: ANKLE_UP,
+    farArm: true,
+    farLeg: true,
+    frames: [
+      { trunk: 84, neck: 80, thigh: 175, shin: 185, thigh2: 182, shin2: 268, foot2: 260, upper2: 146.4, fore2: 201.9, upper: 180, fore: 180 },
+      { trunk: 84, neck: 80, thigh: 175, shin: 185, thigh2: 182, shin2: 268, foot2: 260, upper2: 146.4, fore2: 201.9, upper: 252, fore: 178 },
+    ],
+    moves: [1.0, 1.4],
+    holds: [0.3, 0.4],
+    props: (j) => [floor(-60, 95), ...flatBench(-52, 70, -45), ...kettlebell(j.wrist, 9)],
+  },
+  schulterdruecken: {
+    label: "Schulterdrücken im Stand",
+    anchor: "ankle",
+    anchorAt: ANKLE_UP,
+    frames: [
+      { trunk: 2, upper: 165, fore: 5 },
+      { trunk: 0, upper: 2, fore: 0 },
+    ],
+    moves: [1.0, 1.4],
+    holds: [0.4, 0.3],
+    props: (j) => [floor(-50, 55), ...kettlebell({ x: j.wrist.x - 3, y: j.wrist.y }, 6)],
+  },
+  "face-pulls": {
+    label: "Face Pulls",
+    anchor: "ankle",
+    anchorAt: ANKLE_UP,
+    frames: [
+      { trunk: 352, thigh: 176, shin: 184, upper: 72, fore: 76 },
+      { trunk: 355, thigh: 176, shin: 184, upper: 300, fore: 85 },
+    ],
+    moves: [1.0, 1.3],
+    holds: [0.3, 0.5],
+    props: (j) => [
+      floor(-50, 95),
+      line({ x: 92, y: -175 }, { x: 92, y: FLOOR }, "ground", 6),
+      line({ x: 92, y: -142 }, j.wrist, "equip", 1.5),
+      dot({ x: 92, y: -142 }, 4.5),
+      dot(j.wrist, 3),
+    ],
+  },
+  "landmine-schulterdruecken": {
+    label: "Landmine Schulterdrücken (halbkniend)",
+    anchor: "ankle",
+    anchorAt: ANKLE_UP,
+    farLeg: true,
+    frames: [
+      { trunk: 2, thigh: 90, shin: 180, thigh2: 180, shin2: 270, foot2: 255, upper: 170, fore: 10 },
+      { trunk: 6, thigh: 90, shin: 180, thigh2: 180, shin2: 270, foot2: 255, upper: 55, fore: 55 },
+    ],
+    moves: [1.0, 1.3],
+    holds: [0.4, 0.3],
+    props: (j) => [floor(-100, 95), line({ x: 85, y: -3 }, j.wrist, "equip", 4), dot({ x: 85, y: -3 }, 4)],
+  },
+  "step-down": {
+    label: "Step-down einbeinig",
+    anchor: "ankle",
+    anchorAt: { x: 0, y: -30 },
+    farLeg: true,
+    frames: [
+      { trunk: 4, thigh: 178, shin: 182, thigh2: 162, shin2: 172, foot2: 100, upper: 165, fore: 150 },
+      { trunk: 16, thigh: 110, shin: 212, thigh2: 150, shin2: 150, foot2: 70, upper: 75, fore: 78 },
+    ],
+    moves: [2.2, 1.0],
+    holds: [0.4, 0.2],
+    props: () => [floor(-40, 60), box(-26, -24, 40, 24)],
+  },
+  "hollow-body-hold": {
+    label: "Hollow Body Hold",
+    anchor: "hip",
+    anchorAt: { x: 0, y: -8 },
+    frames: [
+      { trunk: 284, neck: 282, thigh: 77, shin: 77, foot: 50, upper: 290, fore: 288 },
+      { trunk: 284, neck: 282, thigh: 77, shin: 77, foot: 50, upper: 290, fore: 288 },
+    ],
+    moves: [0, 0],
+    holds: [2, 0],
+    props: () => [floor(-125, 100)],
+  },
+  seitstuetz: {
+    label: "Seitstütz",
+    anchor: "toe",
+    anchorAt: { x: 0, y: 0 },
+    farArm: true,
+    scale: { fore: 0.35 },
+    frames: [
+      { trunk: 278.7, neck: 276, thigh: 98.7, shin: 98.7, foot: 190, upper: 180, fore: 270, upper2: 0, fore2: 0 },
+      { trunk: 278.7, neck: 276, thigh: 98.7, shin: 98.7, foot: 190, upper: 180, fore: 270, upper2: 0, fore2: 0 },
+    ],
+    moves: [0, 0],
+    holds: [2, 0],
+    props: () => [floor(-150, 20)],
+  },
+  "gymball-rollout": {
+    label: "Gymball Rollout",
+    anchor: "knee",
+    anchorAt: { x: 0, y: -5 },
+    frames: [
+      { trunk: 50, neck: 55, thigh: 165, shin: 270, foot: 255, upper: 170, fore: 90 },
+      { trunk: 76, neck: 78, thigh: 200, shin: 270, foot: 255, upper: 102, fore: 90 },
+    ],
+    moves: [1.8, 1.4],
+    holds: [0.4, 0.4],
+    props: (j) => [
+      floor(-60, 150),
+      { kind: "circle", c: { x: (j.elbow.x + j.wrist.x) / 2, y: -25 }, r: 25, tone: "equip" },
+    ],
+  },
+  "trizeps-kabelzug": {
+    label: "Trizepsdrücken am Kabelzug",
+    anchor: "ankle",
+    anchorAt: ANKLE_UP,
+    frames: [
+      { trunk: 10, thigh: 176, shin: 184, upper: 172, fore: 25 },
+      { trunk: 10, thigh: 176, shin: 184, upper: 172, fore: 178 },
+    ],
+    moves: [0.9, 1.3],
+    holds: [0.3, 0.4],
+    props: (j) => [
+      floor(-50, 70),
+      line({ x: 58, y: -190 }, { x: 58, y: FLOOR }, "ground", 6),
+      line({ x: 52, y: -178 }, j.wrist, "equip", 1.5),
+      dot({ x: 52, y: -178 }, 4.5),
+      dot(j.wrist, 3),
+    ],
+  },
+  "bizeps-kabelzug": {
+    label: "Bizepscurl am Kabelzug",
+    anchor: "ankle",
+    anchorAt: ANKLE_UP,
+    frames: [
+      { trunk: 358, upper: 178, fore: 172 },
+      { trunk: 358, upper: 172, fore: 22 },
+    ],
+    moves: [1.0, 1.4],
+    holds: [0.3, 0.4],
+    props: (j) => [
+      floor(-50, 70),
+      line({ x: 58, y: -60 }, { x: 58, y: FLOOR }, "ground", 6),
+      line({ x: 52, y: -12 }, j.wrist, "equip", 1.5),
+      dot({ x: 52, y: -12 }, 4.5),
+      dot(j.wrist, 3),
+    ],
+  },
+  beinstrecker: {
+    label: "Beinstrecker",
+    anchor: "hip",
+    anchorAt: { x: 0, y: -55 },
+    frames: [
+      { trunk: 352, thigh: 90, shin: 182, foot: 95, upper: 172, fore: 140 },
+      { trunk: 352, thigh: 90, shin: 88, foot: 10, upper: 172, fore: 140 },
+    ],
+    moves: [1.0, 1.6],
+    holds: [0.3, 0.6],
+    props: (j) => [
+      floor(-45, 110),
+      box(-14, -50, 52, 6),
+      line({ x: 12, y: -44 }, { x: 12, y: FLOOR }),
+      line({ x: -16, y: -50 }, { x: -24, y: -120 }, "equip", 5),
+      { kind: "circle", c: { x: j.ankle.x + (j.toe.x - j.ankle.x) * 0.1, y: j.ankle.y + (j.toe.y - j.ankle.y) * 0.1 }, r: 5, tone: "equip", fill: true },
+    ],
+  },
+  "pogo-jumps": {
+    label: "Pogo Jumps",
+    anchor: "ankle",
+    anchorAt: ANKLE_UP,
+    frames: [
+      { trunk: 3, thigh: 176, shin: 184, foot: 140, upper: 195, fore: 150, lift: 6 },
+      { trunk: 3, thigh: 178, shin: 180, foot: 150, upper: 195, fore: 150, lift: 20 },
+    ],
+    moves: [0.16, 0.16],
+    holds: [0.04, 0],
+    props: () => [floor(-45, 55)],
+  },
+  "hop-and-stick": {
+    label: "Hop and Stick einbeinig",
+    anchor: "ankle",
+    anchorAt: { x: -40, y: -6 },
+    farLeg: true,
+    frames: [
+      { trunk: 6, thigh: 178, shin: 182, thigh2: 165, shin2: 220, foot2: 120, upper: 175, fore: 170 },
+      { trunk: 34, thigh: 125, shin: 205, thigh2: 135, shin2: 235, foot2: 130, upper: 225, fore: 215 },
+      { trunk: 14, thigh: 185, shin: 175, foot: 150, thigh2: 140, shin2: 210, foot2: 120, upper: 40, fore: 30, lift: 18, shift: 40 },
+      { trunk: 30, thigh: 128, shin: 206, thigh2: 135, shin2: 235, foot2: 130, upper: 100, fore: 95, shift: 80 },
+      { trunk: 6, thigh: 178, shin: 182, thigh2: 165, shin2: 220, foot2: 120, upper: 175, fore: 170, shift: 80 },
+    ],
+    // Hop, hold the landing ("stick"), stand up, then step back to the start.
+    moves: [0.5, 0.3, 0.3, 0.9, 0.8],
+    holds: [0.5, 0.05, 0, 1.2, 0.2],
+    props: () => [floor(-70, 85)],
+  },
+  "kabel-rudern": {
+    label: "Rudern am Kabelzug (sitzend)",
+    anchor: "hip",
+    anchorAt: { x: 0, y: -42 },
+    frames: [
+      { trunk: 10, thigh: 75, shin: 125, foot: 20, upper: 88, fore: 90 },
+      { trunk: -4, thigh: 75, shin: 125, foot: 20, upper: 205, fore: 88 },
+    ],
+    moves: [1.0, 1.4],
+    holds: [0.3, 0.5],
+    props: (j) => [
+      floor(-45, 125),
+      box(-24, -37, 48, 6),
+      line({ x: 0, y: -31 }, { x: 0, y: FLOOR }),
+      line({ x: 112, y: -95 }, { x: 112, y: FLOOR }, "ground", 6),
+      line({ x: 105, y: -70 }, j.wrist, "equip", 1.5),
+      dot({ x: 105, y: -70 }, 4.5),
       dot(j.wrist, 3),
     ],
   },
