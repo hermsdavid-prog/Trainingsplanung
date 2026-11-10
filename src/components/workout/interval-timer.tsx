@@ -16,10 +16,19 @@ const SOUND_KEY = "interval-timer-sound";
 
 // ---------- sound ----------
 // Tones are generated with Web Audio (no files to load). iOS only plays
-// audio after a user gesture, so the context is created and resumed in the
-// Start button's click handler.
+// audio after a user gesture, so everything below runs inside the Start
+// (or "Ton testen") click handler.
+//
+// iOS also treats Web Audio like a ringtone: with the ring/silent switch
+// on, it stays mute. Two ways out of that, both needed for older and newer
+// iOS: the Audio Session API ("playback" ignores the switch, iOS 17+), and,
+// where that API is missing, a looping silent <audio> element, which moves
+// the page into the media-playback category while it plays.
 
 type AudioCtxCtor = typeof AudioContext;
+type AudioSessionNav = Navigator & { audioSession?: { type: string } };
+
+export type TimerAudio = { ctx: AudioContext | null; release: () => void };
 
 function createAudioContext(): AudioContext | null {
   const Ctor: AudioCtxCtor | undefined =
@@ -32,6 +41,59 @@ function createAudioContext(): AudioContext | null {
   } catch {
     return null;
   }
+}
+
+// Must be called synchronously from a click/tap handler.
+function startAudio(): TimerAudio {
+  const nav = navigator as AudioSessionNav;
+  const previousType = nav.audioSession?.type;
+  let silent: HTMLAudioElement | null = null;
+  try {
+    if (nav.audioSession) nav.audioSession.type = "playback";
+  } catch {
+    // Not settable here: fall through to the <audio> element.
+  }
+  if (!nav.audioSession) {
+    try {
+      silent = new Audio("/sounds/silence.wav");
+      silent.loop = true;
+      silent.setAttribute("playsinline", "");
+      void silent.play().catch(() => {});
+    } catch {
+      silent = null;
+    }
+  }
+
+  const ctx = createAudioContext();
+  if (ctx) {
+    void ctx.resume().catch(() => {});
+    // Starting a (silent) source inside the gesture unlocks older iOS.
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = ctx.createBuffer(1, 1, 22050);
+      src.connect(ctx.destination);
+      src.start(0);
+    } catch {
+      // Nothing to unlock.
+    }
+  }
+
+  return {
+    ctx,
+    release: () => {
+      void ctx?.close().catch(() => {});
+      if (silent) {
+        silent.pause();
+        silent.removeAttribute("src");
+        silent.load();
+      }
+      try {
+        if (nav.audioSession && previousType) nav.audioSession.type = previousType;
+      } catch {
+        // Leave it as it is.
+      }
+    },
+  };
 }
 
 function tone(ctx: AudioContext, freq: number, ms: number, delayMs = 0, volume = 0.35) {
@@ -85,7 +147,13 @@ function writeSoundPref(on: boolean) {
 
 export function IntervalTimerButton({ items, className = "" }: { items: TimerItem[]; className?: string }) {
   const [setupOpen, setSetupOpen] = useState(false);
-  const [run, setRun] = useState<{ phases: TimerPhase[]; ctx: AudioContext | null } | null>(null);
+  const [run, setRun] = useState<{ phases: TimerPhase[]; audio: TimerAudio } | null>(null);
+  // Leaving the page mid-run: hand the audio session back.
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
+  useEffect(() => () => runRef.current?.audio.release(), []);
 
   if (items.length === 0) return null;
 
@@ -99,20 +167,18 @@ export function IntervalTimerButton({ items, className = "" }: { items: TimerIte
           items={items}
           onClose={() => setSetupOpen(false)}
           onStart={(phases) => {
-            const ctx = createAudioContext();
-            // Resume inside the click: this is what unlocks audio on iOS.
-            void ctx?.resume().catch(() => {});
+            const audio = startAudio();
             setSetupOpen(false);
-            setRun({ phases, ctx });
+            setRun({ phases, audio });
           }}
         />
       )}
       {run && (
         <TimerRunner
           phases={run.phases}
-          audio={run.ctx}
+          audio={run.audio.ctx}
           onClose={() => {
-            void run.ctx?.close().catch(() => {});
+            run.audio.release();
             setRun(null);
           }}
         />
@@ -225,7 +291,18 @@ function TimerSetup({
 
         <button
           type="button"
-          className="btn btn-primary btn-block mt-4"
+          className="btn btn-ghost btn-block mt-3"
+          onClick={() => {
+            const audio = startAudio();
+            if (audio.ctx) SOUNDS.work(audio.ctx);
+            window.setTimeout(audio.release, 1500);
+          }}
+        >
+          <span aria-hidden>🔊</span> Ton testen
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary btn-block mt-2"
           disabled={chosen.length === 0}
           onClick={() => onStart(phases)}
         >
