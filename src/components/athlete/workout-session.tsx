@@ -186,9 +186,9 @@ const VBT_GRID = "76px 38px minmax(0,1fr) 46px 40px 36px";
 // Jump test with contact time / RSI: Versuch · Höhe · Kontakt · RSI · ✓ · ✕.
 const JUMP_GRID = "64px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 40px 36px";
 
-// Bottom sheets: clear of the iPhone home indicator, scrollable on short screens.
 const NO_TIMER_ITEMS: TimerItem[] = [];
 
+// Bottom sheets: clear of the iPhone home indicator, scrollable on short screens.
 const SHEET_STYLE = {
   background: "var(--dc-surface)",
   paddingBottom: "max(26px, calc(env(safe-area-inset-bottom) + 12px))",
