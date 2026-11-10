@@ -23,6 +23,8 @@ import {
   type ExerciseNoteState,
 } from "@/components/athlete/exercise-notes";
 import type { BadgeAward } from "@/lib/badges";
+import type { TimerItem } from "@/lib/interval-timer";
+import { IntervalTimerButton } from "@/components/workout/interval-timer";
 import { SIDE_LABEL, countSets, isPairedRight, type Side } from "@/lib/per-side";
 import { computeRsi, parseDecimal, type JumpMetrics } from "@/lib/jump-metrics";
 import {
@@ -185,6 +187,8 @@ const VBT_GRID = "76px 38px minmax(0,1fr) 46px 40px 36px";
 const JUMP_GRID = "64px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 40px 36px";
 
 // Bottom sheets: clear of the iPhone home indicator, scrollable on short screens.
+const NO_TIMER_ITEMS: TimerItem[] = [];
+
 const SHEET_STYLE = {
   background: "var(--dc-surface)",
   paddingBottom: "max(26px, calc(env(safe-area-inset-bottom) + 12px))",
@@ -438,6 +442,7 @@ export function WorkoutSession({
   exercises: initialExercises,
   cardio,
   karateRows,
+  timerItems = NO_TIMER_ITEMS,
   instructionsByExercise,
   animationByExercise = NO_ANIMATIONS,
   initialRpe,
@@ -459,6 +464,8 @@ export function WorkoutSession({
   exercises: SessionExercise[];
   cardio: SessionCardio[];
   karateRows: SessionKarateRow[];
+  // Timed Runden/Cardio rows the interval timer can run.
+  timerItems?: TimerItem[];
   instructionsByExercise: Record<string, ExerciseInstructions>;
   animationByExercise?: Record<string, string>;
   initialRpe: number | null;
@@ -1121,6 +1128,7 @@ export function WorkoutSession({
       <div className="mt-2.5">
         <div className="kicker">{planKicker}</div>
         <h2 className="mt-1.5 text-[27px] leading-[1.08]">{planTitle}</h2>
+        {editMode && <IntervalTimerButton items={timerItems} className="mt-3.5" />}
 
         {!editMode && (
           <div className="mt-5">

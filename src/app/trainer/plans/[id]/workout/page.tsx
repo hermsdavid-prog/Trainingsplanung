@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateLabel } from "@/lib/date";
+import { toTimerItems } from "@/lib/interval-timer";
+import { IntervalTimerButton } from "@/components/workout/interval-timer";
 import {
   WorkoutOverview,
   type OverviewKraft,
@@ -121,6 +123,7 @@ export default async function TrainerPlanWorkoutPage({
         </div>
         <h2 className="mt-1.5 text-[27px] leading-[1.08]">{plan.title}</h2>
       </div>
+      <IntervalTimerButton items={toTimerItems(items ?? [])} className="mt-4" />
       <div className="mt-5 max-w-[560px]">
         <WorkoutOverview
           isAthletik={isAthletik}

@@ -8,6 +8,7 @@ import { occurrenceOfSet, setNumberBase } from "@/lib/set-numbers";
 import { testUnit } from "@/lib/test-unit";
 import { computeRsi, jumpMetrics } from "@/lib/jump-metrics";
 import { defaultMvt, fitLoadVelocity, vbtSpec } from "@/lib/vbt";
+import { toTimerItems } from "@/lib/interval-timer";
 import type { SessionExercise, SessionCardio, SessionKarateRow } from "@/components/athlete/workout-session";
 
 const VBT_PROFILE_DAYS = 56;
@@ -318,6 +319,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     exercises,
     cardio,
     karateRows,
+    timerItems: toTimerItems(items ?? []),
     instructionsByExercise,
     animationByExercise,
     initialRpe: rating?.rpe ?? null,
