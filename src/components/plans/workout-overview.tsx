@@ -23,6 +23,7 @@ export type OverviewCardio = {
   on: string;
   off: string;
   exerciseId: string | null;
+  linkUrl?: string;
 };
 
 export type OverviewKarateRow = {
@@ -33,6 +34,7 @@ export type OverviewKarateRow = {
   restLabel: string;
   valLabel: string;
   exerciseId: string | null;
+  linkUrl?: string;
 };
 
 type Instructions = { steps: string[]; video_url: string | null; video_label: string | null };
@@ -132,6 +134,17 @@ export function WorkoutOverview({
                           {c.off && ` · Off ${c.off} Pause`}
                           {c.restLabel && ` · Pause ${c.restLabel}`}
                         </div>
+                        {c.linkUrl && (
+                          <a
+                            href={c.linkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 inline-block text-xs"
+                            style={{ color: "var(--dc-accent-700)" }}
+                          >
+                            ▸ Video ansehen
+                          </a>
+                        )}
                       </div>
                       {c.exerciseId && hasGuide(c.exerciseId) && (
                         <button
@@ -171,6 +184,17 @@ export function WorkoutOverview({
                         {row.rounds ? ` · ${row.rounds} Runden` : ""}
                         {row.restLabel ? ` · Pause ${row.restLabel}` : ""}
                       </div>
+                      {row.linkUrl && (
+                        <a
+                          href={row.linkUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-block text-xs"
+                          style={{ color: "var(--dc-accent-700)" }}
+                        >
+                          ▸ Video ansehen
+                        </a>
+                      )}
                     </div>
                     {row.exerciseId && hasGuide(row.exerciseId) && (
                       <button

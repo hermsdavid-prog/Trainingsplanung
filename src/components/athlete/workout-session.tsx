@@ -136,6 +136,7 @@ export type SessionCardio = {
   on: string;
   off: string;
   note: string;
+  linkUrl?: string;
   // The athlete's own entered outcome (e.g. "7 Runden"), stored as
   // athlete_feedback.actual_value for this plan item.
   result: string;
@@ -1558,6 +1559,17 @@ export function WorkoutSession({
                       {c.off && ` · Off ${c.off} Pause`}
                       {c.note && ` · ${c.note}`}
                     </div>
+                  )}
+                  {c.linkUrl && (
+                    <a
+                      href={c.linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1.5 inline-block text-[13px]"
+                      style={{ color: "var(--dc-accent-700)" }}
+                    >
+                      ▸ Video ansehen
+                    </a>
                   )}
                   <SelfNoteReminder note={notes[c.itemId]?.self ?? null} />
                   <div className="field mt-3" style={{ margin: 0, marginTop: 12 }}>

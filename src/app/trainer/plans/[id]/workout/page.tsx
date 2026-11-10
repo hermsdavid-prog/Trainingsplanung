@@ -84,6 +84,7 @@ export default async function TrainerPlanWorkoutPage({
       on: i.heart_rate_on ?? "",
       off: i.heart_rate_off ?? "",
       exerciseId: i.exercise_id,
+      linkUrl: i.link_url ?? "",
     }));
   const karateRows: OverviewKarateRow[] = (items ?? [])
     .filter((i) => i.section === "runden")
@@ -95,6 +96,7 @@ export default async function TrainerPlanWorkoutPage({
       restLabel: i.round_rest ?? i.rest_time ?? "",
       valLabel: i.reps_or_duration ?? "",
       exerciseId: i.exercise_id,
+      linkUrl: i.link_url ?? "",
     }));
 
   const who = plan.scope_type === "group" ? plan.groups?.name : plan.profiles?.full_name;

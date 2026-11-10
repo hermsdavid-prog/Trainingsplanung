@@ -270,6 +270,7 @@ export async function loadWorkoutSession(supabase: SupabaseClient<Database>, pla
     on: item.heart_rate_on ?? "",
     off: item.heart_rate_off ?? "",
     note: item.notes ?? "",
+    linkUrl: item.link_url ?? "",
     result: cardioResultByItem.get(item.id) ?? "",
     screenshotUrl: screenshotUrlByItem.get(item.id) ?? null,
     ...noteFields(item.id),
