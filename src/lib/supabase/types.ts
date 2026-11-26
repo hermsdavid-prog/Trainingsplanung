@@ -241,6 +241,7 @@ export type Database = {
           athlete_id: string
           created_at: string
           created_by: string | null
+          reason: string | null
           self_reported: boolean
           session_id: string
         }
@@ -248,6 +249,7 @@ export type Database = {
           athlete_id: string
           created_at?: string
           created_by?: string | null
+          reason?: string | null
           self_reported?: boolean
           session_id: string
         }
@@ -255,6 +257,7 @@ export type Database = {
           athlete_id?: string
           created_at?: string
           created_by?: string | null
+          reason?: string | null
           self_reported?: boolean
           session_id?: string
         }

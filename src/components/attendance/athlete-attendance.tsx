@@ -26,7 +26,7 @@ export async function AthleteAttendance({ athleteId, today }: { athleteId: strin
           .filter((s) => !s.cancelled_at)
           .map((s) => {
             const absence = upcoming.absences.find((a) => a.session_id === s.id && a.athlete_id === athleteId);
-            return { ...s, absent: !!absence, selfReported: absence?.self_reported ?? false };
+            return { ...s, absent: !!absence, selfReported: absence?.self_reported ?? false, reason: absence?.reason ?? null };
           }),
       };
     })
@@ -44,7 +44,7 @@ export async function AthleteAttendance({ athleteId, today }: { athleteId: strin
               </span>
             )}
           </div>
-          <p className="mt-1 text-xs text-muted">Du bist automatisch eingetragen. Kannst du nicht kommen, melde dich ab.</p>
+          <p className="mt-1 text-xs text-muted">Du bist automatisch eingetragen. Kannst du nicht kommen, melde dich ab. Einen Grund kannst du angeben, musst du aber nicht.</p>
           <AttendanceSignoffList sessions={sessions} today={today} />
         </div>
       ))}

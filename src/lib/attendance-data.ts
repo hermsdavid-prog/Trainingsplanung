@@ -64,7 +64,7 @@ export async function loadSessions(
   for (let i = 0; i < ids.length; i += 150) {
     const { data } = await supabase
       .from("attendance_absences")
-      .select("session_id, athlete_id, self_reported")
+      .select("session_id, athlete_id, self_reported, reason")
       .in("session_id", ids.slice(i, i + 150));
     absences.push(...(data ?? []));
   }

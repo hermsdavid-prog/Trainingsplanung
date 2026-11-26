@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { currentMonthStr, formatMonthLabel, formatWeekdayShort, getMonthGridDays, getWeekDays, shiftMonthStr, todayISO, utcISOToAppDateString, appWallTimeToUTCISOString, shiftDateISO } from "@/lib/date";
 import { CalendarGrid, type CalendarItem } from "@/components/calendar/calendar-grid";
 import { ProposeEventDialog } from "@/components/calendar/propose-event-dialog";
+import { AthleteAttendance } from "@/components/attendance/athlete-attendance";
 
 const INDIVIDUAL_PLAN_COLOR = "#4b3793";
 
@@ -33,6 +34,9 @@ export default async function AthleteCalendarPage({
   const rangeEnd = days[days.length - 1] > weekDays[6] ? days[days.length - 1] : weekDays[6];
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data: myGroups } = await supabase
     .from("group_athletes")
@@ -183,6 +187,8 @@ export default async function AthleteCalendarPage({
       <div className="mt-3">
         <CalendarGrid monthStr={month} days={days} itemsByDate={itemsByDate} todayStr={today} />
       </div>
+
+      {user && <AthleteAttendance athleteId={user.id} today={today} />}
 
       <div className="kicker mt-6.5">Diese Woche</div>
       <div className="mt-3">

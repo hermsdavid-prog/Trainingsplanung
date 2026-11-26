@@ -16,6 +16,7 @@ export type AttendanceAbsence = {
   session_id: string;
   athlete_id: string;
   self_reported: boolean;
+  reason: string | null;
 };
 
 export type AttendanceQuota = { present: number; total: number; pct: number | null };
@@ -58,6 +59,9 @@ export function computeQuotas(
   }
   return result;
 }
+
+// Quick picks for the optional reason; free text is allowed as well.
+export const ABSENCE_REASONS = ["Krank", "Verletzt", "Schule", "Wettkampf", "Familie"];
 
 export type AttendancePeriod = "month" | "4weeks" | "all";
 

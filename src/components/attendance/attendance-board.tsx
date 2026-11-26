@@ -37,7 +37,7 @@ export function AttendanceBoard({
 
   const absenceOf = (sessionId: string, athleteId: string) => {
     const key = `${sessionId}:${athleteId}`;
-    if (key in pending) return pending[key] ? { self_reported: false } : null;
+    if (key in pending) return pending[key] ? { self_reported: false, reason: null } : null;
     return absences.find((a) => a.session_id === sessionId && a.athlete_id === athleteId) ?? null;
   };
 
@@ -154,8 +154,15 @@ export function AttendanceBoard({
                           >
                             {absence ? "✕" : "✓"}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-[15px]" style={{ color: absence ? "var(--dc-muted)" : undefined }}>
-                            {m.full_name}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[15px]" style={{ color: absence ? "var(--dc-muted)" : undefined }}>
+                              {m.full_name}
+                            </span>
+                            {absence?.reason && (
+                              <span className="block text-xs" style={{ color: "var(--dc-accent-2-700)" }}>
+                                Grund: {absence.reason}
+                              </span>
+                            )}
                           </span>
                           {absence && (
                             <span className="flex-none text-xs" style={{ color: "var(--dc-accent-2-700)" }}>

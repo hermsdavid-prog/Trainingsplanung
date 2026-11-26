@@ -19,6 +19,7 @@ async function requireUser() {
 function revalidate() {
   revalidatePath("/trainer/attendance");
   revalidatePath("/athlete");
+  revalidatePath("/athlete/calendar");
 }
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -93,8 +94,9 @@ export async function createExtraSessionAction(input: {
   return {};
 }
 
-// Athlete: sign off from a session today or later, or take it back.
-export async function setOwnAbsenceAction(sessionId: string, absent: boolean): Promise<ActionResult> {
+// Athlete: sign off from a session today or later (optionally with a reason),
+// or take it back. Signing off again only updates the reason.
+export async function setOwnAbsenceAction(sessionId: string, absent: boolean, reason?: string): Promise<ActionResult> {
   const { supabase, userId } = await requireUser();
   const { data: session } = await supabase
     .from("attendance_sessions")
@@ -103,18 +105,33 @@ export async function setOwnAbsenceAction(sessionId: string, absent: boolean): P
     .maybeSingle();
   if (!session || session.cancelled_at) return { error: "Dieses Training findet nicht statt." };
   if (session.date < todayISO()) return { error: "Vergangene Trainings kann nur der Trainer ändern." };
-  const { error } = absent
-    ? await supabase
-        .from("attendance_absences")
-        .insert({ session_id: sessionId, athlete_id: userId, self_reported: true, created_by: userId })
-    : await supabase
-        .from("attendance_absences")
-        .delete()
-        .eq("session_id", sessionId)
-        .eq("athlete_id", userId)
-        .eq("self_reported", true);
-  if (error) {
-    return { error: absent ? "Abmeldung konnte nicht gespeichert werden." : "Abmeldung konnte nicht zurückgenommen werden." };
+
+  if (!absent) {
+    const { error } = await supabase
+      .from("attendance_absences")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq("athlete_id", userId)
+      .eq("self_reported", true);
+    if (error) return { error: "Abmeldung konnte nicht zurückgenommen werden." };
+    revalidate();
+    return {};
+  }
+
+  const cleanReason = reason?.trim().slice(0, 200) || null;
+  const { error } = await supabase
+    .from("attendance_absences")
+    .insert({ session_id: sessionId, athlete_id: userId, self_reported: true, created_by: userId, reason: cleanReason });
+  if (error?.code === "23505") {
+    const { error: updateError } = await supabase
+      .from("attendance_absences")
+      .update({ reason: cleanReason })
+      .eq("session_id", sessionId)
+      .eq("athlete_id", userId)
+      .eq("self_reported", true);
+    if (updateError) return { error: "Grund konnte nicht gespeichert werden." };
+  } else if (error) {
+    return { error: "Abmeldung konnte nicht gespeichert werden." };
   }
   revalidate();
   return {};
