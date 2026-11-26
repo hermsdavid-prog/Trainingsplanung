@@ -4,6 +4,7 @@ import { todayISO, shiftDateISO, formatDateLabel } from "@/lib/date";
 import { ProposedEventsWidget, type ProposedEvent } from "@/components/calendar/proposed-events-widget";
 import { ReadinessPanel, type ReadinessRow } from "@/components/trainer/readiness-panel";
 import { AthleteHints, type AthleteHint } from "@/components/trainer/athlete-hints";
+import { TrainerAbsencesWidget } from "@/components/attendance/trainer-absences-widget";
 import {
   computeHealthStatus,
   HEALTH_STATUS_LABEL,
@@ -204,6 +205,8 @@ export default async function TrainerDashboardPage() {
       <ProposedEventsWidget events={proposedEvents} />
 
       <AthleteHints hints={athleteHints} />
+
+      <TrainerAbsencesWidget today={today} />
 
       {[
         { label: "Heute", plans: plansToday },
