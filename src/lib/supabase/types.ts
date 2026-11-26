@@ -236,6 +236,192 @@ export type Database = {
           },
         ]
       }
+      attendance_absences: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          created_by: string | null
+          self_reported: boolean
+          session_id: string
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          created_by?: string | null
+          self_reported?: boolean
+          session_id: string
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          created_by?: string | null
+          self_reported?: boolean
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_absences_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_absences_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_absences_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_roster_groups: {
+        Row: {
+          group_id: string
+          roster_id: string
+        }
+        Insert: {
+          group_id: string
+          roster_id: string
+        }
+        Update: {
+          group_id?: string
+          roster_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_roster_groups_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_roster_groups_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_rosters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_rosters: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      attendance_schedule: {
+        Row: {
+          end_time: string
+          id: string
+          roster_id: string
+          start_time: string
+          valid_from: string
+          valid_until: string | null
+          weekday: number
+        }
+        Insert: {
+          end_time: string
+          id?: string
+          roster_id: string
+          start_time: string
+          valid_from?: string
+          valid_until?: string | null
+          weekday: number
+        }
+        Update: {
+          end_time?: string
+          id?: string
+          roster_id?: string
+          start_time?: string
+          valid_from?: string
+          valid_until?: string | null
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_schedule_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_rosters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_sessions: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          created_by: string | null
+          date: string
+          end_time: string
+          id: string
+          kind: string
+          note: string | null
+          roster_id: string
+          start_time: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          date: string
+          end_time: string
+          id?: string
+          kind?: string
+          note?: string | null
+          roster_id: string
+          start_time: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          end_time?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          roster_id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_sessions_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_rosters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           all_day: boolean
@@ -1145,6 +1331,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ensure_attendance_sessions: {
+        Args: { p_from: string; p_roster: string; p_to: string }
+        Returns: undefined
+      }
       expired_cardio_screenshots: {
         Args: { max_age: string }
         Returns: string[]

@@ -20,6 +20,7 @@ import { ExerciseTrendList } from "@/components/athletik/exercise-trend-list";
 import { HealthChart } from "@/components/health/health-chart";
 import { CoachNotesBanner } from "@/components/athletes/coach-notes-banner";
 import { BadgesList } from "@/components/athletes/badges-list";
+import { AthleteAttendance } from "@/components/attendance/athlete-attendance";
 import { GoalsPanel, type MesocycleGoalGroup } from "@/components/athletes/goals-panel";
 
 const LEVEL_TAG: Record<HealthStatusLevel, string> = {
@@ -344,6 +345,8 @@ export default async function AthleteTodayPage({
           <Link href="/athlete/plans/new" className="btn btn-secondary btn-block">
             + Eigenes Training erstellen
           </Link>
+
+          {user && date === today && <AthleteAttendance athleteId={user.id} today={today} />}
 
           {/* Today's training comes first; goals and the kickoff prompt
               follow below it instead of pushing it off the screen. */}
